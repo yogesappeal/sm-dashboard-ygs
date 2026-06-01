@@ -106,7 +106,7 @@ function POSupplierFormInner() {
       site_information: siteInfo,
       type: 'supplier',
       status: isDraft ? 'PO Draft' : 'PO Submitted',
-      sm_name: user?.fullName ?? '',
+      sm_name: user?.full_name ?? '',
       order_details: materials.map((r) => ({
         description: r.description,
         quantity: parseFloat(r.qty) || 0,
@@ -157,7 +157,7 @@ function POSupplierFormInner() {
                   <option value="">Select contract...</option>
                   {contracts.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.clientFullName} — {c.suburb}
+                      {c.project_name}
                     </option>
                   ))}
                 </select>

@@ -98,7 +98,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
               <option value="">Select contract…</option>
               {contracts.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.raNumber} — {c.clientFullName}
+                  {c.project_name}
                 </option>
               ))}
             </select>

@@ -2,15 +2,11 @@ import type { Pagination } from './shared'
 
 export interface POData {
   id: string
-  poNumber: string
+  po_number: string
   type: 'supplier' | 'subcontractor'
   status: string
-  supplierName: string
-  contractId: string
-  contractName: string
-  totalAmount: number
-  createdAt: string
-  updatedAt: string
+  supplier_name: string
+  total_count?: number
 }
 
 export interface PurchaseOrderList {

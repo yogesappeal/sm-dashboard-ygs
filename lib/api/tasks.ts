@@ -1,5 +1,5 @@
 import { api } from './fetcher'
-import type { TaskModel } from '../types'
+import type { TaskModel, TasksResponse } from '../types'
 
 interface GetTasksParams {
   assignee?: string
@@ -16,10 +16,12 @@ export async function getAllTasks(token: string, params: GetTasksParams = {}) {
     ...(params.projectId ? { project_id: params.projectId } : {}),
   })
   const qs = q.toString()
-  return api.get<TaskModel[]>(
+  const res = await api.get<TasksResponse>(
     `/functions/v1/tasks${qs ? `?${qs}` : ''}`,
     token
   )
+  // Handle both { data: [...] } and direct array response shapes
+  return Array.isArray(res) ? res : (res.data ?? [])
 }
 
 export async function insertNewTask(token: string, body: unknown) {

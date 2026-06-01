@@ -90,18 +90,18 @@ export function TaskCard({ task, token, queryKey, onEdit }: TaskCardProps) {
           <p className="text-xs text-slate-400 truncate mt-0.5">{task.description}</p>
         )}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          {task.projectName && (
-            <span className="text-xs text-slate-400 truncate max-w-[120px]">{task.projectName}</span>
+          {task.project_name && (
+            <span className="text-xs text-slate-400 truncate max-w-[120px]">{task.project_name}</span>
           )}
           {task.category && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-[#C66EEB] border border-purple-100">
               {task.category}
             </span>
           )}
-          {task.dueDate && (
+          {task.due_date && (
             <span className="flex items-center gap-1 text-xs text-slate-400">
               <CalendarDays size={11} />
-              {formatDate(task.dueDate)}
+              {formatDate(task.due_date)}
             </span>
           )}
           {task.assignee && (

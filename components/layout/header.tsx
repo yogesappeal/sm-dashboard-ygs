@@ -1,24 +1,12 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { useAuthStore, useAppStore } from '@/lib/store'
 import { getGreeting } from '@/lib/utils'
-import { LogOut, Bell, Menu } from 'lucide-react'
-import { initials } from '@/lib/utils/format'
+import { Bell, Menu } from 'lucide-react'
 
 export function Header() {
-  const router = useRouter()
-  const { user, role, clear } = useAuthStore()
+  const { user, role } = useAuthStore()
   const { setMobileSidebarOpen } = useAppStore()
-  const supabase = createClient()
-
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-    clear()
-    router.push('/login')
-    router.refresh()
-  }
 
   return (
     <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10">
@@ -34,7 +22,7 @@ export function Header() {
         <div>
           <p className="text-sm text-slate-500">{getGreeting()},</p>
           <p className="text-sm font-semibold text-slate-800 leading-tight">
-            {user?.fullName || user?.firstName || 'User'}
+            {user?.full_name || user?.first_name || 'User'}
           </p>
         </div>
       </div>
@@ -46,25 +34,9 @@ export function Header() {
             {role}
           </span>
         )}
-
         <button className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors">
           <Bell size={18} />
         </button>
-
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#C66EEB] flex items-center justify-center">
-            <span className="text-white text-xs font-semibold">
-              {user ? initials(user.fullName || `${user.firstName} ${user.lastName}`) : '?'}
-            </span>
-          </div>
-          <button
-            onClick={handleSignOut}
-            title="Sign out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
       </div>
     </header>
   )

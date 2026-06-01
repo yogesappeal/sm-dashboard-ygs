@@ -20,19 +20,37 @@ export function ScopeRow({ scope, onClick }: ScopeRowProps) {
         <ClipboardList size={16} className="text-[#C66EEB]" />
       </div>
       <span className="flex-[2] text-sm text-[#C66EEB] font-medium group-hover:underline truncate min-w-0">
-        {truncate(scope.scopeNumber || '-', 20)}
+        {truncate(scope.scope_number || '-', 20)}
       </span>
-      <span className="flex-[3] text-sm text-slate-700 truncate">
-        {scope.scopeName || '-'}
+      <span className="flex-[4] text-sm text-slate-700 truncate">
+        {scope.scope_name || '-'}
       </span>
       <span className="flex-[4] text-sm text-slate-500 truncate hidden md:block">
-        {scope.clientRaNumber ? `${scope.clientRaNumber} — ${scope.clientFullName || ''}` : scope.clientFullName || '-'}
+        {scope.client_ra_number ? `${scope.client_ra_number} — ${scope.client_full_name || ''}` : scope.client_full_name || '-'}
       </span>
-      <div className="flex-[2] flex">
-        <StatusBadge status={scope.type === 'supplier' ? 'supplier' : 'subcontractor'} />
+      <div className="flex-[3] flex items-center gap-1.5 flex-wrap">
+        {scope.type
+          ? scope.type.split(',').map((t) => {
+              const label = t.trim()
+              const isSubs = label.toLowerCase().includes('sub')
+              return (
+                <span
+                  key={label}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    isSubs
+                      ? 'bg-purple-50 text-purple-600'
+                      : 'bg-blue-50 text-blue-600'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSubs ? 'bg-purple-500' : 'bg-blue-400'}`} />
+                  {label}
+                </span>
+              )
+            })
+          : '-'}
       </div>
       <div className="flex-[2] flex">
-        <StatusBadge status={scope.orderStatus || 'Inactive'} />
+        <StatusBadge status={scope.order_status || 'Inactive'} />
       </div>
     </button>
   )
@@ -43,9 +61,9 @@ export function ScopeTableHeader() {
     <div className="flex items-center gap-2.5 px-4 py-2.5 border-b-2 border-slate-200 bg-slate-50/50">
       <div className="flex-shrink-0 w-5" />
       <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">Number</span>
-      <span className="flex-[3] text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</span>
+      <span className="flex-[4] text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</span>
       <span className="flex-[4] text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:block">Contract</span>
-      <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</span>
+      <span className="flex-[3] text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</span>
       <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</span>
     </div>
   )

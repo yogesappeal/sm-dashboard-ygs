@@ -1,17 +1,30 @@
 import type { Trades, Pagination } from './shared'
 
+export interface ScopeTrade {
+  trade_id: string
+  trade_name: string
+}
+
+export interface ScopeDetail {
+  status: string
+  trades: ScopeTrade[]
+  building_id: string
+  building_name: string
+}
+
 export interface ScopeData {
-  scopeId: string
-  scopeName: string
-  scopeNumber: string
+  scope_id: string
+  scope_name: string
+  scope_number: string
   type: string
   notes: string
-  scopeDetails: ScopeItem[]
-  orderStatus: string
+  scope_details: ScopeDetail[]
+  order_status: string
   builder: string
-  clientRaNumber: string
-  clientFullName: string
-  streetAddress: string
+  client_ra_number: string
+  client_full_name: string
+  street_address: string
+  total_count?: number
 }
 
 export interface ScopeDataModel {

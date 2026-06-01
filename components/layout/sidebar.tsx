@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useAppStore, useAuthStore } from '@/lib/store'
+import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -14,6 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  LogOut,
+  User,
+  Settings,
 } from 'lucide-react'
 import type { UserDetails } from '@/lib/types'
 
@@ -64,23 +69,81 @@ function NavLinks({ pathname, collapsed, onLinkClick }: { pathname: string; coll
   )
 }
 
-function UserFooter({ user, role }: { user: UserDetails | null; role: string | null }) {
+function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role: string | null; collapsed?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const { clear } = useAuthStore()
+  const supabase = createClient()
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleSignOut() {
+    setOpen(false)
+    await supabase.auth.signOut()
+    clear()
+    router.push('/login')
+    router.refresh()
+  }
+
   if (!user) return null
+
+  const initials = user.first_name?.[0] ?? '?'
+  const displayName = user.full_name || `${user.first_name} ${user.last_name}`
+
   return (
-    <div className="px-3 py-4 border-t border-white/5">
-      <div className="flex items-center gap-2.5">
+    <div ref={ref} className="relative px-3 py-4 border-t border-white/5">
+      {/* Floating menu */}
+      {open && (
+        <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#12122a] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+          <div className="px-4 py-3 border-b border-white/5">
+            <p className="text-white text-xs font-semibold truncate">{displayName}</p>
+            <p className="text-slate-500 text-xs truncate">{user.email}</p>
+          </div>
+          <div className="py-1">
+            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors">
+              <User size={15} />
+              Profile
+            </button>
+            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors">
+              <Settings size={15} />
+              Settings
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm transition-colors"
+            >
+              <LogOut size={15} />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'w-full flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-white/5 transition-colors text-left',
+          collapsed && 'justify-center'
+        )}
+      >
         <div className="w-8 h-8 rounded-full bg-[#C66EEB]/30 flex items-center justify-center flex-shrink-0">
-          <span className="text-[#C66EEB] text-xs font-semibold">
-            {user.firstName?.[0] ?? '?'}
-          </span>
+          <span className="text-[#C66EEB] text-xs font-semibold">{initials}</span>
         </div>
-        <div className="min-w-0">
-          <p className="text-white text-xs font-medium truncate">
-            {user.fullName || `${user.firstName} ${user.lastName}`}
-          </p>
-          <p className="text-slate-500 text-xs truncate">{role}</p>
-        </div>
-      </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-xs font-medium truncate">{displayName}</p>
+            <p className="text-slate-500 text-xs truncate">{role}</p>
+          </div>
+        )}
+      </button>
     </div>
   )
 }
@@ -107,7 +170,7 @@ export function Sidebar() {
         <div className="flex items-center justify-between px-4 py-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-            <span className="text-white font-semibold text-sm">AusHail</span>
+            <span className="text-white font-semibold text-sm">SM Dashboard</span>
           </div>
           <button onClick={closeMobile} className="p-1 text-slate-400 hover:text-white transition-colors">
             <X size={18} />
@@ -148,8 +211,7 @@ export function Sidebar() {
         )}
 
         <NavLinks pathname={pathname} collapsed={!sidebarOpen} />
-
-        {sidebarOpen && <UserFooter user={user} role={role} />}
+        <UserFooter user={user} role={role} collapsed={!sidebarOpen} />
       </aside>
     </>
   )

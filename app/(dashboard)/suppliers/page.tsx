@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
 import { SupplierRow, SupplierTableHeader } from '@/components/cards/supplier-row'
+import type { SupplierSortField, SupplierSortDir } from '@/components/cards/supplier-row'
 import { SupplierSlideOver } from '@/components/cards/supplier-slide-over'
 import { SupplierCreateModal } from '@/components/forms/supplier-create-modal'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -36,11 +37,13 @@ export default function SuppliersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [sortField, setSortField] = useState<SupplierSortField | undefined>()
+  const [sortDir, setSortDir] = useState<SupplierSortDir>('desc')
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierData | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
-  const queryKey = ['suppliers', currentPage, typeFilter, statusFilter, search]
+  const queryKey = ['suppliers', currentPage, typeFilter, statusFilter, search, sortField, sortDir]
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
@@ -51,6 +54,8 @@ export default function SuppliersPage() {
         type: typeFilter || undefined,
         status: statusFilter || undefined,
         search: search || undefined,
+        order_by: sortField,
+        order_dir: sortDir,
       }),
     enabled: !!token,
     staleTime: 2 * 60 * 1000,
@@ -77,6 +82,18 @@ export default function SuppliersPage() {
   const handleFilterChange = useCallback((type: string, status: string) => {
     setTypeFilter(type)
     setStatusFilter(status)
+    setCurrentPage(1)
+  }, [])
+
+  const handleSort = useCallback((field: SupplierSortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return field
+      }
+      setSortDir('desc')
+      return field
+    })
     setCurrentPage(1)
   }, [])
 
@@ -162,7 +179,7 @@ export default function SuppliersPage() {
 
       {/* Table */}
       <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
-        <SupplierTableHeader />
+        <SupplierTableHeader sortField={sortField} sortDir={sortDir} onSort={handleSort} />
 
         {isTableLoading ? (
           Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
@@ -183,7 +200,7 @@ export default function SuppliersPage() {
       {pagination && (
         <PaginationBar
           currentPage={currentPage}
-          totalPages={pagination.totalPages}
+          totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
           onPageChange={setCurrentPage}
           onRefresh={handleRefresh}
         />

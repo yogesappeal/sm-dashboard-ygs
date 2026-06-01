@@ -94,7 +94,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-slate-500">Supplier Code</p>
-            <p className="font-medium text-slate-800 truncate">{supplier.supplierCode || '-'}</p>
+            <p className="font-medium text-slate-800 truncate">{supplier.supplier_code || '-'}</p>
           </div>
           {!isEditing && (
             <button

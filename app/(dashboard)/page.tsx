@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText } from 'lucide-react'
+import { FileText, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import {
   getDashboardMetrics,
@@ -13,9 +13,11 @@ import {
 import { WelcomeCard } from '@/components/cards/welcome-card'
 import { MetricCard, OpsMetricCard } from '@/components/cards/metric-card'
 import { ContractRow, ContractTableHeader } from '@/components/cards/contract-row'
+import type { SortField, SortDir } from '@/components/cards/contract-row'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MetricsSkeleton, TableRowSkeleton } from '@/components/ui/skeleton'
 import { PaginationBar } from '@/components/ui/pagination-bar'
+import type { DataContract } from '@/lib/types'
 
 const STATUS_FILTERS = [
   { index: 1, label: 'Deposit', status: 'Deposit' },
@@ -31,6 +33,9 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [isPageChanging, setIsPageChanging] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sortField, setSortField] = useState<SortField | undefined>()
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   const activeStatus = STATUS_FILTERS.find((f) => f.index === activeFilter)?.status
 
@@ -46,11 +51,11 @@ export default function DashboardPage() {
   const metrics = metricsData?.metrics ?? []
 
   // Contracts query
-  const contractsQueryKey = ['contracts', role, currentPage, activeStatus]
+  const contractsQueryKey = ['contracts', role, currentPage, activeStatus, search]
   const { data: contractsData, isLoading: contractsLoading, isFetching } = useQuery({
     queryKey: contractsQueryKey,
     queryFn: () => {
-      const params = { page: currentPage, limit: 10, status: activeStatus }
+      const params = { page: currentPage, limit: 10, status: activeStatus, search: search || undefined }
       return isOps
         ? getAllClientsPaginatedForOps(token!, params)
         : getClientsPaginated(token!, params)
@@ -59,8 +64,20 @@ export default function DashboardPage() {
     staleTime: 2 * 60 * 1000,
   })
 
-  const contracts = contractsData?.data ?? []
+  const rawContracts = contractsData?.data ?? []
   const pagination = contractsData?.pagination
+
+  const contracts = useMemo(() => {
+    if (!sortField) return rawContracts
+    return [...rawContracts].sort((a, b) => {
+      const av = a[sortField] ?? ''
+      const bv = b[sortField] ?? ''
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [rawContracts, sortField, sortDir])
 
   const handleFilterClick = useCallback(
     (filterIndex: number) => {
@@ -81,7 +98,23 @@ export default function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: contractsQueryKey })
   }, [queryClient, contractsQueryKey])
 
-  const firstName = user?.firstName ?? (isOps ? 'Ops' : 'SM')
+  const handleSort = useCallback((field: SortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return field
+      }
+      setSortDir('asc')
+      return field
+    })
+  }, [])
+
+  const handleSearch = useCallback((val: string) => {
+    setSearch(val)
+    setCurrentPage(1)
+  }, [])
+
+  const firstName = user?.first_name ?? (isOps ? 'Ops' : 'SM')
   const isContractsLoading = contractsLoading || isFetching || isPageChanging
 
   return (
@@ -104,10 +137,30 @@ export default function DashboardPage() {
 
       {/* Contract table */}
       <div className="flex flex-col flex-1">
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">Contract</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-slate-800">Contract</h2>
+          <div className="relative w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search project..."
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent"
+            />
+            {search && (
+              <button
+                onClick={() => handleSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="bg-white rounded-xl border border-slate-200 flex flex-col flex-1 overflow-hidden">
-          <ContractTableHeader />
+          <ContractTableHeader sortField={sortField} sortDir={sortDir} onSort={handleSort} />
 
           <div className="flex-1 overflow-y-auto">
             {isContractsLoading ? (
@@ -125,10 +178,10 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {pagination && pagination.totalPages > 0 && (
+          {pagination && (pagination.totalPages ?? pagination.total_pages ?? 0) > 0 && (
             <PaginationBar
               currentPage={pagination.page}
-              totalPages={pagination.totalPages}
+              totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
               onPageChange={handlePageChange}
               isRefreshing={isContractsLoading}
               onRefresh={handleRefresh}

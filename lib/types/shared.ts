@@ -5,20 +5,32 @@ export interface Metrics {
 
 export interface DashboardMetrics {
   metrics: Metrics[]
-  totalContracts: number
-  activeContracts: number
+}
+
+export interface DashboardResponseItem {
+  users: {
+    reference_id: string
+    first_name: string
+    last_name: string
+    full_name: string
+    email: string
+    mobile_phone: string
+    image_url: string
+    job_title: string
+  }
+  metrics: Metrics[]
 }
 
 export interface DashboardResponse {
-  data: DashboardMetrics
-  status: string
+  response: DashboardResponseItem[]
 }
 
 export interface Pagination {
   page: number
   limit: number
   total: number
-  totalPages: number
+  totalPages?: number
+  total_pages?: number
 }
 
 export interface Trades {

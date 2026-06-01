@@ -44,9 +44,7 @@ export default function ScopePage() {
     staleTime: 2 * 60 * 1000,
   })
 
-  const scopes = (data?.data ?? []).filter(
-    (s) => !typeFilter || s.type === typeFilter
-  )
+  const scopes = data?.data ?? []
   const pagination = data?.pagination
 
   const handleRefresh = useCallback(() => {
@@ -111,7 +109,7 @@ export default function ScopePage() {
           />
         ) : (
           scopes.map((s) => (
-            <ScopeRow key={s.scopeId} scope={s} onClick={handleRowClick} />
+            <ScopeRow key={s.scope_id} scope={s} onClick={handleRowClick} />
           ))
         )}
       </div>
@@ -120,7 +118,7 @@ export default function ScopePage() {
       {pagination && (
         <PaginationBar
           currentPage={currentPage}
-          totalPages={pagination.totalPages}
+          totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
           onPageChange={setCurrentPage}
           onRefresh={handleRefresh}
         />

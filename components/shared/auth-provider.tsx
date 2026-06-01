@@ -37,6 +37,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (_event, session) => {
         if (session?.access_token) {
           setToken(session.access_token)
+          try {
+            const res = await getUserDetails(session.access_token)
+            if (res?.data) {
+              setUser(res.data)
+              const metaRole = session.user?.user_metadata?.role
+              setRole(
+                metaRole === 'Operations' ? 'Operations' : 'Site Manager'
+              )
+            }
+          } catch {
+            // non-fatal
+          }
         } else {
           setToken(null)
         }

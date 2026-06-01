@@ -18,15 +18,14 @@ export interface ContractModel {
 
 export interface DataContract {
   id: string
-  raNumber: string
-  clientFullName: string
-  streetAddress: string
+  project_name: string
+  deposit_date: string
+  total_contract_value: number
+  street_address: string
   suburb: string
-  state: string
-  builder: string
-  contractValue: number
-  status: string
-  createdAt: string
+  sm_name: string
+  project_status: string
+  total_count?: number
 }
 
 export interface DataContracts {

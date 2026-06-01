@@ -36,6 +36,7 @@ interface GetPOParams {
   status?: string
   type?: string
   contractId?: string
+  search?: string
 }
 
 export async function getPurchaseOrdersPaginated(
@@ -48,6 +49,7 @@ export async function getPurchaseOrdersPaginated(
     ...(params.status ? { status: params.status } : {}),
     ...(params.type ? { type: params.type } : {}),
     ...(params.contractId ? { contract_id: params.contractId } : {}),
+    ...(params.search ? { search: params.search } : {}),
   })
   return api.get<PurchaseOrderList>(
     `/functions/v1/get-po-paginated?${q}`,

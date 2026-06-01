@@ -25,15 +25,12 @@ export function PORow({ po }: PORowProps) {
         <Building2 size={16} className="text-[#C66EEB]" />
       </div>
       <span className="flex-[2] text-sm text-[#C66EEB] font-medium group-hover:underline truncate min-w-0">
-        {truncate(po.poNumber || '-', 35)}
+        {truncate(po.po_number || '-', 35)}
       </span>
       <span className="flex-[3] text-sm text-slate-700 truncate hidden md:block">
-        {po.supplierName || '-'}
+        {po.supplier_name || '-'}
       </span>
-      <span className="flex-[2] text-sm text-slate-500 hidden lg:block">
-        {po.contractName || '-'}
-      </span>
-      <div className="flex-[2] flex">
+      <div className="flex-[2] flex hidden lg:flex">
         <StatusBadge status={po.type} />
       </div>
       <div className="flex-[2] flex">
@@ -49,8 +46,7 @@ export function POTableHeader() {
       <div className="flex-shrink-0 w-5" />
       <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">PO Number</span>
       <span className="flex-[3] text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:block">Supplier / Subs</span>
-      <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:block">Contract</span>
-      <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</span>
+      <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:block">Type</span>
       <span className="flex-[2] text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</span>
     </div>
   )

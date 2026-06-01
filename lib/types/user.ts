@@ -1,12 +1,12 @@
 export interface UserDetails {
-  referenceId: string
-  firstName: string
-  lastName: string
-  fullName: string
+  reference_id: string
+  first_name: string
+  last_name: string
+  full_name: string
   email: string
-  mobilePhone: string
-  imageUrl: string
-  jobTitle: string
+  mobile_phone: string
+  image_url: string
+  job_title: string
 }
 
 export interface SmToolboxModel {

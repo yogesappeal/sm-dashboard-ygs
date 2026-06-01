@@ -72,7 +72,7 @@ function POSubsFormInner() {
       total_price: parseFloat(totalPrice) || 0,
       type: 'subcontractor',
       status: isDraft ? 'PO Draft' : 'PO Submitted',
-      sm_name: user?.fullName ?? '',
+      sm_name: user?.full_name ?? '',
     }
     insertMutation.mutate(body)
   }
@@ -112,7 +112,7 @@ function POSubsFormInner() {
                   <option value="">Select contract...</option>
                   {contracts.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.clientFullName} — {c.suburb}
+                      {c.project_name}
                     </option>
                   ))}
                 </select>

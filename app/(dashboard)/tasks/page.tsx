@@ -46,7 +46,7 @@ export default function TasksPage() {
     staleTime: 60 * 1000,
   })
 
-  const allTasks = data ?? []
+  const allTasks = Array.isArray(data) ? data : []
   const tasks = priorityOnly ? allTasks.filter((t) => t.priority) : allTasks
   const grouped = statusFilter ? null : groupTasksByStatus(tasks)
 

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, ChevronDown } from 'lucide-react'
+import { ShoppingCart, ChevronDown, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getPurchaseOrdersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
@@ -35,10 +35,11 @@ export default function PurchaseOrdersPage() {
 
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [newPOOpen, setNewPOOpen] = useState(false)
 
-  const queryKey = ['purchase-orders', currentPage, typeFilter, statusFilter]
+  const queryKey = ['purchase-orders', currentPage, typeFilter, statusFilter, search]
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
@@ -48,9 +49,10 @@ export default function PurchaseOrdersPage() {
         limit: 10,
         type: typeFilter || undefined,
         status: statusFilter || undefined,
+        search: search || undefined,
       }),
     enabled: !!token,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   })
 
   const pos = data?.data ?? []
@@ -59,6 +61,11 @@ export default function PurchaseOrdersPage() {
   const handleFilterChange = useCallback((type: string, status: string) => {
     setTypeFilter(type)
     setStatusFilter(status)
+    setCurrentPage(1)
+  }, [])
+
+  const handleSearch = useCallback((val: string) => {
+    setSearch(val)
     setCurrentPage(1)
   }, [])
 
@@ -105,8 +112,8 @@ export default function PurchaseOrdersPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
+      {/* Filters + Search */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap justify-between">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {TYPE_FILTERS.map((f) => (
             <button
@@ -133,6 +140,25 @@ export default function PurchaseOrdersPage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
+
+        <div className="relative w-60 ml-auto">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Search PO..."
+            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent"
+          />
+          {search && (
+            <button
+              onClick={() => handleSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -151,10 +177,10 @@ export default function PurchaseOrdersPage() {
             pos.map((po) => <PORow key={po.id} po={po} />)
           )}
         </div>
-        {pagination && pagination.totalPages > 0 && (
+        {pagination && (pagination.totalPages ?? pagination.total_pages ?? 0) > 0 && (
           <PaginationBar
             currentPage={pagination.page}
-            totalPages={pagination.totalPages}
+            totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
             onPageChange={setCurrentPage}
             isRefreshing={isTableLoading}
             onRefresh={handleRefresh}

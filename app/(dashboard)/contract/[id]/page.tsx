@@ -160,12 +160,12 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
           emptyText="No scopes for this contract"
         >
           {scopes.map((s) => (
-            <div key={s.scopeId} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
+            <div key={s.scope_id} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700 truncate">{s.scopeName || s.scopeNumber}</p>
-                <p className="text-xs text-slate-400">{s.scopeNumber}</p>
+                <p className="text-sm font-medium text-slate-700 truncate">{s.scope_name || s.scope_number}</p>
+                <p className="text-xs text-slate-400">{s.scope_number}</p>
               </div>
-              <StatusBadge status={s.orderStatus || 'Inactive'} />
+              <StatusBadge status={s.order_status || 'Inactive'} />
             </div>
           ))}
         </Section>
@@ -189,8 +189,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center gap-3 min-w-0">
               <ShoppingCart size={14} className="text-[#C66EEB] flex-shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700 truncate group-hover:underline">{po.poNumber}</p>
-                <p className="text-xs text-slate-400">{po.supplierName || '-'}</p>
+                <p className="text-sm font-medium text-slate-700 truncate group-hover:underline">{po.po_number}</p>
+                <p className="text-xs text-slate-400">{po.supplier_name || '-'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

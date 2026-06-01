@@ -26,7 +26,7 @@ export function ScopeSlideOver({ scope, onClose }: ScopeSlideOverProps) {
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-slate-400">Scope Number</p>
-            <p className="font-medium text-slate-800 truncate">{scope.scopeNumber || '-'}</p>
+            <p className="font-medium text-slate-800 truncate">{scope.scope_number || '-'}</p>
           </div>
         </div>
 
@@ -34,19 +34,19 @@ export function ScopeSlideOver({ scope, onClose }: ScopeSlideOverProps) {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <StatusBadge status={scope.type === 'supplier' ? 'supplier' : 'subcontractor'} />
-            <StatusBadge status={scope.orderStatus || 'Inactive'} />
+            <StatusBadge status={scope.type} />
+            <StatusBadge status={scope.order_status || 'Inactive'} />
           </div>
 
           {/* Scope info */}
-          <InfoRow icon={<ClipboardList size={15} />} label="Scope Name" value={scope.scopeName} />
+          <InfoRow icon={<ClipboardList size={15} />} label="Scope Name" value={scope.scope_name} />
           <InfoRow
             icon={<FileText size={15} />}
             label="Contract"
-            value={scope.clientRaNumber ? `${scope.clientRaNumber} — ${scope.clientFullName}` : scope.clientFullName}
+            value={scope.client_ra_number ? `${scope.client_ra_number} — ${scope.client_full_name}` : scope.client_full_name}
           />
-          {scope.streetAddress && (
-            <InfoRow icon={<FileText size={15} />} label="Address" value={scope.streetAddress} />
+          {scope.street_address && (
+            <InfoRow icon={<FileText size={15} />} label="Address" value={scope.street_address} />
           )}
           {scope.builder && (
             <InfoRow icon={<FileText size={15} />} label="Builder" value={scope.builder} />
@@ -56,23 +56,26 @@ export function ScopeSlideOver({ scope, onClose }: ScopeSlideOverProps) {
           )}
 
           {/* Scope Items */}
-          {scope.scopeDetails && scope.scopeDetails.length > 0 && (
+          {scope.scope_details && scope.scope_details.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Layers size={15} className="text-slate-400" />
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Scope Items ({scope.scopeDetails.length})
+                  Scope Items ({scope.scope_details.length})
                 </p>
               </div>
               <div className="space-y-2">
-                {scope.scopeDetails.map((item, idx) => (
+                {scope.scope_details.map((item, idx) => (
                   <div
-                    key={item.id || idx}
+                    key={item.building_id || idx}
                     className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3"
                   >
-                    <p className="text-sm font-medium text-slate-700">{item.buildingName || '-'}</p>
-                    {item.tradeItems && (
-                      <p className="text-xs text-slate-400 mt-0.5">{item.tradeItems}</p>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-sm font-medium text-slate-700">{item.building_name || '-'}</p>
+                      <StatusBadge status={item.status} />
+                    </div>
+                    {item.trades.length > 0 && (
+                      <p className="text-xs text-slate-400">{item.trades.map(t => t.trade_name).join(', ')}</p>
                     )}
                   </div>
                 ))}

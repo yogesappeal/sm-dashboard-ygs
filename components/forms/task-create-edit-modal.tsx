@@ -36,7 +36,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
     defaultValues: {
       title: task?.title ?? '',
       description: task?.description ?? '',
-      dueDate: task?.dueDate ?? '',
+      dueDate: task?.due_date ?? '',
       assignee: task?.assignee ?? '',
       category: task?.category ?? '',
       status: task?.status ?? 'pending',
@@ -48,7 +48,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
       reset({
         title: task.title,
         description: task.description ?? '',
-        dueDate: task.dueDate ?? '',
+        dueDate: task.due_date ?? '',
         assignee: task.assignee ?? '',
         category: task.category ?? '',
         status: task.status ?? 'pending',
@@ -70,7 +70,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
       const body = buildTaskRequestBody({
         ...data,
         id: task?.id,
-        projectId: task?.projectId,
+        project_id: task?.project_id,
       })
       return isEditing
         ? updateExistingTask(token, { task_id: task!.id, ...body })
@@ -156,14 +156,14 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
           {contracts.length > 0 && (
             <Field label="Project (optional)" error={undefined}>
               <select
-                defaultValue={task?.projectId ?? ''}
+                defaultValue={task?.project_id ?? ''}
                 onChange={(e) => {/* projectId handled in buildTaskRequestBody */}}
                 className={inputCls(false)}
               >
                 <option value="">No project</option>
                 {contracts.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.raNumber} — {c.clientFullName}
+                    {c.project_name}
                   </option>
                 ))}
               </select>
