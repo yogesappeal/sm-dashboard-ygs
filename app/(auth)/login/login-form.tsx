@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
+import { Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { loginSchema } from '@/lib/utils/validation'
 
@@ -15,6 +16,7 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') ?? '/'
   const [serverError, setServerError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const supabase = createClient()
 
   const {
@@ -39,55 +41,70 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {/* Email */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">
           Email address
         </label>
         <input
           {...register('email')}
           type="email"
-          placeholder="you@ausmail.com"
-          className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C66EEB] focus:border-transparent text-sm"
+          placeholder="you@example.com"
+          className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/40 focus:border-[#C66EEB] transition-colors text-sm"
         />
         {errors.email && (
-          <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+          <p className="mt-1.5 text-xs text-red-500">{errors.email.message}</p>
         )}
       </div>
 
+      {/* Password */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">
           Password
         </label>
-        <input
-          {...register('password')}
-          type="password"
-          placeholder="••••••••"
-          className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C66EEB] focus:border-transparent text-sm"
-        />
+        <div className="relative">
+          <input
+            {...register('password')}
+            type={showPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            className="w-full px-4 py-2.5 pr-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/40 focus:border-[#C66EEB] transition-colors text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         {errors.password && (
-          <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
+          <p className="mt-1.5 text-xs text-red-500">{errors.password.message}</p>
         )}
       </div>
 
-      <div className="flex items-center justify-end">
+      {/* Forgot password */}
+      <div className="flex justify-end">
         <a
           href="/forgot-password"
-          className="text-sm text-[#C66EEB] hover:text-purple-300 transition-colors"
+          className="text-sm text-[#C66EEB] hover:text-purple-700 transition-colors"
         >
           Forgot password?
         </a>
       </div>
 
+      {/* Server error */}
       {serverError && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-          <p className="text-sm text-red-400">{serverError}</p>
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-sm text-red-600">{serverError}</p>
         </div>
       )}
 
+      {/* Submit */}
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full py-2.5 px-4 rounded-lg bg-[#C66EEB] hover:bg-[#b55fd4] text-white font-medium text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full py-2.5 px-4 rounded-xl bg-[#C66EEB] hover:bg-[#b55fd4] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-purple-200"
       >
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </button>

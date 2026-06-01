@@ -96,6 +96,11 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
 
   const initials = user.first_name?.[0] ?? '?'
   const displayName = user.full_name || `${user.first_name} ${user.last_name}`
+  const avatarUrl = user.image_url
+    ? user.image_url.startsWith('http')
+      ? user.image_url
+      : `https://exlknzxmmqnehvximbyj.supabase.co/${user.image_url.replace(/^\/+/, '')}`
+    : null
 
   return (
     <div ref={ref} className="relative px-3 py-4 border-t border-white/5">
@@ -107,11 +112,17 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
             <p className="text-slate-500 text-xs truncate">{user.email}</p>
           </div>
           <div className="py-1">
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors">
+            <button
+              onClick={() => { setOpen(false); router.push('/profile') }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors"
+            >
               <User size={15} />
               Profile
             </button>
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors">
+            <button
+              onClick={() => { setOpen(false); router.push('/settings') }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors"
+            >
               <Settings size={15} />
               Settings
             </button>
@@ -134,9 +145,15 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
           collapsed && 'justify-center'
         )}
       >
-        <div className="w-8 h-8 rounded-full bg-[#C66EEB]/30 flex items-center justify-center flex-shrink-0">
-          <span className="text-[#C66EEB] text-xs font-semibold">{initials}</span>
-        </div>
+        {avatarUrl ? (
+          <div className="relative w-8 h-8 flex-shrink-0">
+            <Image src={avatarUrl} alt={displayName} fill className="rounded-full object-cover ring-2 ring-[#C66EEB]/30" />
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-[#C66EEB]/30 flex items-center justify-center flex-shrink-0">
+            <span className="text-[#C66EEB] text-xs font-semibold">{initials}</span>
+          </div>
+        )}
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-medium truncate">{displayName}</p>
@@ -192,7 +209,7 @@ export function Sidebar() {
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5">
               <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-              <span className="text-white font-semibold text-sm truncate">AusHail</span>
+              <span className="text-white font-semibold text-sm truncate">SM Dashboard</span>
             </div>
           ) : (
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg mx-auto" />
