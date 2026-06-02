@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-purple-950/60 to-slate-900/80" />
 
         {/* Text pinned at 45% from top */}
-        <div className="relative z-10 w-full" style={{ paddingTop: '45%', paddingLeft: '3rem', paddingRight: '3rem' }}>
+        <div className="relative z-10 w-full" style={{ paddingTop: '35%', paddingLeft: '3rem', paddingRight: '3rem' }}>
           <h2 className="font-extrabold text-white leading-none mb-4" style={{ fontSize: '4.5rem', letterSpacing: '-0.02em' }}>
             SM Dashboard
           </h2>
@@ -39,7 +39,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               alt="AusHail"
               width={180}
               height={66}
-              className="object-contain"
+              className="object-contain w-[180px] h-auto"
               priority
             />
           </div>

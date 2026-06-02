@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import { useAppStore, useAuthStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
@@ -71,18 +72,35 @@ function NavLinks({ pathname, collapsed, onLinkClick }: { pathname: string; coll
 
 function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role: string | null; collapsed?: boolean }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [menuStyle, setMenuStyle] = useState({ left: 0, bottom: 0 })
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const { clear } = useAuthStore()
   const supabase = createClient()
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+  const handleToggle = useCallback(() => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setMenuStyle({
+        left: rect.right + 8,
+        bottom: window.innerHeight - rect.top,
+      })
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    setOpen((v) => !v)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handleClose(e: MouseEvent) {
+      const target = e.target as Node
+      if (triggerRef.current?.contains(target)) return
+      if (menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClose)
+    return () => document.removeEventListener('mousedown', handleClose)
+  }, [open])
 
   async function handleSignOut() {
     setOpen(false)
@@ -102,11 +120,13 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
       : `https://exlknzxmmqnehvximbyj.supabase.co/${user.image_url.replace(/^\/+/, '')}`
     : null
 
-  return (
-    <div ref={ref} className="relative px-3 py-4 border-t border-white/5">
-      {/* Floating menu */}
-      {open && (
-        <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#12122a] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+  const floatingMenu = open
+    ? createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[200] w-52 bg-[#12122a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          style={{ left: menuStyle.left, bottom: menuStyle.bottom }}
+        >
           <div className="px-4 py-3 border-b border-white/5">
             <p className="text-white text-xs font-semibold truncate">{displayName}</p>
             <p className="text-slate-500 text-xs truncate">{user.email}</p>
@@ -134,12 +154,19 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
               Logout
             </button>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+      )
+    : null
+
+  return (
+    <div className="px-3 py-4 border-t border-white/5">
+      {floatingMenu}
 
       {/* Trigger button */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={triggerRef}
+        onClick={handleToggle}
         className={cn(
           'w-full flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-white/5 transition-colors text-left',
           collapsed && 'justify-center'
