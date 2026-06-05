@@ -7,7 +7,7 @@ import { NOTIFICATIONS, NOTIF_UNREAD_COUNT } from '@/lib/data/notifications'
 import type { NotifType } from '@/lib/data/notifications'
 
 const iconMap: Record<NotifType, { icon: React.ElementType; bg: string; color: string }> = {
-  contract: { icon: FileText,      bg: 'bg-purple-50', color: 'text-[#C66EEB]' },
+  contract: { icon: FileText,      bg: 'bg-[#6692C5]/10', color: 'text-[#6692C5]' },
   task:     { icon: ClipboardList, bg: 'bg-amber-50',  color: 'text-amber-500' },
   po:       { icon: Package,       bg: 'bg-blue-50',   color: 'text-blue-500'  },
   alert:    { icon: AlertCircle,   bg: 'bg-red-50',    color: 'text-red-500'   },
@@ -53,12 +53,12 @@ export function NotificationPanel({ open, onClose }: Props) {
             <Bell size={15} className="text-slate-500" />
             <p className="text-sm font-semibold text-slate-800">Notifications</p>
             {NOTIF_UNREAD_COUNT > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#C66EEB] text-white text-[10px] font-bold">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#6692C5] text-white text-[10px] font-bold">
                 {NOTIF_UNREAD_COUNT}
               </span>
             )}
           </div>
-          <button className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-[#C66EEB] transition-colors">
+          <button className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-[#6692C5] transition-colors">
             <CheckCheck size={12} />
             Mark all read
           </button>
@@ -70,7 +70,7 @@ export function NotificationPanel({ open, onClose }: Props) {
             const { icon: Icon, bg, color } = iconMap[n.type]
             return (
               <li key={n.id}>
-                <button className={`w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-slate-50 transition-colors ${!n.read ? 'bg-purple-50/40' : ''}`}>
+                <button className={`w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-slate-50 transition-colors ${!n.read ? 'bg-[#6692C5]/5' : ''}`}>
                   <div className={`mt-0.5 p-2 rounded-xl shrink-0 ${bg}`}>
                     <Icon size={14} className={color} />
                   </div>
@@ -79,7 +79,7 @@ export function NotificationPanel({ open, onClose }: Props) {
                       <p className={`text-sm leading-snug ${n.read ? 'text-slate-700 font-normal' : 'text-slate-800 font-semibold'}`}>
                         {n.title}
                       </p>
-                      {!n.read && <span className="mt-1 w-2 h-2 rounded-full bg-[#C66EEB] shrink-0" />}
+                      {!n.read && <span className="mt-1 w-2 h-2 rounded-full bg-[#6692C5] shrink-0" />}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 leading-snug">{n.body}</p>
                     <p className="text-[10px] text-slate-400 mt-1">{n.time}</p>
@@ -94,7 +94,7 @@ export function NotificationPanel({ open, onClose }: Props) {
         <div className="px-4 py-3 border-t border-slate-50 text-center">
           <button
             onClick={handleViewAll}
-            className="text-xs text-[#C66EEB] hover:text-purple-700 font-medium transition-colors"
+            className="text-xs text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors"
           >
             View all {NOTIFICATIONS.length} notifications →
           </button>

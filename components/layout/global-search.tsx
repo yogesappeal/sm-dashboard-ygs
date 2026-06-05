@@ -108,14 +108,14 @@ export function GlobalSearch() {
       <div
         className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all duration-200 ${
           focused
-            ? 'border-purple-300 bg-white shadow-sm shadow-purple-100'
+            ? 'border-[#6692C5]/50 bg-white shadow-sm shadow-[#6692C5]/10'
             : 'border-slate-200 bg-slate-50'
         }`}
       >
         {loading ? (
-          <Loader2 size={15} className="text-purple-400 shrink-0 animate-spin" />
+          <Loader2 size={15} className="text-[#6692C5] shrink-0 animate-spin" />
         ) : (
-          <Search size={15} className={`shrink-0 transition-colors duration-200 ${focused ? 'text-purple-400' : 'text-slate-400'}`} />
+          <Search size={15} className={`shrink-0 transition-colors duration-200 ${focused ? 'text-[#6692C5]' : 'text-slate-400'}`} />
         )}
         <input
           ref={inputRef}
@@ -174,12 +174,12 @@ export function GlobalSearch() {
                   onClick={() => handleSelect(item.id)}
                   onMouseEnter={() => setActiveIndex(idx)}
                   className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors duration-100 ${
-                    activeIndex === idx ? 'bg-purple-50' : 'hover:bg-slate-50'
+                    activeIndex === idx ? 'bg-[#6692C5]/5' : 'hover:bg-slate-50'
                   }`}
                 >
                   {/* Icon */}
-                  <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 transition-colors ${activeIndex === idx ? 'bg-purple-100' : 'bg-slate-100'}`}>
-                    <FileText size={13} className={activeIndex === idx ? 'text-purple-600' : 'text-slate-500'} />
+                  <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 transition-colors ${activeIndex === idx ? 'bg-[#6692C5]/10' : 'bg-slate-100'}`}>
+                    <FileText size={13} className={activeIndex === idx ? 'text-[#6692C5]' : 'text-slate-500'} />
                   </div>
 
                   {/* Content */}

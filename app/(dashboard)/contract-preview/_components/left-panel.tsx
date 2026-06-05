@@ -294,7 +294,7 @@ export function LeftPanel({ contract, crew, scopes, pos }: LeftPanelProps) {
             className={cn(
               'flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2',
               tab === t.key
-                ? 'border-[#C66EEB] text-[#C66EEB]'
+                ? 'border-[#6692C5] text-[#6692C5]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             )}
           >
@@ -336,8 +336,8 @@ export function LeftPanel({ contract, crew, scopes, pos }: LeftPanelProps) {
                 <div className="grid grid-cols-2 gap-2">
                   {crew.map((member, i) => (
                     <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="w-6 h-6 rounded-full bg-[#C66EEB]/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#C66EEB] text-[10px] font-bold">{member.name[0]}</span>
+                      <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#6692C5] text-[10px] font-bold">{member.name[0]}</span>
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-slate-700 truncate">{member.name}</p>

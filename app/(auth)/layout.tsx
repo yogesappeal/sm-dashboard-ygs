@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-purple-950/60 to-slate-900/80" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-[#1a2e4a]/60 to-slate-900/80" />
 
         {/* Text pinned at 45% from top */}
         <div className="relative z-10 w-full" style={{ paddingTop: '35%', paddingLeft: '3rem', paddingRight: '3rem' }}>

@@ -17,9 +17,9 @@ export function ScopeRow({ scope, onClick }: ScopeRowProps) {
       className="w-full flex items-center gap-2.5 px-4 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 text-left group"
     >
       <div className="flex-shrink-0 w-5 flex items-center justify-center">
-        <ClipboardList size={16} className="text-[#C66EEB]" />
+        <ClipboardList size={16} className="text-[#6692C5]" />
       </div>
-      <span className="flex-[2] text-sm text-[#C66EEB] font-medium group-hover:underline truncate min-w-0">
+      <span className="flex-[2] text-sm text-[#6692C5] font-medium group-hover:underline truncate min-w-0">
         {truncate(scope.scope_number || '-', 20)}
       </span>
       <span className="flex-[4] text-sm text-slate-700 truncate">

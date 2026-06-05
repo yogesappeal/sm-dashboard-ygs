@@ -53,7 +53,7 @@ function TopBar({ contract, pos }: { contract: DummyContract; pos: DummyPO[] }) 
         </div>
         <div className="text-right">
           <p className="text-[10px] text-slate-400 uppercase tracking-wide">In ADS</p>
-          <p className="text-sm font-bold text-[#C66EEB]">${contract.contractValue.toLocaleString()}</p>
+          <p className="text-sm font-bold text-[#6692C5]">${contract.contractValue.toLocaleString()}</p>
         </div>
       </div>
     </div>

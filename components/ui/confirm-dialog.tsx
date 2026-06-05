@@ -46,7 +46,7 @@ export function ConfirmDialog({
   const confirmBtnClass = {
     danger: 'bg-red-500 hover:bg-red-600 text-white',
     warning: 'bg-yellow-500 hover:bg-yellow-600 text-white',
-    default: 'bg-[#C66EEB] hover:bg-[#A855D4] text-white',
+    default: 'bg-[#6692C5] hover:bg-[#4F7CB3] text-white',
   }[variant]
 
   return (

@@ -41,3 +41,7 @@ export async function getScopeDetailByPOId(token: string, poId: string) {
 export async function insertScopeWithItems(token: string, body: unknown) {
   return api.post('/functions/v1/insert-scopes-with-items', token, body)
 }
+
+export async function updateScopeData(token: string, body: unknown) {
+  return api.post('/functions/v1/update-scope', token, body)
+}

@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
             {...register('password')}
             type="password"
             placeholder="••••••••"
-            className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C66EEB] focus:border-transparent text-sm"
+            className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#6692C5] focus:border-transparent text-sm"
           />
           {errors.password && (
             <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
             {...register('confirmPassword')}
             type="password"
             placeholder="••••••••"
-            className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C66EEB] focus:border-transparent text-sm"
+            className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#6692C5] focus:border-transparent text-sm"
           />
           {errors.confirmPassword && (
             <p className="mt-1 text-xs text-red-400">
@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-2.5 px-4 rounded-lg bg-[#C66EEB] hover:bg-[#b55fd4] text-white font-medium text-sm transition-colors disabled:opacity-60"
+          className="w-full py-2.5 px-4 rounded-lg bg-[#6692C5] hover:bg-[#b55fd4] text-white font-medium text-sm transition-colors disabled:opacity-60"
         >
           {isSubmitting ? 'Updating…' : 'Update password'}
         </button>

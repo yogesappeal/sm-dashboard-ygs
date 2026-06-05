@@ -189,7 +189,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
           <button
             onClick={handleSubmit((d) => mutation.mutateAsync(d))}
             disabled={isSubmitting || mutation.isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {(isSubmitting || mutation.isPending) && <Loader2 size={14} className="animate-spin" />}
             {isEditing ? 'Save Changes' : 'Create Task'}
@@ -213,7 +213,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]',
+    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

@@ -7,7 +7,6 @@ import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
 import { SupplierRow, SupplierTableHeader } from '@/components/cards/supplier-row'
-import type { SupplierSortField, SupplierSortDir } from '@/components/cards/supplier-row'
 import { SupplierSlideOver } from '@/components/cards/supplier-slide-over'
 import { SupplierCreateModal } from '@/components/forms/supplier-create-modal'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -22,28 +21,34 @@ const TYPE_FILTERS = [
   { value: 'subcontractor', label: 'Subcontractor' },
 ]
 
-const STATUS_FILTERS = [
-  { value: '', label: 'All Status' },
-  { value: 'Active Supplier', label: 'Active' },
-  { value: 'Inactive', label: 'Inactive' },
+// '' = semua, 'true' = active, 'false' = inactive
+const ACTIVE_FILTERS = [
+  { value: '',      label: 'All Status' },
+  { value: 'true',  label: 'Active' },
+  { value: 'false', label: 'Inactive' },
 ]
 
 export default function SuppliersPage() {
   const { token } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const [typeFilter, setTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [sortField, setSortField] = useState<SupplierSortField | undefined>()
-  const [sortDir, setSortDir] = useState<SupplierSortDir>('desc')
+  const [typeFilter, setTypeFilter]     = useState('')
+  const [activeFilter, setActiveFilter] = useState('')   // '', 'true', 'false'
+  const [currentPage, setCurrentPage]   = useState(1)
+  const [search, setSearch]             = useState('')
+  const [searchInput, setSearchInput]   = useState('')
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc')
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierData | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateModal, setShowCreateModal]   = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
-  const queryKey = ['suppliers', currentPage, typeFilter, statusFilter, search, sortField, sortDir]
+  // convert string filter to boolean | null for the API
+  const isActive =
+    activeFilter === 'true'  ? true  :
+    activeFilter === 'false' ? false :
+    null
+
+  const queryKey = ['suppliers', currentPage, typeFilter, activeFilter, search, sortDir]
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
@@ -52,16 +57,15 @@ export default function SuppliersPage() {
         page: currentPage,
         limit: 10,
         type: typeFilter || undefined,
-        status: statusFilter || undefined,
+        is_active: isActive,
         search: search || undefined,
-        order_by: sortField,
         order_dir: sortDir,
       }),
     enabled: !!token,
     staleTime: 2 * 60 * 1000,
   })
 
-  const suppliers = data?.data ?? []
+  const suppliers  = data?.data ?? []
   const pagination = data?.pagination
 
   const handleSearch = useCallback((value: string) => {
@@ -79,21 +83,19 @@ export default function SuppliersPage() {
     setCurrentPage(1)
   }, [])
 
-  const handleFilterChange = useCallback((type: string, status: string) => {
+  const handleTypeChange = useCallback((type: string) => {
     setTypeFilter(type)
-    setStatusFilter(status)
     setCurrentPage(1)
   }, [])
 
-  const handleSort = useCallback((field: SupplierSortField) => {
-    setSortField((prev) => {
-      if (prev === field) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-        return field
-      }
-      setSortDir('desc')
-      return field
-    })
+  const handleActiveChange = useCallback((active: string) => {
+    setActiveFilter(active)
+    setCurrentPage(1)
+  }, [])
+
+  // Backend only supports order_dir (no per-column sort), so any column click just toggles direction
+  const handleSort = useCallback(() => {
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     setCurrentPage(1)
   }, [])
 
@@ -115,7 +117,7 @@ export default function SuppliersPage() {
         action={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
           >
             + Add Supplier
           </button>
@@ -126,15 +128,15 @@ export default function SuppliersPage() {
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             value={searchInput}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search name, code, company…"
-            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]"
+            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
           />
           {searchInput && (
-            <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
               <X size={14} />
             </button>
           )}
@@ -145,7 +147,7 @@ export default function SuppliersPage() {
           {TYPE_FILTERS.map((f) => (
             <button
               key={f.value}
-              onClick={() => handleFilterChange(f.value, statusFilter)}
+              onClick={() => handleTypeChange(f.value)}
               className={cn(
                 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                 typeFilter === f.value
@@ -158,15 +160,15 @@ export default function SuppliersPage() {
           ))}
         </div>
 
-        {/* Status filter */}
+        {/* Active/Inactive filter */}
         <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {STATUS_FILTERS.map((f) => (
+          {ACTIVE_FILTERS.map((f) => (
             <button
               key={f.value}
-              onClick={() => handleFilterChange(typeFilter, f.value)}
+              onClick={() => handleActiveChange(f.value)}
               className={cn(
                 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                statusFilter === f.value
+                activeFilter === f.value
                   ? 'bg-white text-slate-800 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
               )}
@@ -179,7 +181,7 @@ export default function SuppliersPage() {
 
       {/* Table */}
       <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
-        <SupplierTableHeader sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+        <SupplierTableHeader sortDir={sortDir} onSort={handleSort} />
 
         {isTableLoading ? (
           Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)

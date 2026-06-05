@@ -146,7 +146,7 @@ export default function DashboardPage() {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search project..."
-              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent"
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-transparent"
             />
             {search && (
               <button

@@ -78,7 +78,7 @@ function POSubsFormInner() {
   }
 
   const fieldClass = (field: string) =>
-    `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 ${
+    `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 ${
       errors[field] ? 'border-red-300' : 'border-slate-200'
     }`
 
@@ -179,7 +179,7 @@ function POSubsFormInner() {
                 onChange={(e) => setSiteInfo(e.target.value)}
                 rows={3}
                 placeholder="Enter site information..."
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 resize-none"
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none"
               />
             </div>
           </FormCard>
@@ -190,7 +190,7 @@ function POSubsFormInner() {
               onChange={(e) => setJobDetails(e.target.value)}
               rows={5}
               placeholder="Describe the job scope and details..."
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 resize-none"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none"
             />
           </FormCard>
         </div>
@@ -211,7 +211,7 @@ function POSubsFormInner() {
             <button
               onClick={() => handleSubmit(false)}
               disabled={insertMutation.isPending}
-              className="w-full py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
             </button>

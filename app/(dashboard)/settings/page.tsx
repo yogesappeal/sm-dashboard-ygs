@@ -8,7 +8,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
     <button
       onClick={() => onChange(!enabled)}
       className={`relative w-10 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-        enabled ? 'bg-[#C66EEB]' : 'bg-slate-200'
+        enabled ? 'bg-[#6692C5]' : 'bg-slate-200'
       }`}
     >
       <span
@@ -33,8 +33,8 @@ function SettingRow({
 }) {
   return (
     <div className="flex items-center gap-4 py-4 border-b border-slate-100 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-        <Icon size={15} className="text-[#C66EEB]" />
+      <div className="w-8 h-8 rounded-lg bg-[#6692C5]/10 flex items-center justify-center shrink-0">
+        <Icon size={15} className="text-[#6692C5]" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-800">{label}</p>

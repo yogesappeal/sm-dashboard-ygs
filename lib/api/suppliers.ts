@@ -6,9 +6,8 @@ interface GetSuppliersParams {
   limit?: number
   search?: string
   type?: string
-  status?: string
+  is_active?: boolean | null
   company?: string
-  order_by?: string
   order_dir?: 'asc' | 'desc'
 }
 
@@ -23,8 +22,7 @@ export async function getSuppliersPaginated(
     order_dir: params.order_dir ?? 'desc',
     ...(params.search ? { search: params.search } : {}),
     ...(params.type ? { type: params.type } : {}),
-    ...(params.status ? { status: params.status } : {}),
-    ...(params.order_by ? { order_by: params.order_by } : {}),
+    ...(params.is_active != null ? { is_active: String(params.is_active) } : {}),
   })
   return api.get<SupplierList>(
     `/functions/v1/get-suppliers-paginated?${q}`,
@@ -41,6 +39,10 @@ export async function updateSupplierStatus(
     supplier_id: supplierId,
     status,
   })
+}
+
+export async function createSupplierData(token: string, body: unknown) {
+  return api.post('/functions/v1/create-supplier', token, body)
 }
 
 export async function updateSupplierData(token: string, body: unknown) {

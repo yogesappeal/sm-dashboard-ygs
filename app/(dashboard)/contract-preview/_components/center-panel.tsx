@@ -10,7 +10,7 @@ import type { CanvasContext, CanvasAction } from './canvas-state'
 
 const ACTIVITIES = [
   { id: 1, Icon: Package, color: 'bg-blue-100 text-blue-500', label: 'PO-2026-003 created', sub: 'Plumbing Mate · Subcontractor PO · $3,200', date: '12 Feb 2026, 2:00 PM' },
-  { id: 2, Icon: Send, color: 'bg-purple-100 text-purple-500', label: 'PO-2026-002 submitted to Elec Sub', sub: 'Status changed: PO Draft → PO Submitted', date: '11 Feb 2026, 11:30 AM' },
+  { id: 2, Icon: Send, color: 'bg-[#6692C5]/10 text-[#6692C5]', label: 'PO-2026-002 submitted to Elec Sub', sub: 'Status changed: PO Draft → PO Submitted', date: '11 Feb 2026, 11:30 AM' },
   { id: 3, Icon: Package, color: 'bg-blue-100 text-blue-500', label: 'PO-2026-001 created', sub: 'Roofing Co. · Supplier PO · $12,500', date: '10 Feb 2026, 9:00 AM' },
   { id: 4, Icon: CheckCircle2, color: 'bg-green-100 text-green-500', label: 'Scope SC-2026-00001 updated', sub: 'House · Electrical status changed to In Progress', date: '8 Feb 2026, 3:15 PM' },
   { id: 5, Icon: AlertCircle, color: 'bg-red-100 text-red-500', label: 'Plumbing flagged as Urgent', sub: 'House · Plumbing — immediate action required', date: '7 Feb 2026, 10:00 AM' },
@@ -61,10 +61,10 @@ const SUBS = ['Elec Sub Pty Ltd', 'Plumbing Mate', 'Render Bros', 'Insulation Pl
 function MaterialRow({ onRemove }: { onRemove: () => void }) {
   return (
     <div className="grid grid-cols-[2fr_80px_80px_120px_32px] gap-2 items-center">
-      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]" placeholder="Description" />
-      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB] text-center" placeholder="Qty" type="number" />
-      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]" placeholder="Unit" />
-      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]" placeholder="0.00" type="number" />
+      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]" placeholder="Description" />
+      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] text-center" placeholder="Qty" type="number" />
+      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]" placeholder="Unit" />
+      <input className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]" placeholder="0.00" type="number" />
       <button onClick={onRemove} className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors">
         <X size={14} />
       </button>
@@ -113,7 +113,7 @@ function CreatePOCanvas({
                 onClick={() => setType(t)}
                 className={cn(
                   'px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize',
-                  type === t ? 'bg-[#C66EEB] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  type === t ? 'bg-[#6692C5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 )}
               >
                 {t}
@@ -130,7 +130,7 @@ function CreatePOCanvas({
                   {type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
                 </label>
                 <div className="relative">
-                  <select className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB] appearance-none bg-white">
+                  <select className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] appearance-none bg-white">
                     <option value="">Choose {type === 'supplier' ? 'supplier' : 'subcontractor'}</option>
                     {(type === 'supplier' ? SUPPLIERS : SUBS).map(s => <option key={s}>{s}</option>)}
                   </select>
@@ -139,18 +139,18 @@ function CreatePOCanvas({
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Date</label>
-                <input type="date" className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]" />
+                <input type="date" className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
-                <textarea rows={2} placeholder="Type here..." className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB] resize-none" />
+                <textarea rows={2} placeholder="Type here..." className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
                 <div className="flex items-center gap-4 mt-1">
                   {['Pickup', 'Delivery'].map(m => (
                     <label key={m} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="delivery" value={m} defaultChecked={m === 'Delivery'} className="accent-[#C66EEB]" />
+                      <input type="radio" name="delivery" value={m} defaultChecked={m === 'Delivery'} className="accent-[#6692C5]" />
                       <span className="text-sm text-slate-600">{m}</span>
                     </label>
                   ))}
@@ -176,7 +176,7 @@ function CreatePOCanvas({
               </div>
               <button
                 onClick={() => setRows(prev => [...prev, Date.now()])}
-                className="mt-3 flex items-center gap-1.5 text-sm text-[#C66EEB] hover:text-purple-700 font-medium transition-colors"
+                className="mt-3 flex items-center gap-1.5 text-sm text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors"
               >
                 <Plus size={14} /> Add Row
               </button>
@@ -187,11 +187,11 @@ function CreatePOCanvas({
               <div className="space-y-4">
                 <div className="w-1/2">
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">Total Price (AUD)</label>
-                  <input type="number" placeholder="0.00" className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]" />
+                  <input type="number" placeholder="0.00" className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">Job Details</label>
-                  <textarea rows={4} placeholder="Describe the scope of work in detail..." className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB] resize-none" />
+                  <textarea rows={4} placeholder="Describe the scope of work in detail..." className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none" />
                 </div>
               </div>
             </div>
@@ -200,9 +200,9 @@ function CreatePOCanvas({
           {/* Attachment */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Attachment</h3>
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-[#C66EEB]/40 transition-colors cursor-pointer">
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-[#6692C5]/40 transition-colors cursor-pointer">
               <FileText size={20} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Drop files here or <span className="text-[#C66EEB] font-medium">browse</span></p>
+              <p className="text-sm text-slate-400">Drop files here or <span className="text-[#6692C5] font-medium">browse</span></p>
               <p className="text-xs text-slate-300 mt-1">PDF, JPG, PNG up to 10MB</p>
             </div>
           </div>
@@ -220,7 +220,7 @@ function CreatePOCanvas({
         <button className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
           Save as Draft
         </button>
-        <button className="flex items-center gap-2 px-5 py-2 text-sm bg-[#C66EEB] hover:bg-[#b55fd4] text-white font-medium rounded-lg transition-colors shadow-sm">
+        <button className="flex items-center gap-2 px-5 py-2 text-sm bg-[#6692C5] hover:bg-[#b55fd4] text-white font-medium rounded-lg transition-colors shadow-sm">
           Preview PO
         </button>
       </div>
@@ -279,7 +279,7 @@ function PODetailCanvas({
         </div>
         <div className="flex items-center gap-2">
           {po.status === 'PO Draft' && (
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#C66EEB] hover:bg-[#b55fd4] text-white font-medium rounded-lg transition-colors">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#b55fd4] text-white font-medium rounded-lg transition-colors">
               <Send size={12} /> Send PO
             </button>
           )}

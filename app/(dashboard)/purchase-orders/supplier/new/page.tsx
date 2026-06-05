@@ -120,7 +120,7 @@ function POSupplierFormInner() {
   }
 
   const fieldClass = (field: string) =>
-    `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 ${
+    `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 ${
       errors[field] ? 'border-red-300' : 'border-slate-200'
     }`
 
@@ -208,7 +208,7 @@ function POSupplierFormInner() {
                 onChange={(e) => setSiteInfo(e.target.value)}
                 rows={3}
                 placeholder="Enter site information..."
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 resize-none"
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none"
               />
             </div>
           </FormCard>
@@ -238,7 +238,7 @@ function POSupplierFormInner() {
                           value={row.description}
                           onChange={(e) => updateRow(row.id, 'description', e.target.value)}
                           placeholder="Item description"
-                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C66EEB]/30"
+                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#6692C5]/30"
                         />
                       </td>
                       <td className="py-2 pr-3">
@@ -248,7 +248,7 @@ function POSupplierFormInner() {
                           value={row.qty}
                           onChange={(e) => updateRow(row.id, 'qty', e.target.value)}
                           placeholder="0"
-                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C66EEB]/30"
+                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#6692C5]/30"
                         />
                       </td>
                       <td className="py-2 pr-3">
@@ -256,7 +256,7 @@ function POSupplierFormInner() {
                           value={row.unit}
                           onChange={(e) => updateRow(row.id, 'unit', e.target.value)}
                           placeholder="pcs"
-                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C66EEB]/30"
+                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#6692C5]/30"
                         />
                       </td>
                       <td className="py-2 pr-3">
@@ -266,7 +266,7 @@ function POSupplierFormInner() {
                           value={row.unitRate}
                           onChange={(e) => updateRow(row.id, 'unitRate', e.target.value)}
                           placeholder="0.00"
-                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C66EEB]/30"
+                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#6692C5]/30"
                         />
                       </td>
                       <td className="py-2 pr-3 text-slate-700 text-xs font-medium">
@@ -289,7 +289,7 @@ function POSupplierFormInner() {
 
             <button
               onClick={addRow}
-              className="flex items-center gap-1.5 mt-3 text-xs text-[#C66EEB] hover:text-[#A855D4] font-medium transition-colors"
+              className="flex items-center gap-1.5 mt-3 text-xs text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors"
             >
               <Plus size={14} />
               Add Item
@@ -316,7 +316,7 @@ function POSupplierFormInner() {
             <button
               onClick={() => handleSubmit(false)}
               disabled={insertMutation.isPending}
-              className="w-full py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
             </button>

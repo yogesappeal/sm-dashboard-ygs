@@ -33,9 +33,9 @@ export async function getPODetails(token: string, poId: string) {
 interface GetPOParams {
   page?: number
   limit?: number
-  status?: string
+  order_dir?: 'ASC' | 'DESC'
   type?: string
-  contractId?: string
+  status?: string
   search?: string
 }
 
@@ -46,9 +46,9 @@ export async function getPurchaseOrdersPaginated(
   const q = new URLSearchParams({
     page: String(params.page ?? 1),
     limit: String(params.limit ?? 10),
+    order_dir: params.order_dir ?? 'DESC',
+    ...(params.type   ? { type:   params.type   } : {}),
     ...(params.status ? { status: params.status } : {}),
-    ...(params.type ? { type: params.type } : {}),
-    ...(params.contractId ? { contract_id: params.contractId } : {}),
     ...(params.search ? { search: params.search } : {}),
   })
   return api.get<PurchaseOrderList>(

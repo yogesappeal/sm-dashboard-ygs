@@ -46,7 +46,7 @@ export function PaginationBar({
           value={currentPage}
           onChange={(e) => onPageChange(Number(e.target.value))}
           disabled={isRefreshing}
-          className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30 disabled:opacity-50 cursor-pointer"
+          className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 disabled:opacity-50 cursor-pointer"
         >
           {pages.map((p) => (
             <option key={p} value={p}>

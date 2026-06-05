@@ -5,10 +5,11 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckSquare, Star } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getAllTasks } from '@/lib/api'
-import { groupTasksByStatus } from '@/lib/utils/tasks'
+import { groupTasksByStatus, buildSubtaskMap } from '@/lib/utils/tasks'
 import { PageHeader } from '@/components/shared/page-header'
 import { TaskCard } from '@/components/cards/task-card'
-import { TaskCreateEditModal } from '@/components/forms/task-create-edit-modal'
+import { TaskSlideOver } from '@/components/cards/task-slide-over'
+import { TaskQuickAdd } from '@/components/cards/task-quick-add'
 import { EmptyState } from '@/components/ui/empty-state'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -47,7 +48,10 @@ export default function TasksPage() {
   })
 
   const allTasks = Array.isArray(data) ? data : []
-  const tasks = priorityOnly ? allTasks.filter((t) => t.priority) : allTasks
+  const subtaskMap = buildSubtaskMap(allTasks)
+  // Only show root tasks in the list — subtasks are rendered inside their parent
+  const rootTasks = allTasks.filter((t) => !t.parent_task_id)
+  const tasks = priorityOnly ? rootTasks.filter((t) => t.priority) : rootTasks
   const grouped = statusFilter ? null : groupTasksByStatus(tasks)
 
   if (!FEATURE_TASK) {
@@ -70,7 +74,7 @@ export default function TasksPage() {
         action={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
           >
             + New Task
           </button>
@@ -131,8 +135,10 @@ export default function TasksPage() {
               token={token!}
               queryKey={queryKey}
               onEdit={setEditingTask}
+              subtasks={subtaskMap[task.id] ?? []}
             />
           ))}
+          <TaskQuickAdd token={token!} status={statusFilter} queryKey={queryKey} />
         </div>
       ) : (
         // Grouped by status when showing all
@@ -155,26 +161,28 @@ export default function TasksPage() {
                       token={token!}
                       queryKey={queryKey}
                       onEdit={setEditingTask}
+                      subtasks={subtaskMap[task.id] ?? []}
                     />
                   ))}
+                  <TaskQuickAdd token={token!} status={status} queryKey={queryKey} />
                 </div>
               </div>
             ))}
         </div>
       )}
 
-      {/* Create modal */}
+      {/* Create slide-over */}
       {showCreateModal && (
-        <TaskCreateEditModal
+        <TaskSlideOver
           token={token!}
           onClose={() => setShowCreateModal(false)}
           queryKey={queryKey}
         />
       )}
 
-      {/* Edit modal */}
+      {/* Edit slide-over */}
       {editingTask && (
-        <TaskCreateEditModal
+        <TaskSlideOver
           token={token!}
           task={editingTask}
           onClose={() => setEditingTask(null)}

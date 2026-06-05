@@ -93,7 +93,7 @@ export default function POSupplierDetailPage() {
             {po.status === 'PO Submitted' && (
               <button
                 onClick={() => setSendEmailDialog(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-[#C66EEB] hover:bg-[#A855D4] rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-[#6692C5] hover:bg-[#4F7CB3] rounded-lg transition-colors"
               >
                 <Send size={14} />
                 Send PO

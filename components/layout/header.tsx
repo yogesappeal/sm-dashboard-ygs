@@ -53,7 +53,7 @@ export function Header() {
           >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#C66EEB]" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#6692C5]" />
             )}
           </button>
           <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
@@ -74,12 +74,12 @@ export function Header() {
                 src={avatarUrl}
                 alt={user?.full_name ?? 'avatar'}
                 fill
-                className="rounded-full object-cover ring-2 ring-purple-100"
+                className="rounded-full object-cover ring-2 ring-[#6692C5]/20"
               />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
-              <span className="text-[#C66EEB] text-sm font-semibold">{initials}</span>
+            <div className="w-9 h-9 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center shrink-0">
+              <span className="text-[#6692C5] text-sm font-semibold">{initials}</span>
             </div>
           )}
         </div>

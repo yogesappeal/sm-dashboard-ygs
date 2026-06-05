@@ -58,8 +58,8 @@ function NavLinks({ pathname, collapsed, onLinkClick }: { pathname: string; coll
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
               isActive
-                ? 'bg-[#C66EEB]/20 text-[#C66EEB] border border-[#C66EEB]/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5',
+                ? 'bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20'
+                : 'text-[#667085] hover:text-slate-800 hover:bg-slate-100',
               collapsed && 'justify-center px-2'
             )}
           >
@@ -126,31 +126,31 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
     ? createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[200] w-52 bg-[#12122a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          className="fixed z-[200] w-52 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
           style={{ left: menuStyle.left, bottom: menuStyle.bottom }}
         >
-          <div className="px-4 py-3 border-b border-white/5">
-            <p className="text-white text-xs font-semibold truncate">{displayName}</p>
-            <p className="text-slate-500 text-xs truncate">{user.email}</p>
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-slate-800 text-xs font-semibold truncate">{displayName}</p>
+            <p className="text-slate-400 text-xs truncate">{user.email}</p>
           </div>
           <div className="py-1">
             <button
               onClick={() => { setOpen(false); router.push('/profile') }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 text-sm transition-colors"
             >
               <User size={15} />
               Profile
             </button>
             <button
               onClick={() => { setOpen(false); router.push('/settings') }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 text-sm transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 text-sm transition-colors"
             >
               <Settings size={15} />
               Settings
             </button>
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 text-sm transition-colors"
             >
               <LogOut size={15} />
               Logout
@@ -162,7 +162,7 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
     : null
 
   return (
-    <div className="px-3 py-4 border-t border-white/5">
+    <div className="px-3 py-4 border-t border-slate-100">
       {floatingMenu}
 
       {/* Trigger button */}
@@ -170,23 +170,23 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
         ref={triggerRef}
         onClick={handleToggle}
         className={cn(
-          'w-full flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-white/5 transition-colors text-left',
+          'w-full flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-slate-100 transition-colors text-left',
           collapsed && 'justify-center'
         )}
       >
         {avatarUrl ? (
           <div className="relative w-8 h-8 flex-shrink-0">
-            <Image src={avatarUrl} alt={displayName} fill className="rounded-full object-cover ring-2 ring-[#C66EEB]/30" />
+            <Image src={avatarUrl} alt={displayName} fill className="rounded-full object-cover ring-2 ring-[#6692C5]/30" />
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-full bg-[#C66EEB]/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-[#C66EEB] text-xs font-semibold">{initials}</span>
+          <div className="w-8 h-8 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-[#6692C5] text-xs font-semibold">{initials}</span>
           </div>
         )}
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="text-white text-xs font-medium truncate">{displayName}</p>
-            <p className="text-slate-500 text-xs truncate">{role}</p>
+            <p className="text-slate-800 text-xs font-medium truncate">{displayName}</p>
+            <p className="text-slate-400 text-xs truncate">{role}</p>
           </div>
         )}
       </button>
@@ -209,16 +209,16 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-[#1a1a2e] border-r border-white/5 transition-transform duration-300 ease-in-out md:hidden',
+          'fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-white border-r border-slate-200 transition-transform duration-300 ease-in-out md:hidden',
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between px-4 py-5 border-b border-white/5">
+        <div className="flex items-center justify-between px-4 py-5 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-            <span className="text-white font-semibold text-sm">SM Dashboard</span>
+            <span className="text-slate-800 font-semibold text-sm">SM Dashboard</span>
           </div>
-          <button onClick={closeMobile} className="p-1 text-slate-400 hover:text-white transition-colors">
+          <button onClick={closeMobile} className="p-1 text-slate-400 hover:text-slate-700 transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -229,29 +229,29 @@ export function Sidebar() {
       {/* ── Desktop sidebar ── */}
       <aside
         className={cn(
-          'hidden md:flex flex-col bg-[#1a1a2e] border-r border-white/5 transition-all duration-300 ease-in-out h-screen sticky top-0',
+          'hidden md:flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out h-screen sticky top-0',
           sidebarOpen ? 'w-60' : 'w-16'
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-5 border-b border-white/5">
+        <div className="flex items-center justify-between px-4 py-5 border-b border-slate-100">
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5">
               <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-              <span className="text-white font-semibold text-sm truncate">SM Dashboard</span>
+              <span className="text-slate-800 font-semibold text-sm truncate">SM Dashboard</span>
             </div>
           ) : (
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg mx-auto" />
           )}
           {sidebarOpen && (
-            <button onClick={toggleSidebar} className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+            <button onClick={toggleSidebar} className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
               <ChevronLeft size={16} />
             </button>
           )}
         </div>
 
         {!sidebarOpen && (
-          <button onClick={toggleSidebar} className="mx-auto mt-2 p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+          <button onClick={toggleSidebar} className="mx-auto mt-2 p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
             <ChevronRight size={16} />
           </button>
         )}

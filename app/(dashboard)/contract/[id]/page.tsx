@@ -74,7 +74,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     return (
       <div className="text-center py-20">
         <p className="text-slate-500">Contract not found.</p>
-        <button onClick={() => router.back()} className="mt-4 text-sm text-[#C66EEB] hover:underline">
+        <button onClick={() => router.back()} className="mt-4 text-sm text-[#6692C5] hover:underline">
           Go back
         </button>
       </div>
@@ -138,8 +138,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
         >
           {crew.map((member) => (
             <div key={member.id} className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
-              <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-medium text-[#C66EEB]">
+              <div className="w-7 h-7 rounded-full bg-[#6692C5]/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-medium text-[#6692C5]">
                   {member.name?.charAt(0)?.toUpperCase() ?? '?'}
                 </span>
               </div>
@@ -187,7 +187,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
             className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 -mx-6 px-6 transition-colors group"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <ShoppingCart size={14} className="text-[#C66EEB] flex-shrink-0" />
+              <ShoppingCart size={14} className="text-[#6692C5] flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-700 truncate group-hover:underline">{po.po_number}</p>
                 <p className="text-xs text-slate-400">{po.supplier_name || '-'}</p>
@@ -253,7 +253,7 @@ function Section({
           <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
         </div>
         {viewAllHref && (
-          <Link href={viewAllHref} className="text-xs text-[#C66EEB] hover:underline">
+          <Link href={viewAllHref} className="text-xs text-[#6692C5] hover:underline">
             View all
           </Link>
         )}

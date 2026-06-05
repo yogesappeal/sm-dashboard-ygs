@@ -26,3 +26,14 @@ export function groupTasksByStatus(tasks: TaskModel[]): Record<string, TaskModel
     return acc
   }, {})
 }
+
+/** Map parent_task_id → its direct children */
+export function buildSubtaskMap(tasks: TaskModel[]): Record<string, TaskModel[]> {
+  return tasks.reduce<Record<string, TaskModel[]>>((acc, task) => {
+    if (task.parent_task_id) {
+      if (!acc[task.parent_task_id]) acc[task.parent_task_id] = []
+      acc[task.parent_task_id].push(task)
+    }
+    return acc
+  }, {})
+}

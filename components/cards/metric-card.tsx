@@ -17,9 +17,9 @@ export function MetricCard({ label, value, isActive = false, onClick, className 
       onClick={onClick}
       className={cn(
         'flex-1 min-w-0 rounded-xl border p-4 text-left transition-all duration-150',
-        'hover:shadow-md hover:border-[#C66EEB]/50',
+        'hover:shadow-md hover:border-[#6692C5]/50',
         isActive
-          ? 'bg-[#C66EEB]/10 border-[#C66EEB]/40 shadow-sm'
+          ? 'bg-[#6692C5]/10 border-[#6692C5]/40 shadow-sm'
           : 'bg-white border-slate-200',
         className
       )}
@@ -30,13 +30,13 @@ export function MetricCard({ label, value, isActive = false, onClick, className 
           size={16}
           className={cn(
             'flex-shrink-0 transition-colors',
-            isActive ? 'text-[#C66EEB]' : 'text-slate-300'
+            isActive ? 'text-[#6692C5]' : 'text-slate-300'
           )}
         />
       </div>
       <p className={cn(
         'text-4xl font-bold leading-none transition-colors',
-        isActive ? 'text-[#C66EEB]' : 'text-[#C66EEB]'
+        isActive ? 'text-[#6692C5]' : 'text-[#6692C5]'
       )}>
         {value ?? '-'}
       </p>
@@ -57,12 +57,12 @@ export function OpsMetricCard({ label, value, href, className }: OpsMetricCardPr
       href={href}
       className={cn(
         'flex-1 min-w-0 rounded-xl border border-slate-200 bg-white p-4 text-left',
-        'hover:shadow-md hover:border-[#C66EEB]/50 transition-all duration-150',
+        'hover:shadow-md hover:border-[#6692C5]/50 transition-all duration-150',
         className
       )}
     >
       <p className="text-sm text-slate-600 font-medium mb-3">{label}</p>
-      <p className="text-4xl font-bold text-[#C66EEB] leading-none">{value ?? '-'}</p>
+      <p className="text-4xl font-bold text-[#6692C5] leading-none">{value ?? '-'}</p>
     </a>
   )
 }

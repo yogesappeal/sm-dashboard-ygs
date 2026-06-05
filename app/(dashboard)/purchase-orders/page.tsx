@@ -84,7 +84,7 @@ export default function PurchaseOrdersPage() {
           <div className="relative">
             <button
               onClick={() => setNewPOOpen((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
             >
               + New PO
               <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
@@ -113,7 +113,8 @@ export default function PurchaseOrdersPage() {
       />
 
       {/* Filters + Search */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap justify-between">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        {/* Type filter */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {TYPE_FILTERS.map((f) => (
             <button
@@ -131,29 +132,31 @@ export default function PurchaseOrdersPage() {
           ))}
         </div>
 
+        {/* Status filter */}
         <select
           value={statusFilter}
           onChange={(e) => handleFilterChange(typeFilter, e.target.value)}
-          className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#C66EEB]/30"
+          className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
         >
           {STATUS_FILTERS.map((f) => (
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
 
+        {/* Search */}
         <div className="relative w-60 ml-auto">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search PO..."
-            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent"
+            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
           />
           {search && (
             <button
               onClick={() => handleSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <X size={14} />
             </button>
@@ -171,7 +174,7 @@ export default function PurchaseOrdersPage() {
             <EmptyState
               icon={ShoppingCart}
               title="No purchase orders"
-              description="Create a new supplier or subcontractor PO to get started"
+              description={search ? `No results for "${search}"` : 'Create a new supplier or subcontractor PO to get started'}
             />
           ) : (
             pos.map((po) => <PORow key={po.id} po={po} />)

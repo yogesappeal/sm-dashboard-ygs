@@ -6,7 +6,7 @@ import { NOTIFICATIONS, NOTIF_UNREAD_COUNT } from '@/lib/data/notifications'
 import type { NotifType, Notification } from '@/lib/data/notifications'
 
 const iconMap: Record<NotifType, { icon: React.ElementType; bg: string; color: string; label: string }> = {
-  contract: { icon: FileText,      bg: 'bg-purple-50', color: 'text-[#C66EEB]', label: 'Contract'  },
+  contract: { icon: FileText,      bg: 'bg-[#6692C5]/10', color: 'text-[#6692C5]', label: 'Contract'  },
   task:     { icon: ClipboardList, bg: 'bg-amber-50',  color: 'text-amber-500', label: 'Task'      },
   po:       { icon: Package,       bg: 'bg-blue-50',   color: 'text-blue-500',  label: 'PO'        },
   alert:    { icon: AlertCircle,   bg: 'bg-red-50',    color: 'text-red-500',   label: 'Alert'     },
@@ -53,7 +53,7 @@ export default function NotificationsPage() {
         {unread > 0 && (
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1.5 text-sm text-[#C66EEB] hover:text-purple-700 font-medium transition-colors"
+            className="flex items-center gap-1.5 text-sm text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors"
           >
             <CheckCheck size={15} />
             Mark all as read
@@ -70,8 +70,8 @@ export default function NotificationsPage() {
             onClick={() => setFilter(f.value)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               filter === f.value
-                ? 'bg-[#C66EEB] text-white'
-                : 'bg-white border border-slate-200 text-slate-500 hover:border-purple-300 hover:text-[#C66EEB]'
+                ? 'bg-[#6692C5] text-white'
+                : 'bg-white border border-slate-200 text-slate-500 hover:border-[#6692C5]/50 hover:text-[#6692C5]'
             }`}
           >
             {f.label}
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
                     <div
                       key={n.id}
                       onClick={() => markRead(n.id)}
-                      className={`flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-slate-50 ${!n.read ? 'bg-purple-50/40' : ''}`}
+                      className={`flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-slate-50 ${!n.read ? 'bg-[#6692C5]/5' : ''}`}
                     >
                       <div className={`mt-0.5 p-2.5 rounded-xl shrink-0 ${bg}`}>
                         <Icon size={16} className={color} />
@@ -114,7 +114,7 @@ export default function NotificationsPage() {
                           </p>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[11px] text-slate-400 whitespace-nowrap">{n.time}</span>
-                            {!n.read && <span className="w-2 h-2 rounded-full bg-[#C66EEB] shrink-0" />}
+                            {!n.read && <span className="w-2 h-2 rounded-full bg-[#6692C5] shrink-0" />}
                           </div>
                         </div>
                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">{n.body}</p>

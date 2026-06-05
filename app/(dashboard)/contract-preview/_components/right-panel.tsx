@@ -56,7 +56,7 @@ function ScopeNavigator({ scopes, onCanvas }: {
                   </button>
                   <button
                     onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors border border-purple-100"
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
                   >
                     <Plus size={11} /> Subs
                   </button>
@@ -104,7 +104,7 @@ function ScopeNavigator({ scopes, onCanvas }: {
                                   buildingName: building.building_name,
                                   tradeName: trade.trade_name,
                                 })}
-                                className="hidden group-hover:flex items-center gap-1 text-[10px] text-[#C66EEB] hover:text-purple-700 font-medium whitespace-nowrap"
+                                className="hidden group-hover:flex items-center gap-1 text-[10px] text-[#6692C5] hover:text-[#4F7CB3] font-medium whitespace-nowrap"
                               >
                                 <Plus size={10} /> Create PO
                               </button>
@@ -210,7 +210,7 @@ export function RightPanel({ scopes, pos, onCanvas }: RightPanelProps) {
             className={cn(
               'flex-1 py-3 text-xs font-semibold transition-colors border-b-2',
               tab === t.key
-                ? 'border-[#C66EEB] text-[#C66EEB]'
+                ? 'border-[#6692C5] text-[#6692C5]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             )}
           >

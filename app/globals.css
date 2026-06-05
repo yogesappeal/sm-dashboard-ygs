@@ -3,11 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #C66EEB;
-  --primary-dark: #A855D4;
-  --sidebar-bg: #1a1a2e;
-  --sidebar-text: #e2e8f0;
-  --sidebar-active: #C66EEB;
+  --primary: #6692C5;
+  --primary-dark: #4F7CB3;
+  --primary-secondary: #D3BE39;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #667085;
+  --sidebar-active: #6692C5;
 }
 
 @theme inline {
