@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
@@ -33,9 +33,19 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [isPageChanging, setIsPageChanging] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField | undefined>()
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  // Debounce search input before triggering the API query
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput)
+      setCurrentPage(1)
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
 
   const activeStatus = STATUS_FILTERS.find((f) => f.index === activeFilter)?.status
 
@@ -110,8 +120,7 @@ export default function DashboardPage() {
   }, [])
 
   const handleSearch = useCallback((val: string) => {
-    setSearch(val)
-    setCurrentPage(1)
+    setSearchInput(val)
   }, [])
 
   const firstName = user?.first_name ?? (isOps ? 'Ops' : 'SM')
@@ -143,12 +152,12 @@ export default function DashboardPage() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={search}
+              value={searchInput}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search project..."
               className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-transparent"
             />
-            {search && (
+            {searchInput && (
               <button
                 onClick={() => handleSearch('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
