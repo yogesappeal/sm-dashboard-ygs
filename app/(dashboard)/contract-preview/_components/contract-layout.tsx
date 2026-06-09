@@ -82,7 +82,7 @@ export function ContractLayout({ contract, crew, scopes, pos }: ContractLayoutPr
 
         {/* Right panel */}
         <div className="w-[330px] shrink-0 border-l border-slate-200 overflow-hidden flex flex-col">
-          <RightPanel scopes={scopes} pos={pos} onCanvas={dispatch} />
+          <RightPanel pos={pos} onCanvas={dispatch} />
         </div>
       </div>
     </div>
