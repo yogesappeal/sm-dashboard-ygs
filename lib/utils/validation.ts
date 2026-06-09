@@ -28,12 +28,11 @@ export const resetPasswordSchema = z
 
 export const supplierSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email').or(z.literal('')),
-  phone: z.string().min(1, 'Phone is required'),
-  address: z.string().min(1, 'Address is required'),
   type: z.string().min(1, 'Type is required'),
+  email: z.string().email('Invalid email').or(z.literal('')).optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
   notes: z.string().optional(),
-  company: z.string().optional(),
 })
 
 export const taskSchema = z.object({

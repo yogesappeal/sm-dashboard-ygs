@@ -42,7 +42,7 @@ export async function updateSupplierStatus(
 }
 
 export async function createSupplierData(token: string, body: unknown) {
-  return api.post('/functions/v1/create-supplier', token, body)
+  return api.post('/functions/v1/insert-supplier', token, body)
 }
 
 export async function updateSupplierData(token: string, body: unknown) {

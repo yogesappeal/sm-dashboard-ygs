@@ -26,7 +26,7 @@ export async function getScopeDetailByContractId(
   token: string,
   contractId: string
 ) {
-  const q = new URLSearchParams({ contract_id: contractId })
+  const q = new URLSearchParams({ build_contract: contractId })
   return api.get<ScopeData>(
     `/functions/v1/get-scope-by-contract-id?${q}`,
     token

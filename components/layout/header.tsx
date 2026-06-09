@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useAuthStore, useAppStore } from '@/lib/store'
-import { Bell, Menu } from 'lucide-react'
+import { Bell, Menu, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
 import { GlobalSearch } from './global-search'
 import { NotificationPanel, unreadCount } from './notification-panel'
+import { ToolboxPanel } from './toolbox-panel'
 
 const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
 
@@ -13,6 +14,7 @@ export function Header() {
   const { user } = useAuthStore()
   const { setMobileSidebarOpen } = useAppStore()
   const [notifOpen, setNotifOpen] = useState(false)
+  const [toolboxOpen, setToolboxOpen] = useState(false)
 
   const initials = user?.first_name?.[0]?.toUpperCase() ?? '?'
   const avatarUrl = user?.image_url
@@ -43,6 +45,18 @@ export function Header() {
 
       {/* Right cluster */}
       <div className="flex items-center gap-3 shrink-0">
+
+        {/* SM Toolbox */}
+        <div className="relative">
+          <button
+            onClick={() => setToolboxOpen((v) => !v)}
+            className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+            aria-label="SM Toolbox"
+          >
+            <LayoutGrid size={18} />
+          </button>
+          <ToolboxPanel open={toolboxOpen} onClose={() => setToolboxOpen(false)} />
+        </div>
 
         {/* Notification bell + panel */}
         <div className="relative">
