@@ -8,6 +8,8 @@ import { X, Loader2 } from 'lucide-react'
 import { insertNewTask, updateExistingTask, searchContract } from '@/lib/api'
 import { taskSchema } from '@/lib/utils/validation'
 import { buildTaskRequestBody } from '@/lib/utils/tasks'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { TaskModel } from '@/lib/types'
 import type { z } from 'zod'
@@ -29,6 +31,7 @@ const STATUS_OPTIONS = [
 
 export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCreateEditModalProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const isEditing = !!task
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<TaskForm>({
@@ -77,8 +80,9 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
         : insertNewTask(token, body)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(isEditing ? messages.task.updateSuccess : messages.task.createSuccess, 'success')
       onClose()
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -172,7 +176,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
 
           {mutation.isError && (
             <p className="text-xs text-red-500 text-center">
-              Failed to {isEditing ? 'update' : 'create'} task. Please try again.
+              {isEditing ? messages.task.updateError : messages.task.createError}
             </p>
           )}
         </form>

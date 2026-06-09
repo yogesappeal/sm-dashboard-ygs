@@ -8,6 +8,8 @@ import { X, Building2, Mail, Phone, MapPin, FileText, Edit2, Check, Loader2 } fr
 import { StatusBadge } from '@/components/ui/status-badge'
 import { updateSupplierStatus, updateSupplierData } from '@/lib/api'
 import { supplierSchema } from '@/lib/utils/validation'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { SupplierData } from '@/lib/types'
 import type { z } from 'zod'
@@ -25,6 +27,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
   const [isEditing, setIsEditing] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const {
     register,
@@ -41,17 +44,17 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
           address: supplier.address,
           type: supplier.type,
           notes: supplier.notes || '',
-          company: supplier.company || '',
         }
       : undefined,
   })
 
   const updateMutation = useMutation({
     mutationFn: (data: SupplierForm) =>
-      updateSupplierData(token, { supplier_id: supplier!.id, ...data }),
+      updateSupplierData(token, { supplier: supplier!.id, ...data, company: supplier!.company || 'AusHail' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.supplier.updateSuccess, 'success')
       setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -118,13 +121,6 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
                   placeholder="Supplier name"
                 />
               </Field>
-              <Field label="Company" error={errors.company?.message}>
-                <input
-                  {...register('company')}
-                  className={inputCls(false)}
-                  placeholder="Company name (optional)"
-                />
-              </Field>
               <Field label="Phone" error={errors.phone?.message}>
                 <input
                   {...register('phone')}
@@ -181,7 +177,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
               </div>
 
               {updateMutation.isError && (
-                <p className="text-xs text-red-500 text-center">Failed to save changes. Please try again.</p>
+                <p className="text-xs text-red-500 text-center">{messages.supplier.updateError}</p>
               )}
             </form>
           ) : (

@@ -7,6 +7,8 @@ import { X, ClipboardList, FileText, Layers, Edit2, Loader2, Plus, Trash2 } from
 import { StatusBadge } from '@/components/ui/status-badge'
 import { updateScopeData } from '@/lib/api'
 import { generateScopeItem } from '@/lib/utils/scope'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { ScopeData, ScopeItem } from '@/lib/types'
 
@@ -27,6 +29,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
   const [isEditing, setIsEditing] = useState(false)
   const [items, setItems] = useState<ScopeItem[]>([])
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const {
     register,
@@ -53,8 +56,9 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
           .map((i) => ({ building_name: i.buildingName, trade_items: i.tradeItems })),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.scope.updateSuccess, 'success')
       setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -184,7 +188,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
               </Field>
 
               {updateMutation.isError && (
-                <p className="text-xs text-red-500 text-center">Failed to save changes. Please try again.</p>
+                <p className="text-xs text-red-500 text-center">{messages.scope.updateError}</p>
               )}
 
               <div className="flex gap-2 pt-2">

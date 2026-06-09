@@ -6,6 +6,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Loader2 } from 'lucide-react'
 import { createSupplierData } from '@/lib/api'
 import { supplierSchema } from '@/lib/utils/validation'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { z } from 'zod'
 
@@ -19,6 +21,7 @@ interface SupplierCreateModalProps {
 
 export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreateModalProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const {
     register,
@@ -26,14 +29,15 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
     formState: { errors, isSubmitting },
   } = useForm<SupplierForm>({
     resolver: zodResolver(supplierSchema),
-    defaultValues: { type: 'supplier', email: '', notes: '', company: '' },
+    defaultValues: { type: 'supplier', email: '', phone: '', address: '', notes: '' },
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: SupplierForm) => createSupplierData(token, data),
+    mutationFn: (data: SupplierForm) => createSupplierData(token, { ...data, company: 'AusHail' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.supplier.createSuccess, 'success')
       onClose()
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -69,19 +73,18 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
             />
           </Field>
 
-          <Field label="Company" error={errors.company?.message}>
-            <input
-              {...register('company')}
-              className={inputCls(false)}
-              placeholder="Company name (optional)"
-            />
+          <Field label="Type *" error={errors.type?.message}>
+            <select {...register('type')} className={inputCls(!!errors.type)}>
+              <option value="supplier">Supplier</option>
+              <option value="subcontractor">Subcontractor</option>
+            </select>
           </Field>
 
-          <Field label="Phone *" error={errors.phone?.message}>
+          <Field label="Phone" error={errors.phone?.message}>
             <input
               {...register('phone')}
               className={inputCls(!!errors.phone)}
-              placeholder="Phone number"
+              placeholder="Phone number (optional)"
             />
           </Field>
 
@@ -93,19 +96,12 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
             />
           </Field>
 
-          <Field label="Type *" error={errors.type?.message}>
-            <select {...register('type')} className={inputCls(!!errors.type)}>
-              <option value="supplier">Supplier</option>
-              <option value="subcontractor">Subcontractor</option>
-            </select>
-          </Field>
-
-          <Field label="Address *" error={errors.address?.message}>
+          <Field label="Address" error={errors.address?.message}>
             <textarea
               {...register('address')}
               rows={3}
               className={inputCls(!!errors.address)}
-              placeholder="Full address"
+              placeholder="Full address (optional)"
             />
           </Field>
 
@@ -119,7 +115,11 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
           </Field>
 
           {createMutation.isError && (
-            <p className="text-xs text-red-500 text-center">Failed to create supplier. Please try again.</p>
+            <p className="text-xs text-red-500 text-center">
+              {createMutation.error instanceof Error
+                ? createMutation.error.message
+                : messages.supplier.createError}
+            </p>
           )}
 
           <div className="flex gap-2 pt-2">

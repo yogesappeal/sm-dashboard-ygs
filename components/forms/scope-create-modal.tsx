@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Plus, Trash2, Loader2 } from 'lucide-react'
 import { insertScopeWithItems, searchContract } from '@/lib/api'
 import { generateScopeItem } from '@/lib/utils/scope'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { ScopeItem } from '@/lib/types'
 
@@ -24,6 +26,7 @@ interface ScopeCreateModalProps {
 
 export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [items, setItems] = useState<ScopeItem[]>([generateScopeItem('', '')])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
@@ -50,8 +53,9 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           .map((i) => ({ building_name: i.buildingName, trade_items: i.tradeItems })),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.scope.createSuccess, 'success')
       onClose()
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -170,7 +174,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           </Field>
 
           {createMutation.isError && (
-            <p className="text-xs text-red-500 text-center">Failed to create scope. Please try again.</p>
+            <p className="text-xs text-red-500 text-center">{messages.scope.createError}</p>
           )}
 
           <div className="flex gap-2 pt-2">
