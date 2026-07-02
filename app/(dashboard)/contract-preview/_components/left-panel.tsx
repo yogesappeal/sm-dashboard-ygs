@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, FileText, Users, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, FileText, Users, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
-import type { DummyContract, DummyCrew, DummyScope, DummyPO } from './types'
+import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO } from './types'
 
 function PhotoCarousel() {
   const [photos, setPhotos] = useState<string[]>([])
@@ -206,6 +206,19 @@ function PhotoCarousel() {
   )
 }
 
+function GoogleDriveIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" opacity="0" />
+      <path d="M43.65 25 29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.05c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" />
+      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 56.5c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" />
+      <path d="M43.65 25 57.4 1.2c-1.35-.8-2.9-1.2-4.5-1.2H34.4c-1.6 0-3.15.45-4.5 1.2z" />
+      <path d="M59.8 52.55h-32.3L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.45 4.5-1.2z" />
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 27.55h27.45c0-1.55-.4-3.1-1.2-4.5z" />
+    </svg>
+  )
+}
+
 function AccordionSection({ title, defaultOpen = true, children }: {
   title: string
   defaultOpen?: boolean
@@ -272,11 +285,12 @@ function derivePriorities(scopes: DummyScope[], pos: DummyPO[]) {
 interface LeftPanelProps {
   contract: DummyContract
   crew: DummyCrew[]
+  pod: DummyPod
   scopes: DummyScope[]
   pos: DummyPO[]
 }
 
-export function LeftPanel({ contract, crew, scopes, pos }: LeftPanelProps) {
+export function LeftPanel({ contract, crew, pod, scopes, pos }: LeftPanelProps) {
   const [tab, setTab] = useState<'details' | 'documents'>('details')
   const priorities = derivePriorities(scopes, pos)
 
@@ -306,10 +320,23 @@ export function LeftPanel({ contract, crew, scopes, pos }: LeftPanelProps) {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         {tab === 'documents' ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-            <FileText size={28} className="text-slate-300 mb-2" />
-            <p className="text-sm text-slate-500 font-medium">No documents yet</p>
-            <p className="text-xs text-slate-400 mt-1">Documents will appear here once uploaded</p>
+          <div className="p-4 flex flex-col gap-4">
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100">
+              <Info size={16} className="text-[#6692C5] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[#6692C5] font-medium leading-snug">
+                You can view customer folder in Google Drive
+              </p>
+            </div>
+
+            <a
+              href={contract.googleDriveUrl || 'https://drive.google.com'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#6692C5] text-white text-sm font-semibold hover:bg-[#5a82b3] transition-colors"
+            >
+              <GoogleDriveIcon size={16} />
+              Open Google Drive
+            </a>
           </div>
         ) : (
           <>
@@ -340,13 +367,35 @@ export function LeftPanel({ contract, crew, scopes, pos }: LeftPanelProps) {
                         <span className="text-[#6692C5] text-[10px] font-bold">{member.name[0]}</span>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-700 truncate">{member.name}</p>
                         <p className="text-[10px] text-slate-400 truncate">{member.role}</p>
+                        <p className="text-xs font-medium text-slate-700 truncate">{member.name}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+            </AccordionSection>
+
+            {/* POD section */}
+            <AccordionSection title="POD">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'SM', name: pod.sm },
+                  { label: 'PA', name: pod.pa },
+                  { label: 'PM', name: pod.pm },
+                  { label: 'AM', name: pod.am },
+                ].map((member, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
+                      <Handshake size={12} className="text-[#6692C5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-400 truncate">{member.label}</p>
+                      <p className="text-xs font-medium text-slate-700 truncate">{member.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </AccordionSection>
 
             {/* Priorities section */}

@@ -1,18 +1,19 @@
 'use client'
 
-import { useReducer } from 'react'
-import { ArrowLeft, Calendar, Clock } from 'lucide-react'
+import { useReducer, useState } from 'react'
+import { ArrowLeft, Calendar, Clock, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import Link from 'next/link'
 import { canvasReducer, initialCanvas } from './canvas-state'
 import { LeftPanel } from './left-panel'
 import { CenterPanel } from './center-panel'
 import { RightPanel } from './right-panel'
 import { StatusBadge } from '@/components/ui/status-badge'
-import type { DummyContract, DummyCrew, DummyScope, DummyPO } from './types'
+import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO } from './types'
 
 interface ContractLayoutProps {
   contract: DummyContract
   crew: DummyCrew[]
+  pod: DummyPod
   scopes: DummyScope[]
   pos: DummyPO[]
 }
@@ -60,8 +61,13 @@ function TopBar({ contract, pos }: { contract: DummyContract; pos: DummyPO[] }) 
   )
 }
 
-export function ContractLayout({ contract, crew, scopes, pos }: ContractLayoutProps) {
+export function ContractLayout({ contract, crew, pod, scopes, pos }: ContractLayoutProps) {
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvas)
+
+  // TEMP: left/right panel toggles for testing — remove this block (and the toolbar below) to revert.
+  const [leftHidden, setLeftHidden] = useState(false)
+  const [rightHidden, setRightHidden] = useState(false)
+  const isCreatingPo = canvas.view === 'create-po'
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -69,11 +75,35 @@ export function ContractLayout({ contract, crew, scopes, pos }: ContractLayoutPr
       <TopBar contract={contract} pos={pos} />
 
       {/* 3-panel row */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className="relative flex flex-1 overflow-hidden min-h-0">
+        {/* TEMP: floating collapse handles — sit on the panel borders, remove this block to revert */}
+        {isCreatingPo && (
+          <>
+            <button
+              onClick={() => setLeftHidden(v => !v)}
+              style={{ left: leftHidden ? '8px' : '336px' }}
+              className="absolute top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-300 shadow-md flex items-center justify-center text-slate-500 hover:text-slate-700 hover:shadow-lg transition-all"
+              title={leftHidden ? 'Show left panel' : 'Hide left panel'}
+            >
+              {leftHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            </button>
+            <button
+              onClick={() => setRightHidden(v => !v)}
+              style={{ right: rightHidden ? '8px' : '317px' }}
+              className="absolute top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-300 shadow-md flex items-center justify-center text-slate-500 hover:text-slate-700 hover:shadow-lg transition-all"
+              title={rightHidden ? 'Show right panel' : 'Hide right panel'}
+            >
+              {rightHidden ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
+            </button>
+          </>
+        )}
+
         {/* Left panel */}
-        <div className="w-[350px] shrink-0 border-r border-slate-200 overflow-hidden flex flex-col">
-          <LeftPanel contract={contract} crew={crew} scopes={scopes} pos={pos} />
-        </div>
+        {!leftHidden && (
+          <div className="w-[350px] shrink-0 border-r border-slate-200 overflow-hidden flex flex-col">
+            <LeftPanel contract={contract} crew={crew} pod={pod} scopes={scopes} pos={pos} />
+          </div>
+        )}
 
         {/* Center canvas */}
         <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
@@ -81,9 +111,11 @@ export function ContractLayout({ contract, crew, scopes, pos }: ContractLayoutPr
         </div>
 
         {/* Right panel */}
-        <div className="w-[330px] shrink-0 border-l border-slate-200 overflow-hidden flex flex-col">
-          <RightPanel pos={pos} onCanvas={dispatch} />
-        </div>
+        {!rightHidden && (
+          <div className="w-[330px] shrink-0 border-l border-slate-200 overflow-hidden flex flex-col">
+            <RightPanel pos={pos} onCanvas={dispatch} />
+          </div>
+        )}
       </div>
     </div>
   )

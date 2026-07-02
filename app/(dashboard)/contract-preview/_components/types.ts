@@ -9,11 +9,19 @@ export interface DummyContract {
   status: string
   pif: string
   notes: string
+  googleDriveUrl?: string
 }
 
 export interface DummyCrew {
   name: string
   role: string
+}
+
+export interface DummyPod {
+  sm: string
+  pa: string
+  pm: string
+  am: string
 }
 
 export interface DummyTrade {

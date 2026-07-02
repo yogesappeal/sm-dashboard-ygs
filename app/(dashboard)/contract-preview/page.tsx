@@ -1,5 +1,5 @@
 import { ContractLayout } from './_components/contract-layout'
-import type { DummyContract, DummyCrew, DummyScope, DummyPO } from './_components/types'
+import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO } from './_components/types'
 
 const CONTRACT: DummyContract = {
   raNumber: 'SC-2026-00001-3E3',
@@ -12,6 +12,7 @@ const CONTRACT: DummyContract = {
   status: 'Active',
   pif: 'PIF-2026-001',
   notes: 'Roof repair and electrical work required. Plumbing urgent.',
+  googleDriveUrl: 'https://drive.google.com/drive/folders/1a2B3c4D5e6F7g8H9i0J',
 }
 
 const CREW: DummyCrew[] = [
@@ -20,6 +21,13 @@ const CREW: DummyCrew[] = [
   { name: 'Galang', role: 'Groundie' },
   { name: 'Galang', role: 'Labourer' },
 ]
+
+const POD: DummyPod = {
+  sm: 'Teddy',
+  pa: 'Courtney',
+  pm: 'Joshua',
+  am: 'Dan',
+}
 
 const SCOPES: DummyScope[] = [
   {
@@ -59,7 +67,7 @@ const POS: DummyPO[] = [
 export default function ContractPreviewPage() {
   return (
     <div className="flex -m-4 md:-m-6 h-[calc(100svh-64px)] overflow-hidden">
-      <ContractLayout contract={CONTRACT} crew={CREW} scopes={SCOPES} pos={POS} />
+      <ContractLayout contract={CONTRACT} crew={CREW} pod={POD} scopes={SCOPES} pos={POS} />
     </div>
   )
 }
