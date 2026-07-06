@@ -154,31 +154,32 @@ function POTracker({ pos, onCanvas }: {
   }, {})
 
   return (
-    <div className="p-3 flex flex-col gap-4">
+    <div className="p-3 flex flex-col gap-5">
       {Object.entries(grouped).map(([status, items]) => (
         <div key={status}>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
             {status} <span className="font-normal">({items.length})</span>
           </p>
-          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-            {items.map((po, i) => (
+          <div className="flex flex-col gap-2.5">
+            {items.map(po => (
               <button
                 key={po.id}
                 onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
-                className={cn(
-                  'w-full flex items-start gap-3 px-3 py-3 text-left hover:bg-slate-50 transition-colors',
-                  i > 0 && 'border-t border-slate-100'
-                )}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left hover:border-slate-300 hover:shadow-sm transition-all"
               >
-                <div className="w-[110px] flex-shrink-0">
-                  <StatusBadge status={po.type} className="mt-0.5" />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-slate-800 truncate">{po.po_number}</p>
+                  <StatusBadge status={po.status} className="flex-shrink-0" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-700 truncate">{po.po_number}</p>
-                  <p className="text-xs text-slate-400 truncate">{po.supplier_name}</p>
-                  {po.amount != null && (
-                    <p className="text-xs text-slate-600 font-medium mt-0.5">${po.amount.toLocaleString()}</p>
-                  )}
+
+                <div className="flex items-end justify-between gap-2 mt-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400">
+                      {po.type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700 truncate mt-0.5">{po.supplier_name}</p>
+                  </div>
+                  <StatusBadge status={po.type} className="flex-shrink-0" />
                 </div>
               </button>
             ))}

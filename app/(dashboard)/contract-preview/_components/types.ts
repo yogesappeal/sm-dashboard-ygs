@@ -10,6 +10,7 @@ export interface DummyContract {
   pif: string
   notes: string
   googleDriveUrl?: string
+  plannedStart?: string
 }
 
 export interface DummyCrew {

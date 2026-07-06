@@ -88,6 +88,32 @@ onCanvas({ type: 'SHOW_PO_DETAIL', poId: 'po-1' })
 
 ---
 
+### Photo Section — Catatan & Rencana Perbaikan (belum diimplementasi)
+
+**Komponen:** `PhotoCarousel` di `left-panel.tsx`
+
+**Status saat ini:** upload & tampilkan photo sudah jalan (via `FileReader` → base64, disimpan di local state `useState<string[]>`), tapi **belum ada API upload/delete** — semua foto hilang begitu halaman di-refresh.
+
+**Masalah yang ditemukan (UX review):**
+- Tombol hapus (X) berukuran kecil (20px), hanya muncul saat hover, dan posisinya berdekatan dengan tombol prev/next di carousel — rawan misclick saat user cepat browsing banyak foto.
+- Klik X langsung menghapus foto tanpa konfirmasi dan tanpa undo. Karena state cuma di memory (belum ada backend), foto yang terhapus **tidak bisa dikembalikan sama sekali**.
+- Makin banyak foto yang diupload, makin tinggi risiko kehilangan foto secara tidak sengaja.
+
+**Ide solusi (untuk diimplementasi bersamaan dengan integrasi API upload/delete):**
+1. **Confirm sebelum delete** — inline popover "Remove this photo?" dengan tombol Confirm/Cancel, pola yang sama seperti popover Planned Start di `contract-layout.tsx` (`PlannedStartField`). Ini mencegah delete tidak sengaja di titik masuknya.
+2. **Undo toast** setelah delete berhasil (mis. "Photo removed · Undo" selama beberapa detik) sebagai jaring pengaman kedua — berguna terutama setelah ada API, di mana delete adalah operasi ke server (butuh cara membatalkan sebelum request delete benar-benar terkirim, atau soft-delete di backend).
+3. Pertimbangkan pindahkan/perbesar tombol delete supaya tidak menempel dengan tombol prev/next, dan/atau pindahkan aksi delete ke thumbnail strip terpisah (bukan cuma di foto yang sedang aktif) supaya user lebih sadar foto mana yang akan dihapus.
+
+**Kenapa ditunda sampai integrasi API:**
+Solusi di atas (terutama undo) baru benar-benar berguna kalau sudah terhubung ke endpoint upload/delete real — perilaku undo, loading state saat upload/delete, dan error handling (delete gagal di server) semuanya bergantung pada bentuk API yang dipakai. Implementasi sekarang (local state only) tidak representatif untuk pola request/response asli.
+
+**Langkah saat integrasi API nanti:**
+- Ganti `handleFiles` (base64 di state) → upload ke storage (mis. Supabase storage, sama seperti asset lain di project) dan simpan array URL, bukan base64.
+- Ganti `removePhoto` → panggil API delete, baru update state setelah response sukses (atau optimistic update + rollback kalau gagal, dikombinasikan dengan undo di atas).
+- Tambahkan loading/error state per foto (mis. spinner saat upload, badge error kalau gagal).
+
+---
+
 ## Center Canvas — 3 Views
 
 ### 1. Activity (default)

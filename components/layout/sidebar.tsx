@@ -213,7 +213,7 @@ export function Sidebar() {
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between px-4 py-5 border-b border-slate-100">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
             <span className="text-slate-800 font-semibold text-sm">SM Dashboard</span>
@@ -234,7 +234,7 @@ export function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-5 border-b border-slate-100">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5">
               <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
