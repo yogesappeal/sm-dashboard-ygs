@@ -10,8 +10,7 @@ import { getScopeDetailByContractId } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
 import type { CanvasAction } from './canvas-state'
 import type { DummyPO } from './types'
-
-const STATIC_CONTRACT_ID = '18eb4e8a-56b3-496d-8087-79553b2ebe02'
+import { STATIC_CONTRACT_ID } from './constants'
 
 // ─── Scope Navigator ──────────────────────────────────────────────────────────
 
@@ -132,12 +131,14 @@ function ScopeNavigator({ scopeData, onCanvas }: {
 
 // ─── PO Tracker ───────────────────────────────────────────────────────────────
 
-const PO_STATUS_ORDER = ['PO Draft', 'PO Submitted', 'PO Sent', 'PO Completed', 'PO Rejected', 'PO Cancelled']
+const PO_STATUS_ORDER = ['PO Draft', 'PO Submitted', 'PO Sent', 'PO Confirmed', 'PO Rescheduled', 'PO Completed', 'PO Rejected', 'PO Cancelled']
 
 function POTracker({ pos, onCanvas }: {
   pos: DummyPO[]
   onCanvas: (a: CanvasAction) => void
 }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+
   if (pos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center px-4">
@@ -155,37 +156,49 @@ function POTracker({ pos, onCanvas }: {
 
   return (
     <div className="p-3 flex flex-col gap-5">
-      {Object.entries(grouped).map(([status, items]) => (
-        <div key={status}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
-            {status} <span className="font-normal">({items.length})</span>
-          </p>
-          <div className="flex flex-col gap-2.5">
-            {items.map(po => (
-              <button
-                key={po.id}
-                onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left hover:border-slate-300 hover:shadow-sm transition-all"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-slate-800 truncate">{po.po_number}</p>
-                  <StatusBadge status={po.status} className="flex-shrink-0" />
-                </div>
+      {Object.entries(grouped).map(([status, items]) => {
+        const isOpen = !collapsed[status]
+        return (
+          <div key={status}>
+            <button
+              onClick={() => setCollapsed(p => ({ ...p, [status]: !p[status] }))}
+              className="w-full flex items-center justify-between mb-2 px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
+            >
+              <span>{status} <span className="font-normal">({items.length})</span></span>
+              {isOpen
+                ? <ChevronDown size={13} className="text-slate-400" />
+                : <ChevronRight size={13} className="text-slate-400" />
+              }
+            </button>
+            {isOpen && (
+              <div className="flex flex-col gap-2.5">
+                {items.map(po => (
+                  <button
+                    key={po.id}
+                    onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left hover:border-slate-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{po.po_number}</p>
+                      <StatusBadge status={po.status} className="flex-shrink-0" />
+                    </div>
 
-                <div className="flex items-end justify-between gap-2 mt-2.5">
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-slate-400">
-                      {po.type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700 truncate mt-0.5">{po.supplier_name}</p>
-                  </div>
-                  <StatusBadge status={po.type} className="flex-shrink-0" />
-                </div>
-              </button>
-            ))}
+                    <div className="flex items-end justify-between gap-2 mt-2.5">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-400">
+                          {po.type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
+                        </p>
+                        <p className="text-sm font-semibold text-slate-700 truncate mt-0.5">{po.supplier_name}</p>
+                      </div>
+                      <StatusBadge status={po.type} className="flex-shrink-0" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

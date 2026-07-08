@@ -1,5 +1,5 @@
 import { api } from './fetcher'
-import type { PurchaseOrderList, POSupplierInfo, POAttachment } from '../types'
+import type { PurchaseOrderList, POSupplierInfo, POAttachment, PurchaseOrderDetailsEnvelope } from '../types'
 
 export interface PODetail {
   id: string
@@ -28,6 +28,17 @@ export async function getPODetails(token: string, poId: string) {
     `/rest/v1/purchase_order_details?${q}`,
     token
   )
+}
+
+// Full PO detail payload (order items, scope snapshot, supplier + client info)
+// from the dedicated purchase-order-details function endpoint.
+export async function getPurchaseOrderDetailsFull(token: string, poId: string) {
+  const q = new URLSearchParams({ po_id: poId })
+  const res = await api.get<PurchaseOrderDetailsEnvelope>(
+    `/functions/v1/purchase-order-details?${q}`,
+    token
+  )
+  return res.data
 }
 
 interface GetPOParams {
@@ -98,8 +109,22 @@ export async function updatePOSupplierInformation(token: string, body: unknown) 
   return api.post('/functions/v1/po-supplier-confirmed', token, body)
 }
 
-export async function respondNewDateRequest(token: string, body: unknown) {
-  return api.post('/functions/v1/respond-new-date-request', token, body)
+export interface RespondNewDateRequestBody {
+  po_id: string
+  action: 'approve' | 'decline'
+}
+
+export interface RespondNewDateRequestResponse {
+  success: boolean
+  message: string
+  data: {
+    po_id: string
+    action: 'approve' | 'decline'
+  }
+}
+
+export async function respondNewDateRequest(token: string, body: RespondNewDateRequestBody) {
+  return api.post<RespondNewDateRequestResponse>('/functions/v1/respond-new-date-request', token, body)
 }
 
 export async function autoSendEmailPurchaseOrder(

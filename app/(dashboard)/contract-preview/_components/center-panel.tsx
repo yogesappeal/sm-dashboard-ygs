@@ -1,16 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
-import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, insertPurchaseOrderSubcontractor } from '@/lib/api'
+import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, insertPurchaseOrderSubcontractor, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
-
-const STATIC_CONTRACT_ID = '18eb4e8a-56b3-496d-8087-79553b2ebe02'
+import { STATIC_CONTRACT_ID } from './constants'
 
 // ─── Activity Canvas ──────────────────────────────────────────────────────────
 
@@ -786,32 +785,32 @@ function CreatePOCanvas({
 
 // ─── PO Detail Canvas ─────────────────────────────────────────────────────────
 
-const DUMMY_PO_DETAILS: Record<string, {
-  po_number: string; type: string; status: string; supplier_name: string
-  delivery_date: string; site_info: string; amount: number
-  email: string; phone: string; order_details: string
-}> = {
-  'po-1': {
-    po_number: 'PO-2026-001', type: 'supplier', status: 'PO Draft',
-    supplier_name: 'Roofing Co.', delivery_date: '20 Feb 2026',
-    site_info: '25 Lake Point Way, Lake Point Way NSW',
-    amount: 12500, email: 'contact@roofingco.com.au', phone: '+61 2 9000 1234',
-    order_details: 'Supply and deliver Colorbond roofing sheets — 120 sqm. Include all fixings, flashing and ridge capping.',
-  },
-  'po-2': {
-    po_number: 'PO-2026-002', type: 'subcontractor', status: 'PO Submitted',
-    supplier_name: 'Elec Sub Pty Ltd', delivery_date: '25 Feb 2026',
-    site_info: '25 Lake Point Way, Lake Point Way NSW',
-    amount: 8200, email: 'jobs@elecsub.com.au', phone: '+61 2 9000 5678',
-    order_details: 'Rewire entire house (4 bed, 2 bath). Supply and install new switchboard. Test and certify all circuits.',
-  },
-  'po-3': {
-    po_number: 'PO-2026-003', type: 'subcontractor', status: 'PO Completed',
-    supplier_name: 'Plumbing Mate', delivery_date: '15 Feb 2026',
-    site_info: '25 Lake Point Way, Lake Point Way NSW',
-    amount: 3200, email: 'info@plumbingmate.com.au', phone: '+61 2 9000 9012',
-    order_details: 'Replace all bathroom and kitchen fixtures. Repair burst pipe in garage. Test all connections.',
-  },
+interface NormalizedOrderItem {
+  id: string
+  name: string
+  shortDescription: string
+  description: string
+}
+
+// order_details comes back in different shapes depending on how the PO was
+// created: an array of {name, shortDescription, description} (per the
+// documented API), an array of {trade_name, building_name, notes} (supplier
+// POs created from this page's Create PO form), or a plain string (subcontractor
+// POs created here, which save the job description as free text).
+function normalizeOrderItems(raw: unknown): NormalizedOrderItem[] {
+  if (typeof raw === 'string') {
+    return raw.trim() ? [{ id: 'text', name: 'Job Description', shortDescription: '', description: raw }] : []
+  }
+  if (!Array.isArray(raw)) return []
+  return raw.map((item, i) => {
+    const o = item as Record<string, unknown>
+    return {
+      id: typeof o.id === 'string' ? o.id : String(i),
+      name: (o.name as string) ?? (o.trade_name as string) ?? `Item ${i + 1}`,
+      shortDescription: (o.shortDescription as string) ?? (o.building_name as string) ?? '',
+      description: (o.description as string) ?? (o.notes as string) ?? '',
+    }
+  })
 }
 
 function PODetailCanvas({
@@ -821,11 +820,75 @@ function PODetailCanvas({
   canvas: Extract<CanvasContext, { view: 'po-detail' }>
   onCanvas: (a: CanvasAction) => void
 }) {
+  const { token } = useAuthStore()
+  const queryClient = useQueryClient()
   const [showReject, setShowReject] = useState(false)
-  const po = DUMMY_PO_DETAILS[canvas.poId] ?? DUMMY_PO_DETAILS['po-1']
+  const [rescheduleHandled, setRescheduleHandled] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'approve' | 'decline' | null>(null)
+  const [responseMessage, setResponseMessage] = useState<string | null>(null)
+
+  const { data: po, isLoading, isError } = useQuery({
+    queryKey: ['po-detail-full', canvas.poId],
+    queryFn: () => getPurchaseOrderDetailsFull(token!, canvas.poId),
+    enabled: !!token && !!canvas.poId,
+  })
+
+  const respondMutation = useMutation({
+    mutationFn: (action: 'approve' | 'decline') =>
+      respondNewDateRequest(token!, { po_id: canvas.poId, action }),
+    onSuccess: (res) => {
+      setConfirmAction(null)
+      setRescheduleHandled(true)
+      setResponseMessage(res.message)
+      queryClient.invalidateQueries({ queryKey: ['po-detail-full', canvas.poId] })
+      queryClient.invalidateQueries({ queryKey: ['contract-details-full', STATIC_CONTRACT_ID] })
+    },
+  })
+
+  useEffect(() => {
+    if (!responseMessage) return
+    const t = setTimeout(() => setResponseMessage(null), 3500)
+    return () => clearTimeout(t)
+  }, [responseMessage])
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center gap-2 text-slate-400 h-full">
+        <Loader2 size={16} className="animate-spin" />
+        <span className="text-sm">Loading PO...</span>
+      </div>
+    )
+  }
+
+  if (isError || !po) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full">
+        <p className="text-sm text-slate-400">Failed to load PO detail.</p>
+      </div>
+    )
+  }
+
+  const formatDate = (iso: string | null) =>
+    iso ? new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso + 'T00:00:00')) : '-'
+
+  const formatDateTime = (iso: string | null) =>
+    iso ? new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '-'
+
+  const deliveryDate = formatDate(po.scheduled_date)
+  const requestedDate = formatDate(po.new_requested_date)
+  const orderItems = normalizeOrderItems(po.order_details)
+  const showRescheduleBanner = po.status === 'PO Rescheduled' && !rescheduleHandled
+  const showRescheduleHistory = !!po.reviewed_status
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {responseMessage && (
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-lg">
+          <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
+          {responseMessage}
+        </div>
+      )}
+
       <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-slate-800">{po.po_number}</h2>
@@ -870,6 +933,74 @@ function PODetailCanvas({
       )}
 
       <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
+        {showRescheduleBanner && (
+          <div className="flex items-start gap-4 mb-4 pl-4 pr-5 py-4 rounded-xl border border-orange-100 bg-orange-50/60 border-l-4 border-l-orange-400">
+            <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <Clock size={16} className="text-orange-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-orange-800">Reschedule requested</p>
+              <p className="text-xs text-orange-700/80 mt-0.5">
+                {po.po_number} - {po.supplier_name} has requested reschedule to {requestedDate}.
+              </p>
+              {po.external_notes && (
+                <p className="text-xs text-orange-700/80">Reason: {po.external_notes}</p>
+              )}
+
+              {confirmAction ? (
+                <div className="mt-3 px-3 py-2.5 rounded-lg bg-white border border-orange-200">
+                  <p className="text-xs font-medium text-slate-700">
+                    Are you sure you want to {confirmAction === 'approve' ? 'approve' : 'decline'} this reschedule request?
+                  </p>
+                  <div className="flex gap-2 mt-2.5">
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      disabled={respondMutation.isPending}
+                      className="px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => respondMutation.mutate(confirmAction)}
+                      disabled={respondMutation.isPending}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors disabled:opacity-50',
+                        confirmAction === 'approve' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
+                      )}
+                    >
+                      {respondMutation.isPending
+                        ? 'Submitting…'
+                        : confirmAction === 'approve' ? 'Yes, approve' : 'Yes, decline'}
+                    </button>
+                  </div>
+                  {respondMutation.isError && (
+                    <p className="text-xs text-red-500 mt-2">Failed to submit. Try again.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setConfirmAction('approve')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-green-300 bg-white hover:bg-green-50 text-green-600 font-medium rounded-lg transition-colors"
+                  >
+                    <Check size={12} /> Approve reschedule
+                  </button>
+                  <button
+                    onClick={() => setConfirmAction('decline')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-200 bg-white hover:bg-red-50 text-red-500 font-medium rounded-lg transition-colors"
+                  >
+                    <X size={12} /> Decline
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-100/70 text-orange-700 text-xs font-medium flex-shrink-0 whitespace-nowrap">
+              <Calendar size={12} />
+              Requested date: {requestedDate}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-4 content-start">
           <div className="col-span-2 space-y-4">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -880,8 +1011,10 @@ function PODetailCanvas({
                 { label: 'PO Number', value: po.po_number },
                 { label: 'Status', value: <StatusBadge status={po.status} /> },
                 { label: 'Type', value: <StatusBadge status={po.type} /> },
-                { label: 'Delivery Date', value: po.delivery_date },
-                { label: 'Total Amount', value: <span className="font-semibold text-slate-800">${po.amount.toLocaleString()}</span> },
+                { label: 'Delivery Date', value: deliveryDate },
+                ...(po.type === 'subcontractor'
+                  ? [{ label: 'Total Amount', value: <span className="font-semibold text-slate-800">${po.po_amount.toLocaleString()}</span> }]
+                  : []),
               ].map(row => (
                 <div key={row.label} className="flex items-center px-4 py-3 border-b border-slate-50 last:border-0">
                   <p className="text-xs text-slate-400 w-36 flex-shrink-0">{row.label}</p>
@@ -890,22 +1023,56 @@ function PODetailCanvas({
               ))}
             </div>
 
+            {showRescheduleHistory && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                  <Clock size={12} className="text-slate-400" />
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Reschedule History</p>
+                </div>
+                {[
+                  { label: 'Original Date', value: formatDate(po.original_scheduled_date) },
+                  { label: 'Requested Date', value: requestedDate },
+                  {
+                    label: 'Review Result',
+                    value: (
+                      <span className={cn(
+                        'font-semibold capitalize',
+                        po.reviewed_status === 'approved' ? 'text-green-600' : 'text-red-500'
+                      )}>
+                        {po.reviewed_status}
+                      </span>
+                    ),
+                  },
+                  { label: 'Reviewed At', value: formatDateTime(po.reviewed_at) },
+                  { label: 'Reason', value: po.external_notes || '-' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center px-4 py-3 border-b border-slate-50 last:border-0">
+                    <p className="text-xs text-slate-400 w-36 flex-shrink-0">{row.label}</p>
+                    <div className="text-sm text-slate-700">{row.value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Order Details</p>
               </div>
-              <div className="px-4 py-4">
-                <p className="text-sm text-slate-600 leading-relaxed">{po.order_details}</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Site Information</p>
-              </div>
-              <div className="px-4 py-4">
-                <p className="text-sm text-slate-600">{po.site_info}</p>
-              </div>
+              {orderItems.length === 0 ? (
+                <div className="px-4 py-4">
+                  <p className="text-sm text-slate-400 italic">No order items</p>
+                </div>
+              ) : (
+                <div>
+                  {orderItems.map((item, i) => (
+                    <div key={item.id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
+                      <p className="text-sm font-semibold text-slate-700">{item.name}</p>
+                      {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
+                      {item.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -918,8 +1085,8 @@ function PODetailCanvas({
               </div>
               {[
                 { label: 'Name', value: po.supplier_name },
-                { label: 'Email', value: po.email },
-                { label: 'Phone', value: po.phone },
+                { label: 'Email', value: po.supplier_email },
+                { label: 'Phone', value: '-' },
               ].map(row => (
                 <div key={row.label} className="px-4 py-3 border-b border-slate-50 last:border-0">
                   <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
@@ -930,18 +1097,11 @@ function PODetailCanvas({
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Site Information</p>
               </div>
-              {[
-                { label: 'Name', value: "Lisa D'Hondt" },
-                { label: 'Address', value: '25 Lake Point Way, NSW' },
-                { label: 'Mobile', value: '+1 235689' },
-              ].map(row => (
-                <div key={row.label} className="px-4 py-3 border-b border-slate-50 last:border-0">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
-                  <p className="text-xs text-slate-700 font-medium">{row.value}</p>
-                </div>
-              ))}
+              <div className="px-4 py-4">
+                <p className="text-sm text-slate-600">{po.site_information || '-'}</p>
+              </div>
             </div>
           </div>
         </div>

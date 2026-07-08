@@ -37,6 +37,10 @@ function getStatusConfig(status: string): StatusConfig {
       return { bg: 'bg-red-50', text: 'text-red-500', dot: 'bg-red-400', label: status }
     case 'PO Submitted':
       return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'PO Submitted' }
+    case 'PO Confirmed':
+      return { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500', label: 'PO Confirmed' }
+    case 'PO Rescheduled':
+      return { bg: 'bg-orange-50', text: 'text-orange-600', dot: 'bg-orange-400', label: 'PO Rescheduled' }
     // PO type
     case 'supplier':
       return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'Supplier' }

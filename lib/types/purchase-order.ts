@@ -77,3 +77,60 @@ export interface MaterialItem {
   unitRate: number
   amount: number
 }
+
+// ─── Raw shape returned by GET /functions/v1/purchase-order-details?po_id= ───
+
+export interface PODetailOrderItem {
+  id: string
+  name: string
+  shortDescription: string
+  description: string
+}
+
+export interface PODetailScopeTrade {
+  trade_id: string
+  trade_name: string
+  is_checked?: boolean
+}
+
+export interface PODetailScopeItem {
+  status: string
+  trades: PODetailScopeTrade[]
+  is_checked: boolean
+  building_id: string
+  building_name: string
+}
+
+export interface PurchaseOrderDetailsRaw {
+  id: string
+  contract_id: string
+  supplier_id: string
+  po_number: string
+  scheduled_date: string | null
+  original_scheduled_date: string | null
+  new_requested_date: string | null
+  reviewed_status: string
+  reviewed_at: string | null
+  external_notes: string
+  status: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  site_information: string
+  order_details: PODetailOrderItem[]
+  type: 'supplier' | 'subcontractor'
+  po_amount: number
+  delivery_method: string
+  scope_snapshot: PODetailScopeItem[]
+  supplier_name: string
+  supplier_address: string
+  supplier_email: string
+  client_first_name: string
+  client_last_name: string
+  address: string
+  ra_number: string
+}
+
+export interface PurchaseOrderDetailsEnvelope {
+  data: PurchaseOrderDetailsRaw
+}

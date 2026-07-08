@@ -1,5 +1,5 @@
 import { api } from './fetcher'
-import type { ContractModel, DetailContracts, Crew } from '../types'
+import type { ContractModel, DetailContracts, Crew, ContractDetailsEnvelope } from '../types'
 
 interface GetContractsPaginatedParams {
   page?: number
@@ -56,4 +56,16 @@ export async function getContractDetails(token: string, contractId: string) {
 export async function getCrewPerProject(token: string, projectId: string) {
   const q = new URLSearchParams({ project_id: projectId })
   return api.get<Crew[]>(`/functions/v1/crew-list?${q}`, token)
+}
+
+// Returns the full nested payload (contract + crew + scopes + po_summary) from
+// the same /contract-details endpoint as getContractDetails above — the actual
+// runtime response is richer than DetailContracts, see ContractDetailsRaw.
+export async function getContractDetailsFull(token: string, contractId: string) {
+  const q = new URLSearchParams({ contract_id: contractId })
+  const res = await api.get<ContractDetailsEnvelope>(
+    `/functions/v1/contract-details?${q}`,
+    token
+  )
+  return res.data
 }
