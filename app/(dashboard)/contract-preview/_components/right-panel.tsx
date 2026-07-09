@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Plus, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Loader2, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
@@ -142,8 +142,17 @@ function POTracker({ pos, onCanvas }: {
   if (pos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
+          <FileText size={20} className="text-[#6692C5]" />
+        </div>
         <p className="text-sm text-slate-500 font-medium">No purchase orders</p>
-        <p className="text-xs text-slate-400 mt-1">Create your first PO from the scope navigator</p>
+        <p className="text-xs text-slate-400 mt-1">Create your first PO to get started</p>
+        <button
+          onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+          className="flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+        >
+          <Plus size={14} /> Create PO
+        </button>
       </div>
     )
   }
@@ -239,6 +248,19 @@ export function RightPanel({ pos, onCanvas }: RightPanelProps) {
           </button>
         ))}
       </div>
+
+      {/* PO Tracker header action */}
+      {tab === 'po' && (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white flex-shrink-0">
+          <p className="text-xs font-semibold text-slate-600">PO List</p>
+          <button
+            onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+          >
+            <Plus size={12} /> New PO
+          </button>
+        </div>
+      )}
 
       {/* Info hint */}
       <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0">

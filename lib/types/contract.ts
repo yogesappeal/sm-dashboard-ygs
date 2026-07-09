@@ -101,6 +101,7 @@ export interface ContractDetailsContract {
   project_status: string
   sm_on_contract: string
   street_address: string
+  customer_folder_link: string
   project_manager: string
   client_last_name: string
   client_ra_number: string

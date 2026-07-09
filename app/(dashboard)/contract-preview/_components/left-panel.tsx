@@ -321,22 +321,32 @@ export function LeftPanel({ contract, crew, pod, scopes, pos }: LeftPanelProps) 
       <div className="flex-1 overflow-y-auto">
         {tab === 'documents' ? (
           <div className="p-4 flex flex-col gap-4">
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100">
-              <Info size={16} className="text-[#6692C5] flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-[#6692C5] font-medium leading-snug">
-                You can view customer folder in Google Drive
-              </p>
-            </div>
+            {contract.googleDriveUrl ? (
+              <>
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                  <Info size={16} className="text-[#6692C5] flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-[#6692C5] font-medium leading-snug">
+                    You can view customer folder in Google Drive
+                  </p>
+                </div>
 
-            <a
-              href={contract.googleDriveUrl || 'https://drive.google.com'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#6692C5] text-white text-sm font-semibold hover:bg-[#5a82b3] transition-colors"
-            >
-              <GoogleDriveIcon size={16} />
-              Open Google Drive
-            </a>
+                <a
+                  href={contract.googleDriveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#6692C5] text-white text-sm font-semibold hover:bg-[#5a82b3] transition-colors"
+                >
+                  <GoogleDriveIcon size={16} />
+                  Open Google Drive
+                </a>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4 text-slate-300">
+                <GoogleDriveIcon size={28} />
+                <p className="text-sm text-slate-500 font-medium mt-3">No customer folder linked</p>
+                <p className="text-xs text-slate-400 mt-1">A Google Drive folder hasn&apos;t been linked to this contract yet</p>
+              </div>
+            )}
           </div>
         ) : (
           <>

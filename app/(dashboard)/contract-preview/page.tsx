@@ -21,6 +21,7 @@ function mapContract(raw: ContractDetailsRaw['contract']): DummyContract {
     status: raw.project_status,
     pif: raw.pif,
     notes: '',
+    googleDriveUrl: raw.customer_folder_link || undefined,
   }
 }
 
