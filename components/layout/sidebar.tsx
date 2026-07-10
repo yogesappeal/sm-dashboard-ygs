@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Suppliers', href: '/suppliers', icon: Users },
   { label: 'Scope', href: '/scope', icon: FileText },
   ...(FEATURE_TASK ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
-  { label: 'Preview', href: '/contract-preview', icon: FlaskConical },
+  { label: 'Preview', href: '/contract-preview/1635376a-0ec8-4ddc-8b03-dc1c1176ced5', icon: FlaskConical },
 ]
 
 function NavLinks({ pathname, collapsed, onLinkClick }: { pathname: string; collapsed?: boolean; onLinkClick?: () => void }) {

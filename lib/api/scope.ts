@@ -42,6 +42,18 @@ export async function insertScopeWithItems(token: string, body: unknown) {
   return api.post('/functions/v1/insert-scopes-with-items', token, body)
 }
 
+export interface UpdateScopeItemsTrade {
+  trade_id: string
+  planned_po_date: string | null
+}
+
+export async function updateScopeItems(
+  token: string,
+  body: { scope_id: string; trades: UpdateScopeItemsTrade[] }
+) {
+  return api.post('/functions/v1/update-scope-items', token, body)
+}
+
 export async function updateScopeData(token: string, body: unknown) {
   return api.post('/functions/v1/update-scope', token, body)
 }

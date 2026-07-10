@@ -72,7 +72,7 @@ export function GlobalSearch() {
     setFocused(false)
     setQuery('')
     setResults([])
-    router.push(`/contract/${id}`)
+    router.push(`/contract-preview/${id}`)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

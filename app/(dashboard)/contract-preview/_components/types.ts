@@ -13,6 +13,11 @@ export interface DummyContract {
   plannedStart?: string
 }
 
+export interface DummyProject {
+  id: string
+  projectName: string
+}
+
 export interface DummyCrew {
   name: string
   role: string

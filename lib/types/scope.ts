@@ -3,6 +3,7 @@ import type { Trades, Pagination } from './shared'
 export interface ScopeTrade {
   trade_id: string
   trade_name: string
+  planned_po_date?: string | null
 }
 
 export interface ScopeDetail {

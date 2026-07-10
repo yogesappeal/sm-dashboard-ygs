@@ -116,6 +116,8 @@ export interface ContractDetailsContract {
   date_deposit_received: string
   primary_contact_record_id: string
   build_pay_client_record_id: string
+  // NOTE: not present in the backend response yet — see updateContractPlannedStart in lib/api/contracts.ts
+  planned_start_date?: string | null
 }
 
 export interface ContractDetailsPO {
@@ -132,10 +134,26 @@ export interface ContractDetailsPOGroup {
   total: number
 }
 
+// The project this contract-details response currently represents. A contract
+// can span multiple projects; future fetches will be scoped by contract id + project id.
+export interface ContractDetailsProject {
+  id: string
+  status: string | null
+  start_date: string | null
+  project_name: string
+}
+
+export interface ContractDetailsProjectListItem {
+  id: string
+  project_name: string
+}
+
 export interface ContractDetailsRaw {
   crew: ContractDetailsCrewItem[]
   scopes: ContractDetailsScope[]
   contract: ContractDetailsContract
+  projects?: ContractDetailsProject
+  project_list?: ContractDetailsProjectListItem[]
   po_summary: {
     supplier: ContractDetailsPOGroup
     subcontractor: ContractDetailsPOGroup

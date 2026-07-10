@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Briefcase, Edit, Truck, Shield, Settings, BarChart2, PieChart,
   UserPlus, FolderPlus, Users, Wrench, DollarSign, FileText,
-  RefreshCw, Package, LayoutGrid, ExternalLink, Loader2,
+  RefreshCw, Package, LayoutGrid, Loader2,
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getUserApps } from '@/lib/api'
@@ -108,7 +108,6 @@ export function ToolboxPanel({ open, onClose }: Props) {
                         <span className="text-[10px] text-slate-600 font-medium text-center leading-tight line-clamp-2">
                           {app.name}
                         </span>
-                        <ExternalLink size={9} className="text-slate-300 group-hover:text-[#6692C5] transition-colors" />
                       </a>
                     )
                   })}

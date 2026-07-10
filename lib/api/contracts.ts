@@ -69,3 +69,13 @@ export async function getContractDetailsFull(token: string, contractId: string) 
   )
   return res.data
 }
+
+// NOTE: backend endpoint not implemented yet — placeholder following the
+// `update-<entity>` convention used by update-scope-items etc. Adjust the
+// path/body shape once the real endpoint exists.
+export async function updateContractPlannedStart(
+  token: string,
+  body: { contract_id: string; planned_start_date: string | null }
+) {
+  return api.post('/functions/v1/update-contract', token, body)
+}

@@ -9,7 +9,7 @@ import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, insertPurchaseOrderSubcontractor, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
-import { STATIC_CONTRACT_ID } from './constants'
+import { useContractId } from './contract-id-context'
 
 // ─── Activity Canvas ──────────────────────────────────────────────────────────
 
@@ -447,6 +447,7 @@ function CreatePOCanvas({
   onCanvas: (a: CanvasAction) => void
 }) {
   const { token, user } = useAuthStore()
+  const contractId = useContractId()
 
   const [type, setType]             = useState<'supplier' | 'subcontractor'>(canvas.poType)
   const [vendorId, setVendorId]     = useState('')
@@ -471,8 +472,8 @@ function CreatePOCanvas({
   })
 
   const { data: scopeData, isLoading: scopeLoading, isError: scopeError } = useQuery({
-    queryKey: ['scope-by-contract', STATIC_CONTRACT_ID],
-    queryFn: () => getScopeDetailByContractId(token!, STATIC_CONTRACT_ID),
+    queryKey: ['scope-by-contract', contractId],
+    queryFn: () => getScopeDetailByContractId(token!, contractId),
     enabled: !!token,
   })
 
@@ -581,7 +582,7 @@ function CreatePOCanvas({
 
     if (type === 'supplier') {
       supplierMutation.mutate({
-        contract_id:      STATIC_CONTRACT_ID,
+        contract_id:      contractId,
         supplier_id:      vendorId,
         supplier_name:    vendorName,
         scheduled_date:   deliveryDate,
@@ -598,7 +599,7 @@ function CreatePOCanvas({
       })
     } else {
       subsMutation.mutate({
-        contract_id:      STATIC_CONTRACT_ID,
+        contract_id:      contractId,
         subs_id:          vendorId,
         subs_name:        vendorName,
         scheduled_date:   deliveryDate,
@@ -821,6 +822,7 @@ function PODetailCanvas({
   onCanvas: (a: CanvasAction) => void
 }) {
   const { token } = useAuthStore()
+  const contractId = useContractId()
   const queryClient = useQueryClient()
   const [showReject, setShowReject] = useState(false)
   const [rescheduleHandled, setRescheduleHandled] = useState(false)
@@ -841,7 +843,7 @@ function PODetailCanvas({
       setRescheduleHandled(true)
       setResponseMessage(res.message)
       queryClient.invalidateQueries({ queryKey: ['po-detail-full', canvas.poId] })
-      queryClient.invalidateQueries({ queryKey: ['contract-details-full', STATIC_CONTRACT_ID] })
+      queryClient.invalidateQueries({ queryKey: ['contract-details-full', contractId] })
     },
   })
 

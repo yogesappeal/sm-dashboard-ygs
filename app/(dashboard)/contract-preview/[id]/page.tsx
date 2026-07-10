@@ -1,13 +1,14 @@
 'use client'
 
+import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getContractDetailsFull } from '@/lib/api'
 import type { ContractDetailsRaw } from '@/lib/types'
-import { ContractLayout } from './_components/contract-layout'
-import { STATIC_CONTRACT_ID } from './_components/constants'
-import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO } from './_components/types'
+import { ContractLayout } from '../_components/contract-layout'
+import { ContractIdProvider } from '../_components/contract-id-context'
+import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO, DummyProject } from '../_components/types'
 
 function mapContract(raw: ContractDetailsRaw['contract']): DummyContract {
   return {
@@ -22,6 +23,7 @@ function mapContract(raw: ContractDetailsRaw['contract']): DummyContract {
     pif: raw.pif,
     notes: '',
     googleDriveUrl: raw.customer_folder_link || undefined,
+    plannedStart: raw.planned_start_date ?? undefined,
   }
 }
 
@@ -62,12 +64,20 @@ function mapPos(raw: ContractDetailsRaw['po_summary']): DummyPO[] {
   ]
 }
 
-export default function ContractPreviewPage() {
+function mapProjects(raw: ContractDetailsRaw['project_list']): DummyProject[] {
+  return (raw ?? []).map(p => ({
+    id: p.id,
+    projectName: p.project_name,
+  }))
+}
+
+export default function ContractPreviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { token } = useAuthStore()
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['contract-details-full', STATIC_CONTRACT_ID],
-    queryFn: () => getContractDetailsFull(token!, STATIC_CONTRACT_ID),
+    queryKey: ['contract-details-full', id],
+    queryFn: () => getContractDetailsFull(token!, id),
     enabled: !!token,
   })
 
@@ -95,10 +105,22 @@ export default function ContractPreviewPage() {
   const crew = mapCrew(data.crew)
   const scopes = mapScopes(data.scopes)
   const pos = mapPos(data.po_summary)
+  const projects = mapProjects(data.project_list)
+  const currentProjectId = data.projects?.id || undefined
 
   return (
     <div className="flex -m-4 md:-m-6 h-[calc(100svh-64px)] overflow-hidden">
-      <ContractLayout contract={contract} crew={crew} pod={pod} scopes={scopes} pos={pos} />
+      <ContractIdProvider contractId={id}>
+        <ContractLayout
+          contract={contract}
+          crew={crew}
+          pod={pod}
+          scopes={scopes}
+          pos={pos}
+          projects={projects}
+          currentProjectId={currentProjectId}
+        />
+      </ContractIdProvider>
     </div>
   )
 }

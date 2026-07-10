@@ -29,7 +29,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField?:
 export function ContractRow({ contract }: ContractRowProps) {
   return (
     <Link
-      href={`/contract/${contract.id}`}
+      href={`/contract-preview/${contract.id}`}
       className="flex items-center gap-2.5 px-4 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 group"
     >
       <div className="flex-shrink-0 w-5 flex items-center justify-center">
