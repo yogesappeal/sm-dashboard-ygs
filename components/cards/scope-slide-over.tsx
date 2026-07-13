@@ -3,14 +3,15 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, ClipboardList, FileText, Layers, Edit2, Loader2, Plus, Trash2 } from 'lucide-react'
+import { X, ClipboardList, FileText, Layers, Edit2, Loader2 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { updateScopeData } from '@/lib/api'
-import { generateScopeItem } from '@/lib/utils/scope'
+import { scopeDraftsToItems, scopeDetailsToDrafts } from '@/lib/utils/scope'
+import { ScopeItemsBuilder } from '@/components/forms/scope-items-builder'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
-import type { ScopeData, ScopeItem } from '@/lib/types'
+import type { ScopeData, ScopeTradeDraft } from '@/lib/types'
 
 interface ScopeForm {
   scope_name: string
@@ -27,7 +28,9 @@ interface ScopeSlideOverProps {
 
 export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOverProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [items, setItems] = useState<ScopeItem[]>([])
+  // TEMP: testing a trade-first input flow — see scope-items-builder.tsx.
+  const [buildings, setBuildings] = useState<string[]>([])
+  const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
   const queryClient = useQueryClient()
   const toast = useToast()
 
@@ -51,9 +54,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
       updateScopeData(token, {
         scope_id: scope!.scope_id,
         ...data,
-        items: items
-          .filter((i) => i.buildingName.trim())
-          .map((i) => ({ building_name: i.buildingName, trade_items: i.tradeItems })),
+        items: scopeDraftsToItems(buildings, trades),
       }),
     onSuccess: () => {
       toast(messages.scope.updateSuccess, 'success')
@@ -63,13 +64,10 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
   })
 
   const handleStartEdit = () => {
-    // Pre-populate items from existing scope_details
-    const existingItems = scope?.scope_details?.length
-      ? scope.scope_details.map((d) =>
-          generateScopeItem(d.building_name, d.trades.map((t) => t.trade_name).join(', '))
-        )
-      : [generateScopeItem('', '')]
-    setItems(existingItems)
+    // Pre-populate buildings/trades from existing scope_details
+    const { buildings: existingBuildings, trades: existingTrades } = scopeDetailsToDrafts(scope?.scope_details ?? [])
+    setBuildings(existingBuildings)
+    setTrades(existingTrades)
     setIsEditing(true)
   }
 
@@ -77,11 +75,6 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
     setIsEditing(false)
     reset()
   }
-
-  const addItem = () => setItems((prev) => [...prev, generateScopeItem('', '')])
-  const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id))
-  const updateItem = (id: string, field: keyof ScopeItem, value: string) =>
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)))
 
   if (!scope) return null
 
@@ -137,45 +130,13 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
 
               {/* Scope Items */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-slate-600">Scope Items</label>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="flex items-center gap-1 text-xs text-[#6692C5] hover:text-[#4F7CB3] transition-colors"
-                  >
-                    <Plus size={12} /> Add Building
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex gap-2 items-start bg-slate-50 rounded-xl p-3">
-                      <div className="flex-1 space-y-2">
-                        <input
-                          value={item.buildingName}
-                          onChange={(e) => updateItem(item.id, 'buildingName', e.target.value)}
-                          placeholder="Building name (e.g. House, Garage)"
-                          className={inputCls(false)}
-                        />
-                        <input
-                          value={item.tradeItems}
-                          onChange={(e) => updateItem(item.id, 'tradeItems', e.target.value)}
-                          placeholder="Trade items (e.g. Roofing, Interior)"
-                          className={inputCls(false)}
-                        />
-                      </div>
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="text-slate-300 hover:text-red-400 transition-colors mt-1"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">Scope Items</label>
+                <ScopeItemsBuilder
+                  buildings={buildings}
+                  trades={trades}
+                  onBuildingsChange={setBuildings}
+                  onTradesChange={setTrades}
+                />
               </div>
 
               <Field label="Notes" error={undefined}>

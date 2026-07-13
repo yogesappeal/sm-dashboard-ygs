@@ -39,6 +39,16 @@ export interface ScopeItem {
   tradeItems: string
 }
 
+// TEMP: testing a trade-first input flow for scope-create-modal.tsx — buildings are
+// entered once, each trade snapshots the current building list (default: applies to
+// all buildings) and buildings can be individually excluded per trade. Still converts
+// down to ScopeItem's { building_name, trade_items } shape on submit.
+export interface ScopeTradeDraft {
+  id: string
+  name: string
+  buildingNames: string[]
+}
+
 export interface Items {
   status: string
   trades: Trades[]

@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Plus, Trash2, Loader2 } from 'lucide-react'
+import { X, Loader2 } from 'lucide-react'
 import { insertScopeWithItems, searchContract } from '@/lib/api'
-import { generateScopeItem } from '@/lib/utils/scope'
+import { scopeDraftsToItems } from '@/lib/utils/scope'
+import { ScopeItemsBuilder } from './scope-items-builder'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
-import type { ScopeItem } from '@/lib/types'
+import type { ScopeTradeDraft } from '@/lib/types'
 
 interface ScopeForm {
   scopeName: string
@@ -27,7 +28,9 @@ interface ScopeCreateModalProps {
 export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalProps) {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const [items, setItems] = useState<ScopeItem[]>([generateScopeItem('', '')])
+  // TEMP: testing a trade-first input flow — see scope-items-builder.tsx.
+  const [buildings, setBuildings] = useState<string[]>([])
+  const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
     defaultValues: { type: 'supplier', notes: '' },
@@ -48,9 +51,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
         contract_id: data.contractId,
         type: data.type,
         notes: data.notes,
-        items: items
-          .filter((i) => i.buildingName.trim())
-          .map((i) => ({ building_name: i.buildingName, trade_items: i.tradeItems })),
+        items: scopeDraftsToItems(buildings, trades),
       }),
     onSuccess: () => {
       toast(messages.scope.createSuccess, 'success')
@@ -58,11 +59,6 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
       queryClient.invalidateQueries({ queryKey })
     },
   })
-
-  const addItem = () => setItems((prev) => [...prev, generateScopeItem('', '')])
-  const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id))
-  const updateItem = (id: string, field: keyof ScopeItem, value: string) =>
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)))
 
   return (
     <>
@@ -121,47 +117,14 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             </select>
           </Field>
 
-          {/* Scope Items */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-slate-600">Scope Items</label>
-              <button
-                type="button"
-                onClick={addItem}
-                className="flex items-center gap-1 text-xs text-[#6692C5] hover:text-[#4F7CB3] transition-colors"
-              >
-                <Plus size={12} /> Add Building
-              </button>
-            </div>
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex gap-2 items-start bg-slate-50 rounded-xl p-3">
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.buildingName}
-                      onChange={(e) => updateItem(item.id, 'buildingName', e.target.value)}
-                      placeholder="Building name (e.g. House, Garage)"
-                      className={inputCls(false)}
-                    />
-                    <input
-                      value={item.tradeItems}
-                      onChange={(e) => updateItem(item.id, 'tradeItems', e.target.value)}
-                      placeholder="Trade items (e.g. Roofing, Interior)"
-                      className={inputCls(false)}
-                    />
-                  </div>
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-slate-300 hover:text-red-400 transition-colors mt-1"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+            <label className="text-xs font-medium text-slate-600 block mb-2">Scope Items</label>
+            <ScopeItemsBuilder
+              buildings={buildings}
+              trades={trades}
+              onBuildingsChange={setBuildings}
+              onTradesChange={setTrades}
+            />
           </div>
 
           <Field label="Notes" error={undefined}>
