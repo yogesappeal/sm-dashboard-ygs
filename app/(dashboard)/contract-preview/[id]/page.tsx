@@ -2,15 +2,16 @@
 
 import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getContractDetailsFull } from '@/lib/api'
 import type { ContractDetailsRaw } from '@/lib/types'
 import { ContractLayout } from '../_components/contract-layout'
 import { ContractIdProvider } from '../_components/contract-id-context'
-import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO, DummyProject } from '../_components/types'
+import type { Contract, Crew, Pod, Scope, PurchaseOrder, Project } from '../_components/types'
 
-function mapContract(raw: ContractDetailsRaw['contract']): DummyContract {
+function mapContract(raw: ContractDetailsRaw['contract'], project: ContractDetailsRaw['projects']): Contract {
   return {
     raNumber: raw.client_ra_number,
     clientFullName: `${raw.client_first_name} ${raw.client_last_name}`.replace(/\s+/g, ' ').trim(),
@@ -23,11 +24,13 @@ function mapContract(raw: ContractDetailsRaw['contract']): DummyContract {
     pif: raw.pif,
     notes: '',
     googleDriveUrl: raw.customer_folder_link || undefined,
-    plannedStart: raw.planned_start_date ?? undefined,
+    // Planned start is a project-level field (see update-project-start-date), not on the contract itself.
+    // Normalize to a plain YYYY-MM-DD — the backend may return a full ISO timestamp.
+    plannedStart: project?.start_date ? project.start_date.slice(0, 10) : undefined,
   }
 }
 
-function mapPod(raw: ContractDetailsRaw['contract']): DummyPod {
+function mapPod(raw: ContractDetailsRaw['contract']): Pod {
   return {
     sm: raw.sm_name,
     pm: raw.project_manager,
@@ -36,11 +39,11 @@ function mapPod(raw: ContractDetailsRaw['contract']): DummyPod {
   }
 }
 
-function mapCrew(raw: ContractDetailsRaw['crew']): DummyCrew[] {
-  return raw.map(c => ({ name: c.user_name, role: c.role }))
+function mapCrew(raw: ContractDetailsRaw['crew']): Crew[] {
+  return raw.map(c => ({ name: c.user_name, role: c.role, crewName: c.crew_name }))
 }
 
-function mapScopes(raw: ContractDetailsRaw['scopes']): DummyScope[] {
+function mapScopes(raw: ContractDetailsRaw['scopes']): Scope[] {
   return raw.map(s => ({
     scope_id: s.id,
     scope_number: s.scoping_number,
@@ -57,14 +60,14 @@ function mapScopes(raw: ContractDetailsRaw['scopes']): DummyScope[] {
   }))
 }
 
-function mapPos(raw: ContractDetailsRaw['po_summary']): DummyPO[] {
+function mapPos(raw: ContractDetailsRaw['po_summary']): PurchaseOrder[] {
   return [
     ...raw.supplier.data.map(p => ({ ...p, type: 'supplier' as const })),
     ...raw.subcontractor.data.map(p => ({ ...p, type: 'subcontractor' as const })),
   ]
 }
 
-function mapProjects(raw: ContractDetailsRaw['project_list']): DummyProject[] {
+function mapProjects(raw: ContractDetailsRaw['project_list']): Project[] {
   return (raw ?? []).map(p => ({
     id: p.id,
     projectName: p.project_name,
@@ -74,10 +77,14 @@ function mapProjects(raw: ContractDetailsRaw['project_list']): DummyProject[] {
 export default function ContractPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { token } = useAuthStore()
+  const searchParams = useSearchParams()
+  // Omitted on initial load from the home page — only sent once the user
+  // switches projects via the header dropdown (see ProjectSwitcher).
+  const projectId = searchParams.get('project') ?? undefined
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['contract-details-full', id],
-    queryFn: () => getContractDetailsFull(token!, id),
+    queryKey: ['contract-details-full', id, projectId],
+    queryFn: () => getContractDetailsFull(token!, id, projectId),
     enabled: !!token,
   })
 
@@ -100,7 +107,7 @@ export default function ContractPreviewPage({ params }: { params: Promise<{ id: 
     )
   }
 
-  const contract = mapContract(data.contract)
+  const contract = mapContract(data.contract, data.projects)
   const pod = mapPod(data.contract)
   const crew = mapCrew(data.crew)
   const scopes = mapScopes(data.scopes)

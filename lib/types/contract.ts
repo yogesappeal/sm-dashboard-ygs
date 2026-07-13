@@ -116,7 +116,7 @@ export interface ContractDetailsContract {
   date_deposit_received: string
   primary_contact_record_id: string
   build_pay_client_record_id: string
-  // NOTE: not present in the backend response yet — see updateContractPlannedStart in lib/api/contracts.ts
+  // NOTE: not present in the backend response yet — see updateProjectStartDate in lib/api/contracts.ts
   planned_start_date?: string | null
 }
 

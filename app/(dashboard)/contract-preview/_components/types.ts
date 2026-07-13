@@ -1,4 +1,4 @@
-export interface DummyContract {
+export interface Contract {
   raNumber: string
   clientFullName: string
   streetAddress: string
@@ -13,45 +13,46 @@ export interface DummyContract {
   plannedStart?: string
 }
 
-export interface DummyProject {
+export interface Project {
   id: string
   projectName: string
 }
 
-export interface DummyCrew {
+export interface Crew {
   name: string
   role: string
+  crewName: string
 }
 
-export interface DummyPod {
+export interface Pod {
   sm: string
   pa: string
   pm: string
   am: string
 }
 
-export interface DummyTrade {
+export interface Trade {
   trade_id: string
   trade_name: string
   status: string
 }
 
-export interface DummyBuilding {
+export interface Building {
   building_id: string
   building_name: string
   status: string
-  trades: DummyTrade[]
+  trades: Trade[]
 }
 
-export interface DummyScope {
+export interface Scope {
   scope_id: string
   scope_number: string
   scope_name: string
   order_status: string
-  scope_details: DummyBuilding[]
+  scope_details: Building[]
 }
 
-export interface DummyPO {
+export interface PurchaseOrder {
   id: string
   po_number: string
   type: 'supplier' | 'subcontractor'

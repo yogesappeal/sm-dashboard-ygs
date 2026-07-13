@@ -61,8 +61,13 @@ export async function getCrewPerProject(token: string, projectId: string) {
 // Returns the full nested payload (contract + crew + scopes + po_summary) from
 // the same /contract-details endpoint as getContractDetails above — the actual
 // runtime response is richer than DetailContracts, see ContractDetailsRaw.
-export async function getContractDetailsFull(token: string, contractId: string) {
-  const q = new URLSearchParams({ contract_id: contractId })
+// `projectId` is optional — omitted on initial load (backend picks the default
+// project), passed once the user switches projects via the header dropdown.
+export async function getContractDetailsFull(token: string, contractId: string, projectId?: string) {
+  const q = new URLSearchParams({
+    contract_id: contractId,
+    ...(projectId ? { project_id: projectId } : {}),
+  })
   const res = await api.get<ContractDetailsEnvelope>(
     `/functions/v1/contract-details?${q}`,
     token
@@ -70,12 +75,9 @@ export async function getContractDetailsFull(token: string, contractId: string) 
   return res.data
 }
 
-// NOTE: backend endpoint not implemented yet — placeholder following the
-// `update-<entity>` convention used by update-scope-items etc. Adjust the
-// path/body shape once the real endpoint exists.
-export async function updateContractPlannedStart(
+export async function updateProjectStartDate(
   token: string,
-  body: { contract_id: string; planned_start_date: string | null }
+  body: { project_id: string; start_date: string | null }
 ) {
-  return api.post('/functions/v1/update-contract', token, body)
+  return api.post('/functions/v1/update-project-start-date', token, body)
 }

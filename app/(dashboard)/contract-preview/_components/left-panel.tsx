@@ -2,10 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, FileText, Users, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, FileText, Users, UserPlus, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
-import type { DummyContract, DummyCrew, DummyPod, DummyScope, DummyPO } from './types'
+import { useAuthStore } from '@/lib/store'
+import { getCrewPaginated, updateProjectCrew } from '@/lib/api'
+import type { Contract, Crew, Pod, Scope, PurchaseOrder } from './types'
 
 function PhotoCarousel() {
   const [photos, setPhotos] = useState<string[]>([])
@@ -219,24 +222,41 @@ function GoogleDriveIcon({ size = 16 }: { size?: number }) {
   )
 }
 
-function AccordionSection({ title, defaultOpen = true, children }: {
+function AccordionSection({ title, subtitle, defaultOpen = true, headerAction, children }: {
   title: string
+  subtitle?: string
   defaultOpen?: boolean
+  headerAction?: React.ReactNode
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border-b border-slate-100 last:border-0">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-50 transition-colors"
-      >
-        {title}
-        {open
-          ? <ChevronDown size={13} className="text-slate-400" />
-          : <ChevronRight size={13} className="text-slate-400" />
-        }
-      </button>
+      <div className="flex items-center gap-2 pl-4 pr-2 hover:bg-slate-50 transition-colors">
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex-1 min-w-0 py-3 text-left"
+        >
+          <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
+          {subtitle && (
+            <span className="block text-[10px] text-slate-400 normal-case font-normal truncate mt-0.5">{subtitle}</span>
+          )}
+        </button>
+        {headerAction && (
+          <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+            {headerAction}
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex-shrink-0 flex items-center justify-center w-5 h-5"
+        >
+          {open
+            ? <ChevronDown size={13} className="text-slate-400" />
+            : <ChevronRight size={13} className="text-slate-400" />
+          }
+        </button>
+      </div>
       {open && <div className="px-4 pb-4">{children}</div>}
     </div>
   )
@@ -260,7 +280,123 @@ function InfoRow({ icon: Icon, label, value }: {
   )
 }
 
-function derivePriorities(scopes: DummyScope[], pos: DummyPO[]) {
+// NOTE: get-crew-paginated's response fields (id/name/role/company) are an
+// assumption — adjust CrewMember in lib/api/crew.ts once confirmed.
+function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; currentCrew: Crew[] }) {
+  const { token } = useAuthStore()
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  function handleSearchChange(value: string) {
+    setSearch(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 300)
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['crew-paginated', debouncedSearch],
+    queryFn: () => getCrewPaginated(token!, { search: debouncedSearch, limit: 50 }),
+    enabled: !!token && open,
+  })
+
+  const mutation = useMutation({
+    mutationFn: (crewId: string) => updateProjectCrew(token!, { project_id: projectId!, crew_id: crewId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-details-full'] })
+      setOpen(false)
+      setSearch('')
+      setDebouncedSearch('')
+    },
+  })
+
+  const members = data?.data ?? []
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        onClick={() => setOpen(p => !p)}
+        disabled={!projectId}
+        title={projectId ? 'Add / edit crew' : 'No project selected'}
+        className="flex items-center justify-center w-6 h-6 rounded-lg text-slate-400 hover:text-[#6692C5] hover:bg-[#6692C5]/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <UserPlus size={14} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-20 w-64 bg-white rounded-xl border border-slate-200 shadow-lg p-3">
+          <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1.5">Assign crew</p>
+          {currentCrew.length > 0 && (
+            <div className="mb-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">Currently assigned</p>
+              <div className="flex flex-col gap-0.5">
+                {Array.from(new Set(currentCrew.map(c => c.crewName || c.name))).map(name => (
+                  <p key={name} className="text-xs font-medium text-slate-700 truncate">
+                    {name}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          <input
+            type="text"
+            autoFocus
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search crew..."
+            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+          />
+          {mutation.isError && (
+            <p className="text-xs text-red-500 mt-2">Failed to assign crew. Try again.</p>
+          )}
+          <div className="max-h-52 overflow-y-auto mt-2 -mx-1">
+            {isLoading && (
+              <div className="flex items-center justify-center gap-2 py-4 text-slate-400">
+                <Loader2 size={13} className="animate-spin" />
+                <span className="text-xs">Loading...</span>
+              </div>
+            )}
+            {!isLoading && members.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">No crew found</p>
+            )}
+            {members.map(m => (
+              <button
+                key={m.id}
+                onClick={() => mutation.mutate(m.id)}
+                disabled={mutation.isPending}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+              >
+                <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#6692C5] text-[10px] font-bold">{m.name?.[0]?.toUpperCase() ?? '?'}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-700 truncate">{m.name}</p>
+                  {(m.role || m.company) && (
+                    <p className="text-[10px] text-slate-400 truncate">{[m.role, m.company].filter(Boolean).join(' · ')}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function derivePriorities(scopes: Scope[], pos: PurchaseOrder[]) {
   const items: { label: string; sub: string; level: 'high' | 'medium' }[] = []
 
   pos.filter(p => p.status === 'PO Rejected').forEach(p => {
@@ -283,14 +419,15 @@ function derivePriorities(scopes: DummyScope[], pos: DummyPO[]) {
 }
 
 interface LeftPanelProps {
-  contract: DummyContract
-  crew: DummyCrew[]
-  pod: DummyPod
-  scopes: DummyScope[]
-  pos: DummyPO[]
+  contract: Contract
+  crew: Crew[]
+  pod: Pod
+  scopes: Scope[]
+  pos: PurchaseOrder[]
+  projectId?: string
 }
 
-export function LeftPanel({ contract, crew, pod, scopes, pos }: LeftPanelProps) {
+export function LeftPanel({ contract, crew, pod, scopes, pos, projectId }: LeftPanelProps) {
   const [tab, setTab] = useState<'details' | 'documents'>('details')
   const priorities = derivePriorities(scopes, pos)
 
@@ -363,7 +500,10 @@ export function LeftPanel({ contract, crew, pod, scopes, pos }: LeftPanelProps) 
             </AccordionSection>
 
             {/* Crew section */}
-            <AccordionSection title="Crew">
+            <AccordionSection
+              title="Crew"
+              headerAction={<CrewAssignPicker projectId={projectId} currentCrew={crew} />}
+            >
               {crew.length === 0 ? (
                 <div className="flex items-center gap-2 py-1 text-slate-400">
                   <Users size={13} />
@@ -379,6 +519,9 @@ export function LeftPanel({ contract, crew, pod, scopes, pos }: LeftPanelProps) 
                       <div className="min-w-0">
                         <p className="text-[10px] text-slate-400 truncate">{member.role}</p>
                         <p className="text-xs font-medium text-slate-700 truncate">{member.name}</p>
+                        {member.crewName && (
+                          <p className="text-[10px] text-slate-400 truncate">{member.crewName}</p>
+                        )}
                       </div>
                     </div>
                   ))}

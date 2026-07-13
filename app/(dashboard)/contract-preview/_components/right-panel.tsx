@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, CheckSquare, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, CheckSquare, X, AlertTriangle } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
-import { getScopeDetailByContractId, updateScopeItems } from '@/lib/api'
+import { getScopeDetailByContractId, updateScopeItems, ApiError } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
 import type { CanvasAction } from './canvas-state'
-import type { DummyPO } from './types'
+import type { PurchaseOrder } from './types'
 import { useContractId } from './contract-id-context'
 
 // ─── Scope Navigator ──────────────────────────────────────────────────────────
@@ -20,23 +20,34 @@ function tradeDot(status: string) {
   return 'bg-yellow-400'
 }
 
+// The backend may return a full ISO timestamp for planned_po_date instead of
+// a plain YYYY-MM-DD — normalize before using as a <input type="date"> value
+// or before appending 'T00:00:00' for parsing.
+function toDateOnly(iso: string) {
+  return iso.slice(0, 10)
+}
+
 function PlannedPoDateControl({
   scopeId,
   tradeId,
   tradeName,
   value,
   contractId,
+  plannedStart,
 }: {
   scopeId: string
   tradeId: string
   tradeName: string
   value: string | null | undefined
   contractId: string
+  plannedStart?: string
 }) {
   const { token } = useAuthStore()
   const queryClient = useQueryClient()
+  const normalizedValue = value ? toDateOnly(value) : value
+  const minDate = plannedStart ? toDateOnly(plannedStart) : undefined
   const [open, setOpen] = useState(false)
-  const [pending, setPending] = useState(value ?? '')
+  const [pending, setPending] = useState(normalizedValue ?? '')
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,12 +55,12 @@ function PlannedPoDateControl({
     function onClickOutside(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setOpen(false)
-        setPending(value ?? '')
+        setPending(normalizedValue ?? '')
       }
     }
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open, value])
+  }, [open, normalizedValue])
 
   const mutation = useMutation({
     mutationFn: (plannedPoDate: string | null) =>
@@ -60,14 +71,15 @@ function PlannedPoDateControl({
     },
   })
 
-  const overdue = value ? new Date(value + 'T00:00:00').getTime() < new Date().setHours(0, 0, 0, 0) : false
+  const overdue = normalizedValue ? new Date(normalizedValue + 'T00:00:00').getTime() < new Date().setHours(0, 0, 0, 0) : false
+  const belowMin = !!(minDate && pending && pending < minDate)
 
   return (
     <div ref={wrapperRef} className="relative flex-shrink-0">
       <button
         onClick={(e) => {
           e.stopPropagation()
-          setPending(value ?? '')
+          setPending(normalizedValue ?? '')
           setOpen(true)
         }}
         className={cn(
@@ -89,9 +101,15 @@ function PlannedPoDateControl({
           <input
             type="date"
             value={pending}
+            min={minDate}
             onChange={(e) => setPending(e.target.value)}
             className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
           />
+          {belowMin && (
+            <p className="text-xs text-red-500 mt-2">
+              Can&apos;t be before planned start ({formatDate(minDate!)}).
+            </p>
+          )}
           <div className="flex items-center justify-between gap-2 mt-3">
             <button
               onClick={() => mutation.mutate(null)}
@@ -109,7 +127,7 @@ function PlannedPoDateControl({
               </button>
               <button
                 onClick={() => mutation.mutate(pending)}
-                disabled={mutation.isPending || !pending}
+                disabled={mutation.isPending || !pending || belowMin}
                 className="px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#5a82b3] text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {mutation.isPending ? 'Saving...' : 'Save'}
@@ -131,6 +149,7 @@ function DraftReviewBar({
   scopeId,
   drafts,
   contractId,
+  plannedStart,
   onRemove,
   onDiscardAll,
   onSaved,
@@ -138,6 +157,7 @@ function DraftReviewBar({
   scopeId: string
   drafts: Map<string, PoDateDraft>
   contractId: string
+  plannedStart?: string
   onRemove: (tradeId: string) => void
   onDiscardAll: () => void
   onSaved: () => void
@@ -164,6 +184,11 @@ function DraftReviewBar({
   const count = drafts.size
   if (count === 0) return null
 
+  const minDate = plannedStart ? toDateOnly(plannedStart) : undefined
+  const invalidCount = minDate
+    ? Array.from(drafts.values()).filter(d => d.value && d.value < minDate).length
+    : 0
+
   return (
     <div className="sticky bottom-0 z-10 rounded-xl bg-slate-800 text-white shadow-lg overflow-hidden">
       <button
@@ -179,18 +204,29 @@ function DraftReviewBar({
 
       {expanded && (
         <div className="max-h-36 overflow-y-auto border-t border-white/10">
-          {Array.from(drafts.entries()).map(([tradeId, d]) => (
-            <div key={tradeId} className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-white/5 last:border-0">
-              <span className="text-[11px] truncate">{d.tradeName}</span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="text-[11px] text-white/70">{d.value ? formatDate(d.value) : 'Cleared'}</span>
-                <button onClick={() => onRemove(tradeId)} className="text-white/50 hover:text-white transition-colors">
-                  <X size={11} />
-                </button>
+          {Array.from(drafts.entries()).map(([tradeId, d]) => {
+            const invalid = !!(minDate && d.value && d.value < minDate)
+            return (
+              <div key={tradeId} className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-white/5 last:border-0">
+                <span className="text-[11px] truncate">{d.tradeName}</span>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className={cn('text-[11px]', invalid ? 'text-red-300 font-medium' : 'text-white/70')}>
+                    {d.value ? formatDate(d.value) : 'Cleared'}
+                  </span>
+                  <button onClick={() => onRemove(tradeId)} className="text-white/50 hover:text-white transition-colors">
+                    <X size={11} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
+      )}
+
+      {invalidCount > 0 && (
+        <p className="px-3 py-2 text-[11px] text-red-300 border-t border-white/10">
+          {invalidCount} date{invalidCount === 1 ? '' : 's'} {invalidCount === 1 ? 'is' : 'are'} before planned start ({formatDate(minDate!)}) — fix before saving.
+        </p>
       )}
 
       <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-white/10">
@@ -203,7 +239,7 @@ function DraftReviewBar({
         </button>
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || invalidCount > 0}
           className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] hover:bg-[#5a82b3] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? 'Saving...' : `Save ${count} change${count === 1 ? '' : 's'}`}
@@ -213,10 +249,68 @@ function DraftReviewBar({
   )
 }
 
-function ScopeNavigator({ scopeData, onCanvas, contractId }: {
+interface PlannedStartConflict {
+  tradeId: string
+  tradeName: string
+  plannedPoDate: string
+}
+
+// Shown below the scope info when the contract's planned start date has moved
+// past a trade's planned PO date. We deliberately don't auto-shift trade dates
+// here — the user reviews and fixes each one themselves via PlannedPoDateControl.
+function PlannedStartConflictBanner({
+  plannedStart,
+  conflicts,
+  scopeId,
+  contractId,
+}: {
+  plannedStart: string
+  conflicts: PlannedStartConflict[]
+  scopeId: string
+  contractId: string
+}) {
+  if (conflicts.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-red-700">
+            Planned start ({formatDate(plannedStart)}) is past {conflicts.length} trade PO date{conflicts.length === 1 ? '' : 's'}
+          </p>
+          <p className="text-[11px] text-red-600 mt-0.5">
+            Modify or reset the affected trade dates below.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5 mt-2.5">
+        {conflicts.map(c => (
+          <div key={c.tradeId} className="flex items-center justify-between gap-2 bg-white rounded-lg border border-red-100 px-2.5 py-1.5">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-slate-700 truncate">{c.tradeName}</p>
+              <p className="text-[10px] text-red-500">Due {formatDate(c.plannedPoDate)}</p>
+            </div>
+            <PlannedPoDateControl
+              scopeId={scopeId}
+              tradeId={c.tradeId}
+              tradeName={c.tradeName}
+              value={c.plannedPoDate}
+              contractId={contractId}
+              plannedStart={plannedStart}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
   scopeData: ScopeData
   onCanvas: (a: CanvasAction) => void
   contractId: string
+  plannedStart?: string
 }) {
   const [scopeOpen, setScopeOpen] = useState(true)
   const [openBuildings, setOpenBuildings] = useState<Record<string, boolean>>({})
@@ -244,6 +338,14 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
       return next
     })
   }
+
+  const conflicts: PlannedStartConflict[] = plannedStart
+    ? scopeData.scope_details
+        .flatMap(b => b.trades)
+        .filter((t): t is typeof t & { planned_po_date: string } => !!t.planned_po_date)
+        .filter(t => toDateOnly(plannedStart) > toDateOnly(t.planned_po_date))
+        .map(t => ({ tradeId: t.trade_id, tradeName: t.trade_name, plannedPoDate: t.planned_po_date }))
+    : []
 
   return (
     <div className="p-3 flex flex-col gap-3">
@@ -315,7 +417,11 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
 
                   {bOpen && (
                     <div className="ml-4 border-l-2 border-slate-100 pl-3 pb-1">
-                      {building.trades.map(trade => (
+                      {building.trades.map(trade => {
+                        const minDate = plannedStart ? toDateOnly(plannedStart) : undefined
+                        const draftValue = drafts.get(trade.trade_id)?.value ?? (trade.planned_po_date ? toDateOnly(trade.planned_po_date) : '')
+                        const draftInvalid = !!(minDate && draftValue && draftValue < minDate)
+                        return (
                         <div
                           key={trade.trade_id}
                           className="flex items-center justify-between py-2 pr-2 group border-b border-slate-50 last:border-0"
@@ -334,24 +440,33 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
                             {editMode ? (
                               <input
                                 type="date"
-                                value={drafts.get(trade.trade_id)?.value ?? (trade.planned_po_date ?? '')}
-                                onChange={(e) => setDraft(trade.trade_id, trade.trade_name, e.target.value, trade.planned_po_date)}
+                                value={draftValue}
+                                min={minDate}
+                                onChange={(e) => setDraft(trade.trade_id, trade.trade_name, e.target.value, trade.planned_po_date ? toDateOnly(trade.planned_po_date) : null)}
                                 className={cn(
                                   'text-[10px] border rounded-md px-1.5 py-1 w-[112px] focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
-                                  drafts.has(trade.trade_id)
-                                    ? 'border-[#6692C5] bg-[#6692C5]/5 text-[#6692C5] font-medium'
-                                    : 'border-slate-200 text-slate-500'
+                                  draftInvalid
+                                    ? 'border-red-400 bg-red-50 text-red-600 font-medium'
+                                    : drafts.has(trade.trade_id)
+                                      ? 'border-[#6692C5] bg-[#6692C5]/5 text-[#6692C5] font-medium'
+                                      : 'border-slate-200 text-slate-500'
                                 )}
                               />
                             ) : (
                               <>
-                                <PlannedPoDateControl
-                                  scopeId={scopeData.scope_id}
-                                  tradeId={trade.trade_id}
-                                  tradeName={trade.trade_name}
-                                  value={trade.planned_po_date}
-                                  contractId={contractId}
-                                />
+                                {trade.planned_po_date && (
+                                  <span
+                                    className={cn(
+                                      'flex items-center gap-1 text-[10px] font-medium whitespace-nowrap',
+                                      new Date(toDateOnly(trade.planned_po_date) + 'T00:00:00').getTime() < new Date().setHours(0, 0, 0, 0)
+                                        ? 'text-red-500'
+                                        : 'text-slate-400'
+                                    )}
+                                  >
+                                    <Calendar size={10} />
+                                    {formatDate(trade.planned_po_date)}
+                                  </span>
+                                )}
                                 <button
                                   onClick={() => onCanvas({
                                     type: 'SHOW_CREATE_PO',
@@ -367,7 +482,8 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
                             )}
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -382,11 +498,21 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
         )}
       </div>
 
+      {plannedStart && (
+        <PlannedStartConflictBanner
+          plannedStart={plannedStart}
+          conflicts={conflicts}
+          scopeId={scopeData.scope_id}
+          contractId={contractId}
+        />
+      )}
+
       {editMode && (
         <DraftReviewBar
           scopeId={scopeData.scope_id}
           drafts={drafts}
           contractId={contractId}
+          plannedStart={plannedStart}
           onRemove={removeDraft}
           onDiscardAll={() => setDrafts(new Map())}
           onSaved={toggleEditMode}
@@ -401,7 +527,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId }: {
 const PO_STATUS_ORDER = ['PO Draft', 'PO Submitted', 'PO Sent', 'PO Confirmed', 'PO Rescheduled', 'PO Completed', 'PO Rejected', 'PO Cancelled']
 
 function POTracker({ pos, onCanvas }: {
-  pos: DummyPO[]
+  pos: PurchaseOrder[]
   onCanvas: (a: CanvasAction) => void
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -424,7 +550,7 @@ function POTracker({ pos, onCanvas }: {
     )
   }
 
-  const grouped = PO_STATUS_ORDER.reduce<Record<string, DummyPO[]>>((acc, status) => {
+  const grouped = PO_STATUS_ORDER.reduce<Record<string, PurchaseOrder[]>>((acc, status) => {
     const items = pos.filter(p => p.status === status)
     if (items.length > 0) acc[status] = items
     return acc
@@ -482,20 +608,23 @@ function POTracker({ pos, onCanvas }: {
 // ─── Right Panel ──────────────────────────────────────────────────────────────
 
 interface RightPanelProps {
-  pos: DummyPO[]
+  pos: PurchaseOrder[]
   onCanvas: (action: CanvasAction) => void
+  plannedStart?: string
 }
 
-export function RightPanel({ pos, onCanvas }: RightPanelProps) {
+export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
   const { token } = useAuthStore()
   const contractId = useContractId()
   const [tab, setTab] = useState<'scope' | 'po'>('scope')
 
-  const { data: scopeData, isLoading, isError } = useQuery({
+  const { data: scopeData, isLoading, isError, error: scopeError } = useQuery({
     queryKey: ['scope-by-contract', contractId],
     queryFn: () => getScopeDetailByContractId(token!, contractId),
     enabled: !!token,
+    retry: (failureCount, error) => error instanceof ApiError && error.status === 404 ? false : failureCount < 3,
   })
+  const scopeNotFound = scopeError instanceof ApiError && scopeError.status === 404
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
@@ -569,12 +698,22 @@ export function RightPanel({ pos, onCanvas }: RightPanelProps) {
               </div>
             )}
             {isError && (
-              <div className="p-6 text-center">
-                <p className="text-xs text-slate-400">Failed to load scope</p>
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+                  <FileText size={20} className="text-slate-400" />
+                </div>
+                {scopeNotFound ? (
+                  <>
+                    <p className="text-sm text-slate-500 font-medium">No scope found</p>
+                    <p className="text-xs text-slate-400 mt-1">This project doesn&apos;t have a scope yet.</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500 font-medium">Failed to load scope</p>
+                )}
               </div>
             )}
             {scopeData && (
-              <ScopeNavigator scopeData={scopeData} onCanvas={onCanvas} contractId={contractId} />
+              <ScopeNavigator scopeData={scopeData} onCanvas={onCanvas} contractId={contractId} plannedStart={plannedStart} />
             )}
           </>
         )}
