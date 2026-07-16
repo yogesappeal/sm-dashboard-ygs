@@ -96,33 +96,35 @@ export default function ScopePage() {
       </div>
 
       {/* Table */}
-      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
+      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
         <ScopeTableHeader />
 
-        {isTableLoading ? (
-          Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
-        ) : scopes.length === 0 ? (
-          <EmptyState
-            icon={ClipboardList}
-            title="No scopes found"
-            description="Create your first scope of work to get started"
+        <div className="flex-1">
+          {isTableLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
+          ) : scopes.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No scopes found"
+              description="Create your first scope of work to get started"
+            />
+          ) : (
+            scopes.map((s) => (
+              <ScopeRow key={s.scope_id} scope={s} onClick={handleRowClick} />
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination && (
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+            onPageChange={setCurrentPage}
+            onRefresh={handleRefresh}
           />
-        ) : (
-          scopes.map((s) => (
-            <ScopeRow key={s.scope_id} scope={s} onClick={handleRowClick} />
-          ))
         )}
       </div>
-
-      {/* Pagination */}
-      {pagination && (
-        <PaginationBar
-          currentPage={currentPage}
-          totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
-          onPageChange={setCurrentPage}
-          onRefresh={handleRefresh}
-        />
-      )}
 
       {/* Slide-over */}
       {selectedScope && (

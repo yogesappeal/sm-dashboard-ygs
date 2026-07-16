@@ -180,33 +180,35 @@ export default function SuppliersPage() {
       </div>
 
       {/* Table */}
-      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
+      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
         <SupplierTableHeader sortDir={sortDir} onSort={handleSort} />
 
-        {isTableLoading ? (
-          Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
-        ) : suppliers.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No suppliers found"
-            description={search ? `No results for "${search}"` : 'Add your first supplier to get started'}
+        <div className="flex-1">
+          {isTableLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
+          ) : suppliers.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No suppliers found"
+              description={search ? `No results for "${search}"` : 'Add your first supplier to get started'}
+            />
+          ) : (
+            suppliers.map((s) => (
+              <SupplierRow key={s.id} supplier={s} onClick={handleRowClick} />
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination && (
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+            onPageChange={setCurrentPage}
+            onRefresh={handleRefresh}
           />
-        ) : (
-          suppliers.map((s) => (
-            <SupplierRow key={s.id} supplier={s} onClick={handleRowClick} />
-          ))
         )}
       </div>
-
-      {/* Pagination */}
-      {pagination && (
-        <PaginationBar
-          currentPage={currentPage}
-          totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
-          onPageChange={setCurrentPage}
-          onRefresh={handleRefresh}
-        />
-      )}
 
       {/* Slide-over */}
       {selectedSupplier && (
