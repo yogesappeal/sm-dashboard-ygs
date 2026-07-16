@@ -37,11 +37,11 @@ function formatPlannedDate(iso: string) {
     .format(new Date(toDateOnly(iso) + 'T00:00:00'))
 }
 
-function daysUntil(iso: string) {
+function daysSince(iso: string) {
   const target = new Date(toDateOnly(iso) + 'T00:00:00')
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return Math.round((target.getTime() - today.getTime()) / 86400000)
+  return Math.round((today.getTime() - target.getTime()) / 86400000)
 }
 
 function PlannedStartField({ projectId, value }: { projectId?: string; value: string }) {
@@ -235,7 +235,7 @@ function TopBar({ contract, pos, projects, currentProjectId, projectId }: {
   const remaining = contract.contractValue - totalAmount
 
   const plannedStart = contract.plannedStart ?? ''
-  const daysOpen = plannedStart ? daysUntil(plannedStart) : null
+  const daysOpen = plannedStart ? daysSince(plannedStart) : null
 
   return (
     <div className="flex items-center gap-4 px-4 h-12 bg-white border-b border-slate-200 flex-shrink-0 min-w-0">
@@ -256,8 +256,8 @@ function TopBar({ contract, pos, projects, currentProjectId, projectId }: {
         {daysOpen === null ? (
           <span className="text-slate-400 italic">Not set</span>
         ) : (
-          <span className={cn('font-semibold', daysOpen < 0 ? 'text-red-500' : 'text-slate-700')}>
-            {daysOpen === 0 ? 'Today' : daysOpen < 0 ? `Overdue ${Math.abs(daysOpen)}d` : `${daysOpen}d`}
+          <span className={cn('font-semibold', 'text-slate-700')}>
+            {daysOpen === 0 ? 'Today' : daysOpen < 0 ? `Starts in ${Math.abs(daysOpen)}d` : `${daysOpen}d`}
           </span>
         )}
       </div>
