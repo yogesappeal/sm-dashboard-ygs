@@ -7,14 +7,35 @@ import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, Fil
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
-import { getCrewPaginated, updateProjectCrew } from '@/lib/api'
+import { getCrewPaginated, updateProjectCrew, getContractImages, uploadContractImages } from '@/lib/api'
+import { useContractId } from './contract-id-context'
 import type { Contract, Crew, Pod, Scope, PurchaseOrder } from './types'
 
 function PhotoCarousel() {
-  const [photos, setPhotos] = useState<string[]>([])
+  const contractId = useContractId()
+  const { token } = useAuthStore()
+  const queryClient = useQueryClient()
   const [current, setCurrent] = useState(0)
   const [zoomed, setZoomed] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const { data } = useQuery({
+    queryKey: ['contract-images', contractId],
+    queryFn: () => getContractImages(token!, contractId),
+    enabled: !!token,
+  })
+  const photos = data?.data.images ?? []
+
+  const uploadMutation = useMutation({
+    mutationFn: (files: File[]) => uploadContractImages(token!, contractId, files),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-images', contractId] })
+    },
+  })
+
+  useEffect(() => {
+    if (current >= photos.length) setCurrent(Math.max(0, photos.length - 1))
+  }, [photos.length, current])
 
   useEffect(() => {
     if (!zoomed) return
@@ -28,27 +49,8 @@ function PhotoCarousel() {
   }, [zoomed, photos.length])
 
   function handleFiles(files: FileList | null) {
-    if (!files) return
-    const readers = Array.from(files).map(file => new Promise<string>(resolve => {
-      const reader = new FileReader()
-      reader.onload = e => resolve(e.target?.result as string)
-      reader.readAsDataURL(file)
-    }))
-    Promise.all(readers).then(urls => {
-      setPhotos(prev => {
-        const next = [...prev, ...urls]
-        setCurrent(next.length - 1)
-        return next
-      })
-    })
-  }
-
-  function removePhoto(idx: number) {
-    setPhotos(prev => {
-      const next = prev.filter((_, i) => i !== idx)
-      setCurrent(c => Math.min(c, Math.max(0, next.length - 1)))
-      return next
-    })
+    if (!files || files.length === 0) return
+    uploadMutation.mutate(Array.from(files))
   }
 
   function prev(e?: React.MouseEvent) { e?.stopPropagation(); setCurrent(c => (c - 1 + photos.length) % photos.length) }
@@ -61,11 +63,20 @@ function PhotoCarousel() {
         onClick={() => inputRef.current?.click()}
       >
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-slate-400 group-hover:text-slate-500 transition-colors">
-          <ImageIcon size={24} />
-          <p className="text-xs">No photos — click to upload</p>
+          {uploadMutation.isPending ? (
+            <>
+              <Loader2 size={24} className="animate-spin" />
+              <p className="text-xs">Uploading...</p>
+            </>
+          ) : (
+            <>
+              <ImageIcon size={24} />
+              <p className="text-xs">No photos — click to upload</p>
+            </>
+          )}
         </div>
         <div className="absolute bottom-2 right-2 bg-black/40 text-white text-[10px] px-2 py-0.5 rounded-full">0 / 0</div>
-        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { handleFiles(e.target.files); e.target.value = '' }} />
       </div>
     )
   }
@@ -75,8 +86,8 @@ function PhotoCarousel() {
       {/* Carousel thumbnail */}
       <div className="relative h-36 bg-black flex-shrink-0 overflow-hidden group">
         <img
-          src={photos[current]}
-          alt={`Photo ${current + 1}`}
+          src={photos[current].url}
+          alt={photos[current].file_name}
           onClick={() => setZoomed(true)}
           className="w-full h-full object-cover cursor-zoom-in"
         />
@@ -106,28 +117,21 @@ function PhotoCarousel() {
           </>
         )}
 
-        {/* Remove current */}
-        <button
-          onClick={e => { e.stopPropagation(); removePhoto(current) }}
-          className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-        >
-          <X size={11} />
-        </button>
-
         {/* Add more */}
         <button
           onClick={e => { e.stopPropagation(); inputRef.current?.click() }}
-          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+          disabled={uploadMutation.isPending}
+          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-50"
         >
-          <Plus size={11} />
+          {uploadMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
         </button>
 
         {/* Dot indicators */}
         {photos.length > 1 && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-            {photos.map((_, i) => (
+            {photos.map((photo, i) => (
               <button
-                key={i}
+                key={photo.image_id}
                 onClick={e => { e.stopPropagation(); setCurrent(i) }}
                 className={cn('w-1.5 h-1.5 rounded-full transition-all', i === current ? 'bg-white' : 'bg-white/40')}
               />
@@ -140,7 +144,7 @@ function PhotoCarousel() {
           {current + 1} / {photos.length}
         </div>
 
-        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { handleFiles(e.target.files); e.target.value = '' }} />
       </div>
 
       {/* Lightbox */}
@@ -174,8 +178,8 @@ function PhotoCarousel() {
 
           {/* Image */}
           <img
-            src={photos[current]}
-            alt={`Photo ${current + 1}`}
+            src={photos[current].url}
+            alt={photos[current].file_name}
             onClick={e => e.stopPropagation()}
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-default"
           />
@@ -193,9 +197,9 @@ function PhotoCarousel() {
           {/* Dot indicators */}
           {photos.length > 1 && (
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
-              {photos.map((_, i) => (
+              {photos.map((photo, i) => (
                 <button
-                  key={i}
+                  key={photo.image_id}
                   onClick={e => { e.stopPropagation(); setCurrent(i) }}
                   className={cn('w-2 h-2 rounded-full transition-all', i === current ? 'bg-white' : 'bg-white/35 hover:bg-white/60')}
                 />
