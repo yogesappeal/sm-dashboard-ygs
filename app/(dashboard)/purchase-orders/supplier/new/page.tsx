@@ -51,6 +51,7 @@ function POSupplierFormInner() {
   const [contractId, setContractId]     = useState('')
   const [supplierId, setSupplierId]     = useState('')
   const [supplierName, setSupplierName] = useState('')
+  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
   const [deliveryDate, setDeliveryDate] = useState('')
   const [siteInfo, setSiteInfo]         = useState('')
   const [scopes, setScopes]             = useState<ScopeSection[]>([])
@@ -198,6 +199,7 @@ function POSupplierFormInner() {
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const checkedCount = scopes.flatMap((s) => s.trades.filter((t) => t.checked)).length
+  const dateLabel = deliveryMethod === 'Delivery' ? 'Delivery Date' : 'Pick Up Date'
 
   // ── Validate + submit ─────────────────────────────────────────────────────
 
@@ -205,7 +207,7 @@ function POSupplierFormInner() {
     const e: Record<string, string> = {}
     if (!contractId)   e.contractId   = 'Select a contract'
     if (!supplierId)   e.supplierId   = 'Select a supplier'
-    if (!deliveryDate) e.deliveryDate = 'Select delivery date'
+    if (!deliveryDate) e.deliveryDate = `Select ${dateLabel.toLowerCase()}`
     if (scopes.length === 0)     e.scopes = 'No scope found for this contract'
     else if (checkedCount === 0) e.scopes = 'Select at least one trade to order'
     setErrors(e)
@@ -228,6 +230,7 @@ function POSupplierFormInner() {
       contract_id:      contractId,
       supplier_id:      supplierId,
       supplier_name:    supplierName,
+      delivery_method:  deliveryMethod,
       scheduled_date:   deliveryDate,
       site_information: siteInfo,
       type:             'supplier',
@@ -286,16 +289,34 @@ function POSupplierFormInner() {
                 </select>
                 {errors.supplierId && <p className="text-xs text-red-400 mt-1">{errors.supplierId}</p>}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Delivery Date <span className="text-red-400">*</span>
-                </label>
-                <input type="date" value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                  className={fieldCls('deliveryDate')} />
-                {errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{errors.deliveryDate}</p>}
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
+              <div className="flex items-center gap-4">
+                {(['Delivery', 'Pick Up'] as const).map((method) => (
+                  <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      checked={deliveryMethod === method}
+                      onChange={() => setDeliveryMethod(method)}
+                      className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                    />
+                    {method}
+                  </label>
+                ))}
               </div>
+            </div>
+
+            <div className="mt-4 sm:w-1/2 sm:pr-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                {dateLabel} <span className="text-red-400">*</span>
+              </label>
+              <input type="date" value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className={fieldCls('deliveryDate')} />
+              {errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{errors.deliveryDate}</p>}
             </div>
 
             <div className="mt-4">
@@ -355,6 +376,7 @@ function POSupplierFormInner() {
         <div className="space-y-3">
           <EmailPreview
             supplierName={supplierName}
+            deliveryMethod={deliveryMethod}
             deliveryDate={deliveryDate}
             siteInfo={siteInfo}
             siteAddress={siteAddress}
@@ -513,6 +535,7 @@ function FormCard({ title, children }: { title: string; children: React.ReactNod
 
 function EmailPreview({
   supplierName,
+  deliveryMethod,
   deliveryDate,
   siteInfo,
   siteAddress,
@@ -521,6 +544,7 @@ function EmailPreview({
   smName,
 }: {
   supplierName: string
+  deliveryMethod: 'Delivery' | 'Pick Up'
   deliveryDate: string
   siteInfo: string
   siteAddress: string
@@ -528,6 +552,7 @@ function EmailPreview({
   scopes: ScopeSection[]
   smName: string
 }) {
+  const methodVerb = deliveryMethod === 'Delivery' ? 'delivery' : 'pick up'
   const formattedDate = deliveryDate
     ? new Intl.DateTimeFormat('en-AU', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -564,7 +589,7 @@ function EmailPreview({
           Review PO Scope &amp; Schedule for PO Number:{' '}
           <strong className="text-slate-400 italic">TBD</strong>.
           {deliveryDate && (
-            <> To accept the order and delivery on <strong>{formattedDate}</strong>.</>
+            <> To accept the order and {methodVerb} on <strong>{formattedDate}</strong>.</>
           )}
         </p>
 
@@ -639,7 +664,7 @@ function EmailPreview({
         {/* Schedule + action buttons */}
         <div>
           <p className="font-bold text-slate-800 mb-1">Schedule and Confirm</p>
-          {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm delivery on {formattedDate}</p>}
+          {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm {methodVerb} on {formattedDate}</p>}
           <p className="text-xs text-slate-600 mb-3">Confirm PO Scope above before accepting</p>
           <div className="flex flex-wrap gap-2">
             <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Accept</span>

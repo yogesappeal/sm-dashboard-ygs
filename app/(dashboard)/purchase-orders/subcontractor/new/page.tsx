@@ -213,7 +213,7 @@ function POSubsFormInner() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Delivery Date <span className="text-red-400">*</span>
+                  Schedule Date <span className="text-red-400">*</span>
                 </label>
                 <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)}
                   className={fieldCls('deliveryDate')} />
@@ -222,7 +222,7 @@ function POSubsFormInner() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Total Price (AUD) <span className="text-red-400">*</span>
+                  Total Price <span className="text-red-400">*</span>
                 </label>
                 <input type="number" min="0" step="0.01" value={totalPrice} placeholder="0.00"
                   onChange={(e) => setTotalPrice(e.target.value)} className={fieldCls('totalPrice')} />

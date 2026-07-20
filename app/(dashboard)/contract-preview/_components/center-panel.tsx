@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, normalizeOrderItems } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, insertPurchaseOrderSubcontractor, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
@@ -785,34 +785,6 @@ function CreatePOCanvas({
 }
 
 // ─── PO Detail Canvas ─────────────────────────────────────────────────────────
-
-interface NormalizedOrderItem {
-  id: string
-  name: string
-  shortDescription: string
-  description: string
-}
-
-// order_details comes back in different shapes depending on how the PO was
-// created: an array of {name, shortDescription, description} (per the
-// documented API), an array of {trade_name, building_name, notes} (supplier
-// POs created from this page's Create PO form), or a plain string (subcontractor
-// POs created here, which save the job description as free text).
-function normalizeOrderItems(raw: unknown): NormalizedOrderItem[] {
-  if (typeof raw === 'string') {
-    return raw.trim() ? [{ id: 'text', name: 'Job Description', shortDescription: '', description: raw }] : []
-  }
-  if (!Array.isArray(raw)) return []
-  return raw.map((item, i) => {
-    const o = item as Record<string, unknown>
-    return {
-      id: typeof o.id === 'string' ? o.id : String(i),
-      name: (o.name as string) ?? (o.trade_name as string) ?? `Item ${i + 1}`,
-      shortDescription: (o.shortDescription as string) ?? (o.building_name as string) ?? '',
-      description: (o.description as string) ?? (o.notes as string) ?? '',
-    }
-  })
-}
 
 function PODetailCanvas({
   canvas,

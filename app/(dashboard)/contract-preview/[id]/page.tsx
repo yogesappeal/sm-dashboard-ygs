@@ -15,6 +15,8 @@ function mapContract(raw: ContractDetailsRaw['contract'], project: ContractDetai
   return {
     raNumber: raw.client_ra_number,
     clientFullName: `${raw.client_first_name} ${raw.client_last_name}`.replace(/\s+/g, ' ').trim(),
+    clientEmail: raw.client_email_address,
+    clientMobile: raw.client_contact_mobile,
     streetAddress: raw.street_address,
     suburb: raw.suburb,
     state: raw.state,

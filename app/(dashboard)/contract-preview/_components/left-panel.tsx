@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, ChevronLeft, MapPin, Wrench, DollarSign, FileText, Users, UserPlus, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronLeft, DollarSign, FileText, Users, UserPlus, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
@@ -284,6 +284,15 @@ function InfoRow({ icon: Icon, label, value }: {
   )
 }
 
+function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0 py-2">
+      <p className="text-[10px] text-slate-400 uppercase tracking-wide leading-none mb-1">{label}</p>
+      <p className="text-xs text-slate-700 font-medium leading-snug break-words">{value || '-'}</p>
+    </div>
+  )
+}
+
 // NOTE: get-crew-paginated's response fields (id/name/role/company) are an
 // assumption — adjust CrewMember in lib/api/crew.ts once confirmed.
 function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; currentCrew: Crew[] }) {
@@ -493,14 +502,21 @@ export function LeftPanel({ contract, crew, pod, scopes, pos, projectId }: LeftP
           <>
             {/* Client section */}
             <AccordionSection title="Client">
-              <InfoRow icon={MapPin} label="Full Name" value={contract.clientFullName} />
-              <InfoRow icon={MapPin} label="Address" value={`${contract.streetAddress}, ${contract.suburb} ${contract.state}`} />
-              <InfoRow icon={Wrench} label="Ownership" value={contract.builder} />
-              <InfoRow icon={DollarSign} label="Contract Value" value={`$${contract.contractValue.toLocaleString()}`} />
+              <div className="grid grid-cols-2 gap-x-4 divide-y divide-slate-50">
+                <InfoField label="Full Name" value={contract.clientFullName} />
+                <InfoField label="Mobile Number" value={contract.clientMobile} />
+                <InfoField label="Email" value={contract.clientEmail} />
+                <InfoField label="Home Number" value={null} />
+                <InfoField label="Street Address" value={contract.streetAddress} />
+                <InfoField label="Suburb" value={contract.suburb} />
+                <InfoField label="State" value={contract.state} />
+                <InfoField label="Ownership Status" value={null} />
+              </div>
+              {/* <InfoRow icon={DollarSign} label="Contract Value" value={`$${contract.contractValue.toLocaleString()}`} />
               <InfoRow icon={FileText} label="PIF" value={contract.pif} />
               {contract.notes && (
                 <InfoRow icon={FileText} label="Notes" value={contract.notes} />
-              )}
+              )} */}
             </AccordionSection>
 
             {/* Crew section */}

@@ -1,6 +1,8 @@
 export interface Contract {
   raNumber: string
   clientFullName: string
+  clientEmail: string
+  clientMobile: string
   streetAddress: string
   suburb: string
   state: string

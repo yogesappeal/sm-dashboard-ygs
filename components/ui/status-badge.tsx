@@ -28,19 +28,22 @@ function getStatusConfig(status: string): StatusConfig {
     case 'Inactive':
       return { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'Inactive' }
     // PO statuses
+    case 'PO Draft':
+      return { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400', label: 'PO Draft' }
+    case 'PO Submitted':
+      return { bg: 'bg-cyan-50', text: 'text-cyan-600', dot: 'bg-cyan-500', label: 'PO Submitted' }
     case 'PO Sent':
       return { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500', label: 'PO Sent' }
-    case 'PO Draft':
-      return { bg: 'bg-yellow-50', text: 'text-yellow-600', dot: 'bg-yellow-400', label: 'PO Draft' }
-    case 'PO Rejected':
-    case 'PO Cancelled':
-      return { bg: 'bg-red-50', text: 'text-red-500', dot: 'bg-red-400', label: status }
-    case 'PO Submitted':
-      return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'PO Submitted' }
     case 'PO Confirmed':
-      return { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500', label: 'PO Confirmed' }
+      return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'PO Confirmed' }
     case 'PO Rescheduled':
       return { bg: 'bg-orange-50', text: 'text-orange-600', dot: 'bg-orange-400', label: 'PO Rescheduled' }
+    case 'PO Completed':
+      return { bg: 'bg-teal-50', text: 'text-teal-600', dot: 'bg-teal-500', label: 'PO Completed' }
+    case 'PO Rejected':
+      return { bg: 'bg-red-50', text: 'text-red-500', dot: 'bg-red-400', label: 'PO Rejected' }
+    case 'PO Cancelled':
+      return { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'PO Cancelled' }
     // PO type
     case 'supplier':
       return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'Supplier' }

@@ -1,20 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Send, Edit2, X, Check } from 'lucide-react'
+import { ArrowLeft, Send, Edit2, X, Check, Clock, Calendar, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import {
-  getPODetails,
+  getPurchaseOrderDetailsFull,
   updatePurchaseOrderStatus,
   autoSendEmailPurchaseOrder,
+  respondNewDateRequest,
 } from '@/lib/api'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { cn, formatDate, formatDateTime, normalizeOrderItems } from '@/lib/utils'
 
 export default function POSubsDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -26,13 +27,13 @@ export default function POSubsDetailPage() {
   const [acceptDialog, setAcceptDialog] = useState(false)
   const [sendEmailDialog, setSendEmailDialog] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [rescheduleHandled, setRescheduleHandled] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'approve' | 'decline' | null>(null)
+  const [responseMessage, setResponseMessage] = useState<string | null>(null)
 
-  const { data: details, isLoading } = useQuery({
+  const { data: po, isLoading } = useQuery({
     queryKey: ['po-detail', id],
-    queryFn: async () => {
-      const result = await getPODetails(token!, id)
-      return Array.isArray(result) ? result[0] : result
-    },
+    queryFn: () => getPurchaseOrderDetailsFull(token!, id),
     enabled: !!token && !!id,
   })
 
@@ -55,10 +56,38 @@ export default function POSubsDetailPage() {
     },
   })
 
-  const po = details
+  const respondMutation = useMutation({
+    mutationFn: (action: 'approve' | 'decline') =>
+      respondNewDateRequest(token!, { po_id: id, action }),
+    onSuccess: (res) => {
+      setConfirmAction(null)
+      setRescheduleHandled(true)
+      setResponseMessage(res.message)
+      queryClient.invalidateQueries({ queryKey: ['po-detail', id] })
+    },
+  })
+
+  useEffect(() => {
+    if (!responseMessage) return
+    const t = setTimeout(() => setResponseMessage(null), 3500)
+    return () => clearTimeout(t)
+  }, [responseMessage])
+
+  const deliveryDate = po ? formatDate(po.scheduled_date ?? '') || '-' : '-'
+  const requestedDate = po ? formatDate(po.new_requested_date ?? '') || '-' : '-'
+  const orderItems = po ? normalizeOrderItems(po.order_details) : []
+  const showRescheduleBanner = po?.status === 'PO Rescheduled' && !rescheduleHandled
+  const showRescheduleHistory = !!po?.reviewed_status
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex flex-col min-h-full relative">
+      {responseMessage && (
+        <div className="fixed bottom-4 right-4 z-20 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-lg">
+          <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
+          {responseMessage}
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => router.back()}
@@ -71,13 +100,14 @@ export default function POSubsDetailPage() {
             <Skeleton className="h-6 w-48" />
           ) : (
             <h1 className="text-lg font-semibold text-slate-800 truncate">
-              {po?.poNumber ?? 'Subcontractor PO Detail'}
+              {po?.po_number ?? 'Subcontractor PO Detail'}
             </h1>
           )}
         </div>
         {po && (
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={po.status} />
+            <StatusBadge status={po.type} />
             {po.status === 'PO Draft' && (
               <Link
                 href={`/purchase-orders/subcontractor/new?edit=${id}`}
@@ -119,48 +149,142 @@ export default function POSubsDetailPage() {
       {isLoading ? (
         <PODetailSkeleton />
       ) : po ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <InfoCard title="PO Information">
-              <InfoRow label="PO Number" value={po.poNumber} />
-              <InfoRow label="Status" value={<StatusBadge status={po.status} />} />
-              <InfoRow label="Type" value={<StatusBadge status={po.type} />} />
-              <InfoRow label="Delivery Date" value={po.scheduledDate ? formatDate(po.scheduledDate) : '-'} />
-              <InfoRow label="Created" value={formatDate(po.createdAt)} />
-              {po.totalAmount != null && (
-                <InfoRow label="Total Amount" value={formatCurrency(po.totalAmount)} />
+        <>
+          {showRescheduleBanner && (
+            <div className="flex items-start gap-4 mb-4 pl-4 pr-5 py-4 rounded-xl border border-orange-100 bg-orange-50/60 border-l-4 border-l-orange-400">
+              <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <Clock size={16} className="text-orange-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-orange-800">Reschedule requested</p>
+                <p className="text-xs text-orange-700/80 mt-0.5">
+                  {po.po_number} - {po.supplier_name} has requested reschedule to {requestedDate}.
+                </p>
+                {po.external_notes && (
+                  <p className="text-xs text-orange-700/80">Reason: {po.external_notes}</p>
+                )}
+
+                {confirmAction ? (
+                  <div className="mt-3 px-3 py-2.5 rounded-lg bg-white border border-orange-200">
+                    <p className="text-xs font-medium text-slate-700">
+                      Are you sure you want to {confirmAction === 'approve' ? 'approve' : 'decline'} this reschedule request?
+                    </p>
+                    <div className="flex gap-2 mt-2.5">
+                      <button
+                        onClick={() => setConfirmAction(null)}
+                        disabled={respondMutation.isPending}
+                        className="px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => respondMutation.mutate(confirmAction)}
+                        disabled={respondMutation.isPending}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors disabled:opacity-50',
+                          confirmAction === 'approve' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
+                        )}
+                      >
+                        {respondMutation.isPending
+                          ? 'Submitting…'
+                          : confirmAction === 'approve' ? 'Yes, approve' : 'Yes, decline'}
+                      </button>
+                    </div>
+                    {respondMutation.isError && (
+                      <p className="text-xs text-red-500 mt-2">Failed to submit. Try again.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => setConfirmAction('approve')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-green-300 bg-white hover:bg-green-50 text-green-600 font-medium rounded-lg transition-colors"
+                    >
+                      <Check size={12} /> Approve reschedule
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction('decline')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-200 bg-white hover:bg-red-50 text-red-500 font-medium rounded-lg transition-colors"
+                    >
+                      <X size={12} /> Decline
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-100/70 text-orange-700 text-xs font-medium flex-shrink-0 whitespace-nowrap">
+                <Calendar size={12} />
+                Requested date: {requestedDate}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-4">
+              <InfoCard title="PO Information">
+                <InfoRow label="PO Number" value={po.po_number} />
+                <InfoRow label="Status" value={<StatusBadge status={po.status} />} />
+                <InfoRow label="Type" value={<StatusBadge status={po.type} />} />
+                <InfoRow label="Delivery Date" value={deliveryDate} />
+                <InfoRow label="Total Amount" value={<span className="font-semibold text-slate-800">${po.po_amount.toLocaleString()}</span>} />
+              </InfoCard>
+
+              {showRescheduleHistory && (
+                <InfoCard title="Reschedule History" icon={<Clock size={12} className="text-slate-400" />}>
+                  <InfoRow label="Original Date" value={formatDate(po.original_scheduled_date ?? '') || '-'} />
+                  <InfoRow label="Requested Date" value={requestedDate} />
+                  <InfoRow
+                    label="Review Result"
+                    value={
+                      <span className={cn(
+                        'font-semibold capitalize',
+                        po.reviewed_status === 'approved' ? 'text-green-600' : 'text-red-500'
+                      )}>
+                        {po.reviewed_status}
+                      </span>
+                    }
+                  />
+                  <InfoRow label="Reviewed At" value={po.reviewed_at ? formatDateTime(po.reviewed_at) : '-'} />
+                  <InfoRow label="Reason" value={po.external_notes || '-'} />
+                </InfoCard>
               )}
-            </InfoCard>
 
-            {po.siteInformation && (
-              <InfoCard title="Site Information">
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{po.siteInformation}</p>
-              </InfoCard>
-            )}
-
-            {po.orderDetails && (
               <InfoCard title="Job Details / Scope">
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{po.orderDetails}</p>
+                {orderItems.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No order items</p>
+                ) : (
+                  <div className="-mx-4 -my-2">
+                    {orderItems.map((item, i) => (
+                      <div key={item.id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
+                        <p className="text-sm font-semibold text-slate-700">{item.name}</p>
+                        {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
+                        {item.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </InfoCard>
-            )}
-          </div>
+            </div>
 
-          <div className="space-y-4">
-            <InfoCard title="Subcontractor">
-              <InfoRow label="Name" value={po.supplierName || '-'} />
-              {po.supplierEmail && <InfoRow label="Email" value={po.supplierEmail} />}
-              {po.supplierPhone && <InfoRow label="Phone" value={po.supplierPhone} />}
-            </InfoCard>
+            <div className="space-y-4">
+              <InfoCard title="Subcontractor">
+                <InfoRow label="Name" value={po.supplier_name || '-'} />
+                <InfoRow label="Email" value={po.supplier_email || '-'} />
+              </InfoCard>
 
-            <InfoCard title="Client">
-              <InfoRow
-                label="Name"
-                value={[po.clientFirstName, po.clientLastName].filter(Boolean).join(' ') || '-'}
-              />
-              <InfoRow label="Address" value={po.address || '-'} />
-            </InfoCard>
+              <InfoCard title="Client">
+                <InfoRow
+                  label="Name"
+                  value={[po.client_first_name, po.client_last_name].filter(Boolean).join(' ') || '-'}
+                />
+                <InfoRow label="Address" value={po.address || '-'} />
+              </InfoCard>
+
+              <InfoCard title="Site Information">
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{po.site_information || '-'}</p>
+              </InfoCard>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <div className="flex items-center justify-center flex-1 text-slate-400">
           Purchase order not found
@@ -211,20 +335,23 @@ export default function POSubsDetailPage() {
   )
 }
 
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+function InfoCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <h3 className="text-sm font-semibold text-slate-700 mb-3">{title}</h3>
-      <div className="space-y-2">{children}</div>
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+        {icon}
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{title}</p>
+      </div>
+      <div className="px-4 py-2">{children}</div>
     </div>
   )
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-1 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-400 flex-shrink-0 w-28">{label}</span>
-      <span className="text-sm text-slate-700 text-right">{value}</span>
+    <div className="flex items-center py-2 border-b border-slate-50 last:border-0">
+      <p className="text-xs text-slate-400 w-32 flex-shrink-0">{label}</p>
+      <div className="text-sm text-slate-700 min-w-0">{value}</div>
     </div>
   )
 }

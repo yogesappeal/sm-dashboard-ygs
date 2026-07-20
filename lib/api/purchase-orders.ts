@@ -1,35 +1,6 @@
 import { api } from './fetcher'
 import type { PurchaseOrderList, POSupplierInfo, POAttachment, PurchaseOrderDetailsEnvelope } from '../types'
 
-export interface PODetail {
-  id: string
-  poNumber: string
-  status: string
-  type: string
-  supplierName: string
-  supplierEmail?: string
-  supplierPhone?: string
-  clientFirstName?: string
-  clientLastName?: string
-  address?: string
-  scheduledDate?: string
-  siteInformation?: string
-  orderDetails?: string
-  totalAmount?: number
-  contractId?: string
-  contractName?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export async function getPODetails(token: string, poId: string) {
-  const q = new URLSearchParams({ id: `eq.${poId}`, select: '*' })
-  return api.get<PODetail[]>(
-    `/rest/v1/purchase_order_details?${q}`,
-    token
-  )
-}
-
 // Full PO detail payload (order items, scope snapshot, supplier + client info)
 // from the dedicated purchase-order-details function endpoint.
 export async function getPurchaseOrderDetailsFull(token: string, poId: string) {
