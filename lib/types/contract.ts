@@ -54,6 +54,17 @@ export interface DropdownContract {
   label: string
 }
 
+// ─── Raw shape returned by GET /functions/v1/get-dropdown-contract-scope ─────
+
+export interface ContractScopeDropdownItem {
+  id: string
+  client_ra_number: string
+  full_name: string
+  street_address: string
+  dropdown_label: string
+  has_scope: boolean
+}
+
 // ─── Raw shape returned by GET /functions/v1/contract-details ────────────────
 // NOTE: this is the actual current API response — richer than DetailContracts
 // above (which is stale / does not match runtime shape).

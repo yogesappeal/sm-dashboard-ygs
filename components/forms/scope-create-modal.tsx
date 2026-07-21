@@ -1,16 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2 } from 'lucide-react'
-import { insertScopeWithItems, searchContract } from '@/lib/api'
-import { scopeDraftsToItems } from '@/lib/utils/scope'
+import { X, Loader2, ChevronDown } from 'lucide-react'
+import { insertScopeWithItems, getDropdownContractScope } from '@/lib/api'
+import { scopeDraftsToItems, scopeTypeToLabel } from '@/lib/utils/scope'
 import { ScopeItemsBuilder } from './scope-items-builder'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
-import type { ScopeTradeDraft } from '@/lib/types'
+import type { ScopeTradeDraft, ContractScopeDropdownItem } from '@/lib/types'
 
 interface ScopeForm {
   scopeName: string
@@ -32,24 +32,28 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
   const [buildings, setBuildings] = useState<string[]>([])
   const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
-    defaultValues: { type: 'supplier', notes: '' },
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
+    defaultValues: { type: 'supplier', notes: '', contractId: '' },
   })
+  register('contractId', { required: 'Contract is required' })
+  const contractId = watch('contractId')
 
   const { data: contractsData } = useQuery({
-    queryKey: ['contracts-search', ''],
-    queryFn: () => searchContract(token, ''),
+    queryKey: ['contracts-dropdown-scope'],
+    queryFn: () => getDropdownContractScope(token),
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   })
-  const contracts = contractsData?.data ?? []
+  const contracts = contractsData ?? []
+  const contractsWithScope = contracts.filter((c) => c.has_scope)
+  const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
 
   const createMutation = useMutation({
     mutationFn: (data: ScopeForm) =>
       insertScopeWithItems(token, {
         scope_name: data.scopeName,
-        contract_id: data.contractId,
-        type: data.type,
+        build_contract_id: data.contractId,
+        type: scopeTypeToLabel(data.type as 'supplier' | 'subcontractor' | 'both'),
         notes: data.notes,
         items: scopeDraftsToItems(buildings, trades),
       }),
@@ -93,17 +97,13 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           </Field>
 
           <Field label="Contract *" error={errors.contractId?.message}>
-            <select
-              {...register('contractId', { required: 'Contract is required' })}
-              className={inputCls(!!errors.contractId)}
-            >
-              <option value="">Select contract…</option>
-              {contracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.project_name}
-                </option>
-              ))}
-            </select>
+            <ContractSearchSelect
+              value={contractId}
+              onChange={(id) => setValue('contractId', id, { shouldValidate: true })}
+              contractsWithScope={contractsWithScope}
+              contractsWithoutScope={contractsWithoutScope}
+              error={!!errors.contractId}
+            />
           </Field>
 
           <Field label="Type *" error={errors.type?.message}>
@@ -160,6 +160,114 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
         </form>
       </div>
     </>
+  )
+}
+
+function ContractSearchSelect({
+  value,
+  onChange,
+  contractsWithScope,
+  contractsWithoutScope,
+  error,
+}: {
+  value: string
+  onChange: (id: string) => void
+  contractsWithScope: ContractScopeDropdownItem[]
+  contractsWithoutScope: ContractScopeDropdownItem[]
+  error?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const selected = [...contractsWithoutScope, ...contractsWithScope].find((c) => c.id === value)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  const q = search.trim().toLowerCase()
+  const filterFn = (c: ContractScopeDropdownItem) => !q || c.dropdown_label.toLowerCase().includes(q)
+  const filteredWithoutScope = contractsWithoutScope.filter(filterFn)
+  const filteredWithScope = contractsWithScope.filter(filterFn)
+  const noResults = filteredWithoutScope.length === 0 && filteredWithScope.length === 0
+
+  const select = (id: string) => {
+    onChange(id)
+    setOpen(false)
+    setSearch('')
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(inputCls(!!error), 'flex items-center justify-between gap-2 text-left')}
+      >
+        <span className={cn('truncate', !selected && 'text-slate-400')}>
+          {selected ? selected.dropdown_label : 'Select contract…'}
+        </span>
+        <ChevronDown size={14} className={cn('text-slate-400 flex-shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search contract..."
+              className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {noResults && (
+              <p className="text-xs text-slate-400 text-center py-4">No contracts found</p>
+            )}
+            {filteredWithoutScope.length > 0 && (
+              <ContractOptionGroup label="No Scope Yet" contracts={filteredWithoutScope} value={value} onSelect={select} />
+            )}
+            {filteredWithScope.length > 0 && (
+              <ContractOptionGroup label="Has Scope" contracts={filteredWithScope} value={value} onSelect={select} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ContractOptionGroup({ label, contracts, value, onSelect }: {
+  label: string
+  contracts: ContractScopeDropdownItem[]
+  value: string
+  onSelect: (id: string) => void
+}) {
+  return (
+    <div>
+      <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+      {contracts.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onSelect(c.id)}
+          className={cn(
+            'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors truncate',
+            c.id === value ? 'text-[#6692C5] font-medium bg-[#6692C5]/5' : 'text-slate-700'
+          )}
+        >
+          {c.dropdown_label}
+        </button>
+      ))}
+    </div>
   )
 }
 

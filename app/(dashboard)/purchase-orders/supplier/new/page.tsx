@@ -5,8 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { ArrowLeft, ChevronDown, PackagePlus, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
-import { getClientsPaginated, getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { getDropdownContractScope, getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder } from '@/lib/api'
+import { cn, buildScopeSnapshot, buildOrderDetailsNote } from '@/lib/utils'
+import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { useToast } from '@/components/shared/toast'
+import type { InsertPurchaseOrderBody } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +50,7 @@ function POSupplierFormInner() {
   const { token, user } = useAuthStore()
   const router          = useRouter()
   const editId          = useSearchParams().get('edit')
+  const toast            = useToast()
 
   const [contractId, setContractId]     = useState('')
   const [supplierId, setSupplierId]     = useState('')
@@ -55,13 +59,15 @@ function POSupplierFormInner() {
   const [deliveryDate, setDeliveryDate] = useState('')
   const [siteInfo, setSiteInfo]         = useState('')
   const [scopes, setScopes]             = useState<ScopeSection[]>([])
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([])
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
   const [errors, setErrors]             = useState<Record<string, string>>({})
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
   const { data: contractsData } = useQuery({
-    queryKey: ['contracts-dropdown'],
-    queryFn: () => getClientsPaginated(token!, { limit: 100 }),
+    queryKey: ['contracts-dropdown-scope'],
+    queryFn: () => getDropdownContractScope(token!),
     enabled: !!token,
   })
 
@@ -77,12 +83,12 @@ function POSupplierFormInner() {
     enabled: !!token && !!contractId,
   })
 
-  const contracts       = contractsData?.data ?? []
+  const contracts       = contractsData ?? []
+  const contractsWithScope    = contracts.filter((c) => c.has_scope)
+  const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
   const suppliers       = suppliersData?.data ?? []
   const selectedContract = contracts.find((c) => c.id === contractId)
-  const siteAddress     = selectedContract
-    ? [selectedContract.street_address, selectedContract.suburb].filter(Boolean).join(', ')
-    : ''
+  const siteAddress     = selectedContract?.street_address ?? ''
 
   // Auto-populate material order when scope loads
   useEffect(() => {
@@ -143,8 +149,11 @@ function POSupplierFormInner() {
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const insertMutation = useMutation({
-    mutationFn: (body: unknown) => insertPurchaseOrder(token!, body),
-    onSuccess: () => router.push('/purchase-orders'),
+    mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
+    onSuccess: (res) => {
+      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+      router.push('/purchase-orders')
+    },
   })
 
   // ── Trade handlers ────────────────────────────────────────────────────────
@@ -216,27 +225,22 @@ function POSupplierFormInner() {
 
   const handleSubmit = (isDraft: boolean) => {
     if (!validate()) return
-    const orderDetails = scopes.flatMap((s) =>
-      s.trades.filter((t) => t.checked).flatMap((t) =>
-        t.buildings.filter((b) => b.checked).map((b) => ({
-          scope_name:    s.scopeName,
-          trade_name:    t.tradeName,
-          building_name: b.buildingName,
-          notes:         b.notes,
-        }))
-      )
-    )
+    if (attachmentsUploading) return
+    const allTrades = scopes.flatMap((s) => s.trades)
     insertMutation.mutate({
       contract_id:      contractId,
       supplier_id:      supplierId,
-      supplier_name:    supplierName,
       delivery_method:  deliveryMethod,
       scheduled_date:   deliveryDate,
       site_information: siteInfo,
       type:             'supplier',
+      service_type:     'supplier',
       status:           isDraft ? 'PO Draft' : 'PO Submitted',
-      sm_name:          user?.full_name ?? '',
-      order_details:    orderDetails,
+      po_amount:        0,
+      order_details:    buildOrderDetailsNote(allTrades),
+      scope_snapshot:   buildScopeSnapshot(allTrades),
+      attachment_ids:   attachmentIds,
+      send_email:       !isDraft,
     })
   }
 
@@ -271,7 +275,18 @@ function POSupplierFormInner() {
                   onChange={(e) => { setContractId(e.target.value); setScopes([]) }}
                   className={fieldCls('contractId')}>
                   <option value="">Select contract...</option>
-                  {contracts.map((c) => <option key={c.id} value={c.id}>{c.project_name}</option>)}
+                  {contractsWithScope.length > 0 && (
+                    <optgroup label="Has Scope">
+                      {contractsWithScope.map((c) => <option key={c.id} value={c.id}>{c.dropdown_label}</option>)}
+                    </optgroup>
+                  )}
+                  {contractsWithoutScope.length > 0 && (
+                    <optgroup label="No Scope Yet">
+                      {contractsWithoutScope.map((c) => (
+                        <option key={c.id} value={c.id} disabled>{c.dropdown_label} — no scope</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 {errors.contractId && <p className="text-xs text-red-400 mt-1">{errors.contractId}</p>}
               </div>
@@ -370,6 +385,14 @@ function POSupplierFormInner() {
               />
             ))}
           </div>
+
+          {FEATURE_ATTACHMENTS && (
+            <PoAttachmentsSection
+              attachmentIds={attachmentIds}
+              onAttachmentIdsChange={setAttachmentIds}
+              onUploadingChange={setAttachmentsUploading}
+            />
+          )}
         </div>
 
         {/* ── Right col ── */}
@@ -386,11 +409,11 @@ function POSupplierFormInner() {
           />
 
           <div className="space-y-2">
-            <button onClick={() => handleSubmit(false)} disabled={insertMutation.isPending}
+            <button onClick={() => handleSubmit(false)} disabled={insertMutation.isPending || attachmentsUploading}
               className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
-              {insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
+              {attachmentsUploading ? 'Uploading attachments...' : insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
             </button>
-            <button onClick={() => handleSubmit(true)} disabled={insertMutation.isPending}
+            <button onClick={() => handleSubmit(true)} disabled={insertMutation.isPending || attachmentsUploading}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               Save as Draft
             </button>

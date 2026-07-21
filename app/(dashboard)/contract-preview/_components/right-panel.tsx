@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, CheckSquare, X, AlertTriangle } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatDate, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
 import { getScopeDetailByContractId, updateScopeItems, ApiError } from '@/lib/api'
@@ -347,6 +347,11 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
         .map(t => ({ tradeId: t.trade_id, tradeName: t.trade_name, plannedPoDate: t.planned_po_date }))
     : []
 
+  const allowedPoTypes = scopeAllowedPoTypes(scopeData.type)
+  // Single-type scope — the inline per-trade "Create PO" button has no type
+  // picker of its own, so it always creates whichever type the scope allows.
+  const inlinePoType = allowedPoTypes[0]
+
   return (
     <div className="p-3 flex flex-col gap-3">
       <div className="rounded-xl border border-slate-200 overflow-hidden">
@@ -371,18 +376,22 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
             {/* Quick-create buttons */}
             <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-t border-b border-slate-100">
               <div className="flex gap-2">
-                <button
-                  onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
-                >
-                  <Plus size={11} /> Supplier
-                </button>
-                <button
-                  onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
-                >
-                  <Plus size={11} /> Subs
-                </button>
+                {allowedPoTypes.includes('supplier') && (
+                  <button
+                    onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                    <Plus size={11} /> Supplier
+                  </button>
+                )}
+                {allowedPoTypes.includes('subcontractor') && (
+                  <button
+                    onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
+                  >
+                    <Plus size={11} /> Subs
+                  </button>
+                )}
               </div>
               <button
                 onClick={toggleEditMode}
@@ -470,7 +479,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                                 <button
                                   onClick={() => onCanvas({
                                     type: 'SHOW_CREATE_PO',
-                                    poType: 'supplier',
+                                    poType: inlinePoType,
                                     buildingName: building.building_name,
                                     tradeName: trade.trade_name,
                                   })}

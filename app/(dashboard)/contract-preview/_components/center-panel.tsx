@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar } from 'lucide-react'
-import { cn, normalizeOrderItems } from '@/lib/utils'
+import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar, Paperclip } from 'lucide-react'
+import { cn, normalizeOrderItems, scopeAllowedPoTypes, buildScopeSnapshot, buildOrderDetailsNote } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
-import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, insertPurchaseOrderSubcontractor, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
-import type { ScopeData } from '@/lib/types'
+import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
+import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { AttachmentList } from '@/components/shared/attachment-list'
+import { useToast } from '@/components/shared/toast'
+import type { ScopeData, InsertPurchaseOrderBody } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
 import { useContractId } from './contract-id-context'
 
@@ -448,8 +451,10 @@ function CreatePOCanvas({
 }) {
   const { token, user } = useAuthStore()
   const contractId = useContractId()
+  const toast = useToast()
 
   const [type, setType]             = useState<'supplier' | 'subcontractor'>(canvas.poType)
+  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
   const [vendorId, setVendorId]     = useState('')
   const [vendorName, setVendorName] = useState('')
   const [deliveryDate, setDeliveryDate] = useState('')
@@ -457,6 +462,8 @@ function CreatePOCanvas({
   const [jobDetails, setJobDetails] = useState('')
   const [totalPrice, setTotalPrice] = useState('')
   const [trades, setTrades]         = useState<TradeSection[]>([])
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([])
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
   const [errors, setErrors]         = useState<Record<string, string>>({})
   const [showEmailPreview, setShowEmailPreview] = useState(false)
 
@@ -478,6 +485,16 @@ function CreatePOCanvas({
   })
 
   const vendors = vendorsData?.data ?? []
+
+  // A scope whose type is supplier-only (or subcontractor-only) can't have
+  // the other kind of PO raised against it — snap back to an allowed type if
+  // the scope loads (or changes) after the canvas already picked one.
+  const allowedTypes = scopeData ? scopeAllowedPoTypes(scopeData.type) : ['supplier', 'subcontractor'] as const
+  useEffect(() => {
+    if (!scopeData) return
+    if (!allowedTypes.includes(type)) setType(allowedTypes[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeData])
 
   // ── Parse scope + apply pre-select in one effect ───────────────────────────
 
@@ -552,18 +569,16 @@ function CreatePOCanvas({
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
-  const supplierMutation = useMutation({
-    mutationFn: (body: unknown) => insertPurchaseOrder(token!, body),
-    onSuccess: () => onCanvas({ type: 'SHOW_ACTIVITY' }),
+  const insertMutation = useMutation({
+    mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
+    onSuccess: (res) => {
+      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+      onCanvas({ type: 'SHOW_ACTIVITY' })
+    },
   })
 
-  const subsMutation = useMutation({
-    mutationFn: (body: unknown) => insertPurchaseOrderSubcontractor(token!, body),
-    onSuccess: () => onCanvas({ type: 'SHOW_ACTIVITY' }),
-  })
-
-  const isPending = supplierMutation.isPending || subsMutation.isPending
-  const isSubmitError = supplierMutation.isError || subsMutation.isError
+  const isPending = insertMutation.isPending || attachmentsUploading
+  const isSubmitError = insertMutation.isError
   const checkedTradeCount = trades.filter((t) => t.checked).length
 
   const validate = () => {
@@ -578,46 +593,22 @@ function CreatePOCanvas({
 
   const handleSubmit = (isDraft: boolean) => {
     if (!validate()) return
-    const smName = user?.full_name ?? ''
-
-    if (type === 'supplier') {
-      supplierMutation.mutate({
-        contract_id:      contractId,
-        supplier_id:      vendorId,
-        supplier_name:    vendorName,
-        scheduled_date:   deliveryDate,
-        site_information: siteInfo,
-        type:             'supplier',
-        status:           isDraft ? 'PO Draft' : 'PO Submitted',
-        sm_name:          smName,
-        order_details:    trades.flatMap((t) =>
-          t.checked ? t.buildings.filter((b) => b.checked).map((b) => ({
-            scope_name: scopeData?.scope_name ?? '', trade_name: t.tradeName,
-            building_name: b.buildingName, notes: b.notes,
-          })) : []
-        ),
-      })
-    } else {
-      subsMutation.mutate({
-        contract_id:      contractId,
-        subs_id:          vendorId,
-        subs_name:        vendorName,
-        scheduled_date:   deliveryDate,
-        site_information: siteInfo,
-        order_details:    jobDetails,
-        scope_id:         scopeData?.scope_id ?? '',
-        scope_name:       scopeData?.scope_name ?? '',
-        selected_items:   trades.filter((t) => t.checked).flatMap((t) =>
-          t.buildings.filter((b) => b.checked).map((b) => ({
-            trade_name: t.tradeName, building_name: b.buildingName,
-          }))
-        ),
-        total_price:      parseFloat(totalPrice) || 0,
-        type:             'subcontractor',
-        status:           isDraft ? 'PO Draft' : 'PO Submitted',
-        sm_name:          smName,
-      })
-    }
+    if (attachmentsUploading) return
+    insertMutation.mutate({
+      contract_id:      contractId,
+      supplier_id:      vendorId,
+      delivery_method:  deliveryMethod,
+      scheduled_date:   deliveryDate,
+      site_information: siteInfo,
+      type,
+      service_type:     type,
+      status:           isDraft ? 'PO Draft' : 'PO Submitted',
+      po_amount:        type === 'subcontractor' ? (parseFloat(totalPrice) || 0) : 0,
+      order_details:    type === 'supplier' ? buildOrderDetailsNote(trades) : { details: jobDetails },
+      scope_snapshot:   buildScopeSnapshot(trades),
+      attachment_ids:   attachmentIds,
+      send_email:       !isDraft,
+    })
   }
 
   const fieldCls = (k: string) =>
@@ -650,9 +641,9 @@ function CreatePOCanvas({
       <div className="flex-1 overflow-y-auto bg-slate-50 p-5 pb-24">
         <div className="space-y-4">
 
-          {/* Type toggle */}
+          {/* Type toggle — only shows types this scope allows */}
           <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-            {(['supplier', 'subcontractor'] as const).map((t) => (
+            {allowedTypes.map((t) => (
               <button key={t} onClick={() => { setType(t); setVendorId(''); setVendorName('') }}
                 className={cn('px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize',
                   type === t ? 'bg-[#6692C5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
@@ -699,6 +690,24 @@ function CreatePOCanvas({
                 </div>
               )}
 
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
+                <div className="flex items-center gap-4">
+                  {(['Delivery', 'Pick Up'] as const).map((method) => (
+                    <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="deliveryMethod"
+                        checked={deliveryMethod === method}
+                        onChange={() => setDeliveryMethod(method)}
+                        className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                      />
+                      {method}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className={type === 'subcontractor' ? '' : 'col-span-2'}>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
                 <textarea value={siteInfo} onChange={(e) => setSiteInfo(e.target.value)} rows={2}
@@ -744,6 +753,14 @@ function CreatePOCanvas({
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
             </div>
           )}
+
+          {FEATURE_ATTACHMENTS && (
+            <PoAttachmentsSection
+              attachmentIds={attachmentIds}
+              onAttachmentIdsChange={setAttachmentIds}
+              onUploadingChange={setAttachmentsUploading}
+            />
+          )}
         </div>
       </div>
 
@@ -761,7 +778,7 @@ function CreatePOCanvas({
         </button>
         <button onClick={() => handleSubmit(false)} disabled={isPending}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors disabled:opacity-50">
-          {isPending ? 'Submitting…' : 'Submit PO'}
+          {attachmentsUploading ? 'Uploading attachments…' : insertMutation.isPending ? 'Submitting…' : 'Submit PO'}
         </button>
       </div>
 
@@ -1048,6 +1065,30 @@ function PODetailCanvas({
                 </div>
               )}
             </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Scope</p>
+              </div>
+              {po.scope_snapshot.length === 0 ? (
+                <div className="px-4 py-4">
+                  <p className="text-sm text-slate-400 italic">No scope selected</p>
+                </div>
+              ) : (
+                <div>
+                  {po.scope_snapshot.map((building, i) => (
+                    <div key={building.building_id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
+                      <p className="text-sm font-semibold text-slate-700">{building.building_name || 'Building'}</p>
+                      {building.trades.length > 0 && (
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {building.trades.map((t) => t.trade_name).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -1071,6 +1112,22 @@ function PODetailCanvas({
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client</p>
+              </div>
+              {[
+                { label: 'RA Number', value: po.ra_number || '-' },
+                { label: 'Name', value: [po.client_first_name, po.client_last_name].filter(Boolean).join(' ') || '-' },
+                { label: 'Address', value: po.address || '-' },
+              ].map(row => (
+                <div key={row.label} className="px-4 py-3 border-b border-slate-50 last:border-0">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
+                  <p className="text-xs text-slate-700 font-medium break-all">{row.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Site Information</p>
               </div>
               <div className="px-4 py-4">
@@ -1078,6 +1135,16 @@ function PODetailCanvas({
               </div>
             </div>
           </div>
+
+          {po.attachments && po.attachments.length > 0 && (
+            <div className="col-span-3 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                <Paperclip size={12} className="text-slate-400" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attachments</p>
+              </div>
+              <AttachmentList attachments={po.attachments} />
+            </div>
+          )}
         </div>
       </div>
     </div>

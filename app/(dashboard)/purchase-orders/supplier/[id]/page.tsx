@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Send, Edit2, X, Check, Clock, Calendar, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Send, Edit2, X, Check, Clock, Calendar, CheckCircle2, Paperclip } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import {
@@ -15,6 +15,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AttachmentList } from '@/components/shared/attachment-list'
 import { cn, formatDate, formatDateTime, normalizeOrderItems } from '@/lib/utils'
 
 export default function POSupplierDetailPage() {
@@ -89,7 +90,7 @@ export default function POSupplierDetailPage() {
       )}
 
       {/* Top bar */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 sticky top-0 z-30 isolate transform-gpu bg-slate-50 pb-6">
         <button
           onClick={() => router.back()}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600"
@@ -272,6 +273,25 @@ export default function POSupplierDetailPage() {
                   </div>
                 )}
               </InfoCard>
+
+              <InfoCard title="Scope">
+                {po.scope_snapshot.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No scope selected</p>
+                ) : (
+                  <div className="-mx-4 -my-2">
+                    {po.scope_snapshot.map((building, i) => (
+                      <div key={building.building_id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
+                        <p className="text-sm font-semibold text-slate-700">{building.building_name || 'Building'}</p>
+                        {building.trades.length > 0 && (
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {building.trades.map((t) => t.trade_name).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </InfoCard>
             </div>
 
             {/* Supplier & contract side panel */}
@@ -282,6 +302,7 @@ export default function POSupplierDetailPage() {
               </InfoCard>
 
               <InfoCard title="Client">
+                <InfoRow label="RA Number" value={po.ra_number || '-'} />
                 <InfoRow
                   label="Name"
                   value={[po.client_first_name, po.client_last_name].filter(Boolean).join(' ') || '-'}
@@ -294,6 +315,14 @@ export default function POSupplierDetailPage() {
               </InfoCard>
             </div>
           </div>
+
+          {po.attachments && po.attachments.length > 0 && (
+            <div className="mt-4">
+              <InfoCard title="Attachments" icon={<Paperclip size={12} className="text-slate-400" />}>
+                <AttachmentList attachments={po.attachments} />
+              </InfoCard>
+            </div>
+          )}
         </>
       ) : (
         <div className="flex items-center justify-center flex-1 text-slate-400">

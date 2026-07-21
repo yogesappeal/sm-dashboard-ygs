@@ -1,4 +1,4 @@
-import type { ScopeItem, Items, ScopeTradeDraft, ScopeDetail } from '../types'
+import type { ScopeItem, Items, ScopeTradeDraft, ScopeDetail, ScopeSnapshotBuilding } from '../types'
 
 export function generateScopeItem(
   buildingName: string,
@@ -42,14 +42,101 @@ export function generateScopeTradeDraft(name: string, buildingNames: string[]): 
 export function scopeDraftsToItems(
   buildings: string[],
   trades: ScopeTradeDraft[]
-): { building_name: string; trade_items: string }[] {
+): { building_name: string; trades: string }[] {
   return buildings.map((b) => ({
     building_name: b,
-    trade_items: trades
+    trades: trades
       .filter((t) => t.buildingNames.includes(b))
       .map((t) => t.name)
       .join(', '),
   }))
+}
+
+// Backend scope.type can come back as a literal 'both', or as a comma-separated
+// list of the individual types — e.g. 'Supplier, Subs' (subcontractor is
+// abbreviated 'Subs', not spelled out) — normalize either shape to the single
+// value the Type <select> options expect:
+//   Supplier, Subs -> both | Supplier -> supplier | Subs -> subcontractor
+export function normalizeScopeType(type: string): 'supplier' | 'subcontractor' | 'both' {
+  const parts = type.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+  const hasSupplier = parts.some((t) => t.includes('supplier') || t === 'both')
+  const hasSubcontractor = parts.some((t) => t.includes('sub') || t === 'both')
+  if (hasSupplier && hasSubcontractor) return 'both'
+  if (hasSubcontractor) return 'subcontractor'
+  return 'supplier'
+}
+
+// Which PO types can be created against a scope — a scope whose type is
+// supplier-only (or subcontractor-only) can't have the other kind of PO
+// raised against it.
+export function scopeAllowedPoTypes(type: string): ('supplier' | 'subcontractor')[] {
+  const normalized = normalizeScopeType(type)
+  if (normalized === 'both') return ['supplier', 'subcontractor']
+  return [normalized]
+}
+
+// Inverse of normalizeScopeType — converts the Type <select> value back into the
+// label shape the backend expects on insert/update (see normalizeScopeType above).
+export function scopeTypeToLabel(type: 'supplier' | 'subcontractor' | 'both'): string {
+  switch (type) {
+    case 'both': return 'Supplier, Subs'
+    case 'subcontractor': return 'Subs'
+    default: return 'Supplier'
+  }
+}
+
+// ─── PO builder submit helpers ────────────────────────────────────────────
+// Shared by the Supplier/Subcontractor PO forms and contract-preview's inline
+// Create PO canvas — all three use the same trade-first builder UI shape.
+
+export interface OrderBuildingSelection {
+  buildingId: string
+  buildingName: string
+  checked: boolean
+  notes?: string
+}
+
+export interface OrderTradeSelection {
+  tradeId: string
+  tradeName: string
+  checked: boolean
+  buildings: OrderBuildingSelection[]
+}
+
+// Inverts the trade-first PO builder UI state (trade -> checked buildings) into
+// the building-first scope_snapshot shape insert-purchase-order expects.
+export function buildScopeSnapshot(trades: OrderTradeSelection[]): ScopeSnapshotBuilding[] {
+  const buildingMap = new Map<string, ScopeSnapshotBuilding>()
+  for (const trade of trades) {
+    if (!trade.checked) continue
+    for (const building of trade.buildings) {
+      if (!building.checked) continue
+      if (!buildingMap.has(building.buildingId)) {
+        buildingMap.set(building.buildingId, {
+          building_id: building.buildingId,
+          building_name: building.buildingName,
+          trades: [],
+        })
+      }
+      buildingMap.get(building.buildingId)!.trades.push({ trade_id: trade.tradeId, trade_name: trade.tradeName })
+    }
+  }
+  return Array.from(buildingMap.values())
+}
+
+// order_details is a single free-text note on the backend — fold the
+// per-building notes from the trade-first builder into one readable string.
+export function buildOrderDetailsNote(trades: OrderTradeSelection[]): string {
+  const lines: string[] = []
+  for (const trade of trades) {
+    if (!trade.checked) continue
+    for (const building of trade.buildings) {
+      const notes = building.notes?.trim()
+      if (!building.checked || !notes) continue
+      lines.push(`${trade.tradeName} — ${building.buildingName}: ${notes}`)
+    }
+  }
+  return lines.join('\n')
 }
 
 // Inverts existing backend scope_details (building-first: building -> trades) into the

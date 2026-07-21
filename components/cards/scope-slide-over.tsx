@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, ClipboardList, FileText, Layers, Edit2, Loader2 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { updateScopeData } from '@/lib/api'
-import { scopeDraftsToItems, scopeDetailsToDrafts } from '@/lib/utils/scope'
+import { scopeDraftsToItems, scopeDetailsToDrafts, normalizeScopeType, scopeTypeToLabel } from '@/lib/utils/scope'
 import { ScopeItemsBuilder } from '@/components/forms/scope-items-builder'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
@@ -43,7 +43,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
     values: scope
       ? {
           scope_name: scope.scope_name,
-          type: scope.type,
+          type: normalizeScopeType(scope.type),
           notes: scope.notes || '',
         }
       : undefined,
@@ -54,6 +54,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
       updateScopeData(token, {
         scope_id: scope!.scope_id,
         ...data,
+        type: scopeTypeToLabel(data.type as 'supplier' | 'subcontractor' | 'both'),
         items: scopeDraftsToItems(buildings, trades),
       }),
     onSuccess: () => {

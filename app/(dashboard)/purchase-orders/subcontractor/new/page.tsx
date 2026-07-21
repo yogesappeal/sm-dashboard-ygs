@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { ArrowLeft, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
-import { getClientsPaginated, getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrderSubcontractor } from '@/lib/api'
-import { cn } from '@/lib/utils'
-import type { ScopeData } from '@/lib/types'
+import { getDropdownContractScope, getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder } from '@/lib/api'
+import { cn, buildScopeSnapshot } from '@/lib/utils'
+import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { useToast } from '@/components/shared/toast'
+import type { ScopeData, InsertPurchaseOrderBody } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,22 +39,26 @@ function POSubsFormInner() {
   const { token, user } = useAuthStore()
   const router          = useRouter()
   const editId          = useSearchParams().get('edit')
+  const toast            = useToast()
 
   const [contractId, setContractId]     = useState('')
   const [subsId, setSubsId]             = useState('')
   const [subsName, setSubsName]         = useState('')
+  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
   const [deliveryDate, setDeliveryDate] = useState('')
   const [siteInfo, setSiteInfo]         = useState('')
   const [jobDetails, setJobDetails]     = useState('')
   const [totalPrice, setTotalPrice]     = useState('')
   const [trades, setTrades]             = useState<TradeSection[]>([])
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([])
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
   const [errors, setErrors]             = useState<Record<string, string>>({})
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
   const { data: contractsData } = useQuery({
-    queryKey: ['contracts-dropdown'],
-    queryFn: () => getClientsPaginated(token!, { limit: 100 }),
+    queryKey: ['contracts-dropdown-scope'],
+    queryFn: () => getDropdownContractScope(token!),
     enabled: !!token,
   })
 
@@ -68,12 +74,12 @@ function POSubsFormInner() {
     enabled: !!token && !!contractId,
   })
 
-  const contracts        = contractsData?.data ?? []
+  const contracts             = contractsData ?? []
+  const contractsWithScope    = contracts.filter((c) => c.has_scope)
+  const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
   const subsList         = subsData?.data ?? []
   const selectedContract = contracts.find((c) => c.id === contractId)
-  const siteAddress      = selectedContract
-    ? [selectedContract.street_address, selectedContract.suburb].filter(Boolean).join(', ')
-    : ''
+  const siteAddress      = selectedContract?.street_address ?? ''
 
   // Auto-parse scope_details into trade → building structure
   useEffect(() => {
@@ -117,9 +123,38 @@ function POSubsFormInner() {
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const insertMutation = useMutation({
-    mutationFn: (body: unknown) => insertPurchaseOrderSubcontractor(token!, body),
-    onSuccess: () => router.push('/purchase-orders'),
+    mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
+    onSuccess: (res) => {
+      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+      router.push('/purchase-orders')
+    },
   })
+
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  // Warn before losing in-progress input.
+
+  const isDirty = !!(
+    contractId || subsId || deliveryDate || siteInfo || jobDetails || totalPrice ||
+    attachmentIds.length > 0 || attachmentsUploading || trades.some((t) => t.checked)
+  )
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!isDirty || insertMutation.isSuccess) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty, insertMutation.isSuccess])
+
+  const handleBack = () => {
+    if (isDirty && !insertMutation.isSuccess &&
+        !window.confirm('You have unsaved changes. Are you sure you want to leave this page?')) {
+      return
+    }
+    router.back()
+  }
 
   const checkedCount = trades.filter((t) => t.checked).length
 
@@ -136,26 +171,21 @@ function POSubsFormInner() {
 
   const handleSubmit = (isDraft: boolean) => {
     if (!validate()) return
-    const selectedItems = trades.filter((t) => t.checked).flatMap((t) =>
-      t.buildings.filter((b) => b.checked).map((b) => ({
-        trade_name: t.tradeName,
-        building_name: b.buildingName,
-      }))
-    )
+    if (attachmentsUploading) return
     insertMutation.mutate({
       contract_id:      contractId,
-      subs_id:          subsId,
-      subs_name:        subsName,
+      supplier_id:      subsId,
+      delivery_method:  deliveryMethod,
       scheduled_date:   deliveryDate,
       site_information: siteInfo,
-      order_details:    jobDetails,
-      scope_id:         scopeData?.scope_id ?? '',
-      scope_name:       scopeData?.scope_name ?? '',
-      selected_items:   selectedItems,
-      total_price:      parseFloat(totalPrice) || 0,
       type:             'subcontractor',
+      service_type:     'subcontractor',
       status:           isDraft ? 'PO Draft' : 'PO Submitted',
-      sm_name:          user?.full_name ?? '',
+      po_amount:        parseFloat(totalPrice) || 0,
+      order_details:    { details: jobDetails },
+      scope_snapshot:   buildScopeSnapshot(trades),
+      attachment_ids:   attachmentIds,
+      send_email:       !isDraft,
     })
   }
 
@@ -168,7 +198,7 @@ function POSubsFormInner() {
   return (
     <div className="flex flex-col min-h-full">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => router.back()}
+        <button onClick={handleBack}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600">
           <ArrowLeft size={20} />
         </button>
@@ -192,7 +222,18 @@ function POSubsFormInner() {
                   setTrades([])
                 }} className={fieldCls('contractId')}>
                   <option value="">Select contract...</option>
-                  {contracts.map((c) => <option key={c.id} value={c.id}>{c.project_name}</option>)}
+                  {contractsWithScope.length > 0 && (
+                    <optgroup label="Has Scope">
+                      {contractsWithScope.map((c) => <option key={c.id} value={c.id}>{c.dropdown_label}</option>)}
+                    </optgroup>
+                  )}
+                  {contractsWithoutScope.length > 0 && (
+                    <optgroup label="No Scope Yet">
+                      {contractsWithoutScope.map((c) => (
+                        <option key={c.id} value={c.id} disabled>{c.dropdown_label} — no scope</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 {errors.contractId && <p className="text-xs text-red-400 mt-1">{errors.contractId}</p>}
               </div>
@@ -227,6 +268,24 @@ function POSubsFormInner() {
                 <input type="number" min="0" step="0.01" value={totalPrice} placeholder="0.00"
                   onChange={(e) => setTotalPrice(e.target.value)} className={fieldCls('totalPrice')} />
                 {errors.totalPrice && <p className="text-xs text-red-400 mt-1">{errors.totalPrice}</p>}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
+              <div className="flex items-center gap-4">
+                {(['Delivery', 'Pick Up'] as const).map((method) => (
+                  <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      checked={deliveryMethod === method}
+                      onChange={() => setDeliveryMethod(method)}
+                      className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                    />
+                    {method}
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -352,6 +411,14 @@ function POSubsFormInner() {
                 placeholder="Describe the job scope, materials to be used, work requirements..."
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
             </div>
+
+            {FEATURE_ATTACHMENTS && (
+              <PoAttachmentsSection
+                attachmentIds={attachmentIds}
+                onAttachmentIdsChange={setAttachmentIds}
+                onUploadingChange={setAttachmentsUploading}
+              />
+            )}
           </div>
         </div>
 
@@ -370,11 +437,11 @@ function POSubsFormInner() {
           />
 
           <div className="space-y-2">
-            <button onClick={() => handleSubmit(false)} disabled={insertMutation.isPending}
+            <button onClick={() => handleSubmit(false)} disabled={insertMutation.isPending || attachmentsUploading}
               className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
-              {insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
+              {attachmentsUploading ? 'Uploading attachments...' : insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
             </button>
-            <button onClick={() => handleSubmit(true)} disabled={insertMutation.isPending}
+            <button onClick={() => handleSubmit(true)} disabled={insertMutation.isPending || attachmentsUploading}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               Save as Draft
             </button>

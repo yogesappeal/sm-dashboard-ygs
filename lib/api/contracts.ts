@@ -1,5 +1,5 @@
 import { api } from './fetcher'
-import type { ContractModel, DetailContracts, Crew, ContractDetailsEnvelope } from '../types'
+import type { ContractModel, DetailContracts, Crew, ContractDetailsEnvelope, ContractScopeDropdownItem } from '../types'
 
 interface GetContractsPaginatedParams {
   page?: number
@@ -36,6 +36,15 @@ export async function getAllClientsPaginatedForOps(
   })
   return api.get<ContractModel>(
     `/functions/v1/all-clients-paginated?${q}`,
+    token
+  )
+}
+
+// Contract dropdown for PO forms — flags whether each contract already has a
+// scope (has_scope), so callers can separate/disable contracts that don't.
+export async function getDropdownContractScope(token: string) {
+  return api.get<ContractScopeDropdownItem[]>(
+    '/functions/v1/get-dropdown-contract-scope',
     token
   )
 }
