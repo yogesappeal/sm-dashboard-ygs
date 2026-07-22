@@ -139,6 +139,28 @@ export function buildOrderDetailsNote(trades: OrderTradeSelection[]): string {
   return lines.join('\n')
 }
 
+// Best-effort inverse of buildOrderDetailsNote, for edit prefill — the backend
+// only stores the flattened string, so per-building notes are recovered by
+// matching the "Trade — Building: " headers it writes and taking everything up
+// to the next header as that building's note (supports multi-line notes).
+// Free-text headers that happen to collide with this pattern would misparse —
+// acceptable since this only seeds the edit form, not the source of truth.
+export function parseOrderDetailsNotes(raw: unknown): Map<string, string> {
+  const map = new Map<string, string>()
+  if (typeof raw !== 'string' || !raw) return map
+
+  const headerRe = /^(.+?) — (.+?): /gm
+  const matches = [...raw.matchAll(headerRe)]
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i]
+    const start = m.index! + m[0].length
+    const end = i + 1 < matches.length ? matches[i + 1].index! : raw.length
+    const key = `${m[1].trim().toLowerCase()}::${m[2].trim().toLowerCase()}`
+    map.set(key, raw.slice(start, end).trim())
+  }
+  return map
+}
+
 // Inverts existing backend scope_details (building-first: building -> trades) into the
 // trade-first draft shape the builder UI edits (trade -> buildings), for edit prefill.
 export function scopeDetailsToDrafts(details: ScopeDetail[]): { buildings: string[]; trades: ScopeTradeDraft[] } {

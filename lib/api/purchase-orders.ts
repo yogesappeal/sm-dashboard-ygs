@@ -6,6 +6,8 @@ import type {
   PurchaseOrderDetailsEnvelope,
   InsertPurchaseOrderBody,
   InsertPurchaseOrderResponse,
+  UpdatePurchaseOrderBody,
+  UpdatePurchaseOrderResponse,
 } from '../types'
 
 // Full PO detail payload (order items, scope snapshot, supplier + client info)
@@ -61,8 +63,8 @@ export async function insertSupplierOrSubs(token: string, body: unknown) {
   return api.post('/rest/v1/rpc/insert_po_supplier', token, body)
 }
 
-export async function updatePurchaseOrder(token: string, body: unknown) {
-  return api.post('/functions/v1/update-purchase-order', token, body)
+export async function updatePurchaseOrder(token: string, body: UpdatePurchaseOrderBody) {
+  return api.post<UpdatePurchaseOrderResponse>('/functions/v1/update-purchase-order', token, body)
 }
 
 export async function updatePurchaseOrderStatus(

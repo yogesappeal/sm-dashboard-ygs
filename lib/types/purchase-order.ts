@@ -136,6 +136,7 @@ export interface PurchaseOrderDetailsRaw {
   supplier_name: string
   supplier_address: string
   supplier_email: string
+  supplier_phone: string
   client_first_name: string
   client_last_name: string
   address: string
@@ -179,4 +180,28 @@ export interface InsertPurchaseOrderResponse {
   data: string
   email_sent: boolean
   email_error: string | null
+}
+
+// ─── POST /functions/v1/update-purchase-order — distinct wire shape from ────
+// insert: underscore-prefixed params, and scope_snapshot/attachment_ids/send_email
+// are not part of this endpoint's contract (see updatePurchaseOrder in
+// lib/api/purchase-orders.ts).
+export interface UpdatePurchaseOrderBody {
+  _id: string
+  _contract_id: string
+  _supplier_id: string
+  _scheduled_date: string
+  _status: string
+  _type: 'supplier' | 'subcontractor'
+  _po_amount: number
+  _delivery_method: 'Delivery' | 'Pick Up'
+  _site_information: string
+  _order_details: { details: string }
+  _scope_snapshot: ScopeSnapshotBuilding[]
+}
+
+// update-purchase-order doesn't send email or touch attachments (unlike insert) —
+// its response isn't documented yet, so this only asserts the shape we rely on.
+export interface UpdatePurchaseOrderResponse {
+  success: boolean
 }

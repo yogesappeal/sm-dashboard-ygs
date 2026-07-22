@@ -2,14 +2,22 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
-import { getDropdownContractScope, getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder } from '@/lib/api'
-import { cn, buildScopeSnapshot } from '@/lib/utils'
+import {
+  getDropdownContractScope,
+  getSuppliersPaginated,
+  getScopeDetailByContractId,
+  getPurchaseOrderDetailsFull,
+  insertPurchaseOrder,
+  updatePurchaseOrder,
+} from '@/lib/api'
+import { cn, buildScopeSnapshot, normalizeOrderItems } from '@/lib/utils'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { RichTextEditor } from '@/components/forms/rich-text-editor'
 import { useToast } from '@/components/shared/toast'
-import type { ScopeData, InsertPurchaseOrderBody } from '@/lib/types'
+import type { ScopeData, InsertPurchaseOrderBody, UpdatePurchaseOrderBody } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +48,7 @@ function POSubsFormInner() {
   const router          = useRouter()
   const editId          = useSearchParams().get('edit')
   const toast            = useToast()
+  const queryClient     = useQueryClient()
 
   const [contractId, setContractId]     = useState('')
   const [subsId, setSubsId]             = useState('')
@@ -74,6 +83,12 @@ function POSubsFormInner() {
     enabled: !!token && !!contractId,
   })
 
+  const { data: poDetail, isLoading: poDetailLoading } = useQuery({
+    queryKey: ['po-detail', editId],
+    queryFn: () => getPurchaseOrderDetailsFull(token!, editId!),
+    enabled: !!token && !!editId,
+  })
+
   const contracts             = contractsData ?? []
   const contractsWithScope    = contracts.filter((c) => c.has_scope)
   const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
@@ -81,7 +96,22 @@ function POSubsFormInner() {
   const selectedContract = contracts.find((c) => c.id === contractId)
   const siteAddress      = selectedContract?.street_address ?? ''
 
-  // Auto-parse scope_details into trade → building structure
+  // Prefill the form from the existing PO when editing a draft.
+  useEffect(() => {
+    if (!editId || !poDetail) return
+    setContractId(poDetail.contract_id)
+    setSubsId(poDetail.supplier_id)
+    setSubsName(poDetail.supplier_name)
+    setDeliveryMethod(poDetail.delivery_method === 'Pick Up' ? 'Pick Up' : 'Delivery')
+    setDeliveryDate(poDetail.scheduled_date ? poDetail.scheduled_date.slice(0, 10) : '')
+    setSiteInfo(poDetail.site_information ?? '')
+    setJobDetails(normalizeOrderItems(poDetail.order_details)[0]?.description ?? '')
+    setTotalPrice(poDetail.po_amount ? String(poDetail.po_amount) : '')
+    setAttachmentIds((poDetail.attachments ?? []).map((a) => a.id))
+  }, [editId, poDetail])
+
+  // Auto-parse scope_details into trade → building structure, carrying over
+  // whichever trades/buildings were already checked on the PO being edited.
   useEffect(() => {
     if (!scopeData) { setTrades([]); return }
 
@@ -97,14 +127,25 @@ function POSubsFormInner() {
       }
     }
 
+    const checkedTradeIds = new Set<string>()
+    const checkedPairs = new Set<string>()
+    if (editId) {
+      for (const building of poDetail?.scope_snapshot ?? []) {
+        for (const trade of building.trades ?? []) {
+          checkedTradeIds.add(trade.trade_id)
+          checkedPairs.add(`${trade.trade_id}::${building.building_id}`)
+        }
+      }
+    }
+
     setTrades(Array.from(tradeMap.values()).map((t) => ({
       tradeId:   t.tradeId,
       tradeName: t.tradeName,
-      checked:   false,
+      checked:   checkedTradeIds.has(t.tradeId),
       open:      true,
-      buildings: t.buildings.map((b) => ({ ...b, checked: false })),
+      buildings: t.buildings.map((b) => ({ ...b, checked: checkedPairs.has(`${t.tradeId}::${b.buildingId}`) })),
     })))
-  }, [scopeData])
+  }, [scopeData, editId, poDetail])
 
   // ── Trade / building handlers ─────────────────────────────────────────────
 
@@ -126,6 +167,16 @@ function POSubsFormInner() {
     mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
     onSuccess: (res) => {
       if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      router.push('/purchase-orders')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (body: UpdatePurchaseOrderBody) => updatePurchaseOrder(token!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
       router.push('/purchase-orders')
     },
   })
@@ -138,18 +189,20 @@ function POSubsFormInner() {
     attachmentIds.length > 0 || attachmentsUploading || trades.some((t) => t.checked)
   )
 
+  const isSaved = insertMutation.isSuccess || updateMutation.isSuccess
+
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!isDirty || insertMutation.isSuccess) return
+      if (!isDirty || isSaved) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [isDirty, insertMutation.isSuccess])
+  }, [isDirty, isSaved])
 
   const handleBack = () => {
-    if (isDirty && !insertMutation.isSuccess &&
+    if (isDirty && !isSaved &&
         !window.confirm('You have unsaved changes. Are you sure you want to leave this page?')) {
       return
     }
@@ -172,21 +225,38 @@ function POSubsFormInner() {
   const handleSubmit = (isDraft: boolean) => {
     if (!validate()) return
     if (attachmentsUploading) return
-    insertMutation.mutate({
-      contract_id:      contractId,
-      supplier_id:      subsId,
-      delivery_method:  deliveryMethod,
-      scheduled_date:   deliveryDate,
-      site_information: siteInfo,
-      type:             'subcontractor',
-      service_type:     'subcontractor',
-      status:           isDraft ? 'PO Draft' : 'PO Submitted',
-      po_amount:        parseFloat(totalPrice) || 0,
-      order_details:    { details: jobDetails },
-      scope_snapshot:   buildScopeSnapshot(trades),
-      attachment_ids:   attachmentIds,
-      send_email:       !isDraft,
-    })
+    const status = isDraft ? 'PO Draft' : 'PO Submitted'
+    if (editId) {
+      updateMutation.mutate({
+        _id:               editId,
+        _contract_id:      contractId,
+        _supplier_id:      subsId,
+        _scheduled_date:   deliveryDate,
+        _status:           status,
+        _type:             'subcontractor',
+        _po_amount:        parseFloat(totalPrice) || 0,
+        _delivery_method:  deliveryMethod,
+        _site_information: siteInfo,
+        _order_details:    { details: jobDetails },
+        _scope_snapshot:   buildScopeSnapshot(trades),
+      })
+    } else {
+      insertMutation.mutate({
+        contract_id:      contractId,
+        supplier_id:      subsId,
+        delivery_method:  deliveryMethod,
+        scheduled_date:   deliveryDate,
+        site_information: siteInfo,
+        type:             'subcontractor',
+        service_type:     'subcontractor',
+        status,
+        po_amount:        parseFloat(totalPrice) || 0,
+        order_details:    { details: jobDetails },
+        scope_snapshot:   buildScopeSnapshot(trades),
+        attachment_ids:   attachmentIds,
+        send_email:       !isDraft,
+      })
+    }
   }
 
   const fieldCls = (field: string) =>
@@ -407,16 +477,19 @@ function POSubsFormInner() {
             {/* Job description */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Job Description</label>
-              <textarea value={jobDetails} onChange={(e) => setJobDetails(e.target.value)} rows={5}
+              <RichTextEditor
+                value={jobDetails}
+                onChange={setJobDetails}
                 placeholder="Describe the job scope, materials to be used, work requirements..."
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
+              />
             </div>
 
-            {FEATURE_ATTACHMENTS && (
+            {FEATURE_ATTACHMENTS && (!editId || poDetail) && (
               <PoAttachmentsSection
                 attachmentIds={attachmentIds}
                 onAttachmentIdsChange={setAttachmentIds}
                 onUploadingChange={setAttachmentsUploading}
+                initialAttachments={poDetail?.attachments}
               />
             )}
           </div>
@@ -437,17 +510,21 @@ function POSubsFormInner() {
           />
 
           <div className="space-y-2">
-            <button onClick={() => handleSubmit(false)} disabled={insertMutation.isPending || attachmentsUploading}
+            <button onClick={() => handleSubmit(false)}
+              disabled={insertMutation.isPending || updateMutation.isPending || attachmentsUploading || (!!editId && poDetailLoading)}
               className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
-              {attachmentsUploading ? 'Uploading attachments...' : insertMutation.isPending ? 'Submitting...' : 'Submit PO'}
+              {attachmentsUploading ? 'Uploading attachments...'
+                : (insertMutation.isPending || updateMutation.isPending) ? 'Submitting...'
+                : 'Submit PO'}
             </button>
-            <button onClick={() => handleSubmit(true)} disabled={insertMutation.isPending || attachmentsUploading}
+            <button onClick={() => handleSubmit(true)}
+              disabled={insertMutation.isPending || updateMutation.isPending || attachmentsUploading || (!!editId && poDetailLoading)}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               Save as Draft
             </button>
           </div>
 
-          {insertMutation.isError && (
+          {(insertMutation.isError || updateMutation.isError) && (
             <p className="text-xs text-red-400 text-center">Failed to save. Please try again.</p>
           )}
         </div>
@@ -543,8 +620,11 @@ function EmailPreview({
         {/* Job description */}
         <div>
           <p className="font-bold text-slate-800 mb-1">Job Description</p>
-          {jobDetails ? (
-            <p className="text-slate-600 text-xs whitespace-pre-wrap">{jobDetails}</p>
+          {jobDetails && jobDetails !== '<br>' ? (
+            <div
+              className="text-slate-600 text-xs [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5"
+              dangerouslySetInnerHTML={{ __html: jobDetails }}
+            />
           ) : (
             <p className="text-slate-300 italic text-xs">No description added yet</p>
           )}

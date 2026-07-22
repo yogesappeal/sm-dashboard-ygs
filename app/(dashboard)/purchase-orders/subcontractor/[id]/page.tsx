@@ -277,7 +277,12 @@ export default function POSubsDetailPage() {
                       <div key={item.id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
                         <p className="text-sm font-semibold text-slate-700">{item.name}</p>
                         {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
-                        {item.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>}
+                        {item.description && (
+                          <div
+                            className="text-sm text-slate-600 mt-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
+                            dangerouslySetInnerHTML={{ __html: item.description }}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -295,6 +300,7 @@ export default function POSubsDetailPage() {
               <InfoCard title="Subcontractor">
                 <InfoRow label="Name" value={po.supplier_name || '-'} />
                 <InfoRow label="Email" value={po.supplier_email || '-'} />
+                <InfoRow label="Phone" value={po.supplier_phone || '-'} />
               </InfoCard>
 
               <InfoCard title="Client">

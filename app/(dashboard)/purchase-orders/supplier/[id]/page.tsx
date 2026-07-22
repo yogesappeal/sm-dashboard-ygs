@@ -107,7 +107,7 @@ export default function POSupplierDetailPage() {
           )}
         </div>
         {po && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={po.status} />
             <StatusBadge status={po.type} />
             {/* Edit button — only on Draft */}
@@ -258,22 +258,6 @@ export default function POSupplierDetailPage() {
                 </InfoCard>
               )}
 
-              <InfoCard title="Order Details">
-                {orderItems.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">No order items</p>
-                ) : (
-                  <div className="-mx-4 -my-2">
-                    {orderItems.map((item, i) => (
-                      <div key={item.id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
-                        <p className="text-sm font-semibold text-slate-700">{item.name}</p>
-                        {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
-                        {item.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </InfoCard>
-
               <InfoCard title="Scope">
                 {po.scope_snapshot.length === 0 ? (
                   <p className="text-sm text-slate-400 italic">No scope selected</p>
@@ -292,6 +276,28 @@ export default function POSupplierDetailPage() {
                   </div>
                 )}
               </InfoCard>
+
+              <InfoCard title="Order Details">
+                {orderItems.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No order items</p>
+                ) : (
+                  <div className="-mx-4 -my-2">
+                    {orderItems.map((item, i) => (
+                      <div key={item.id} className={cn('px-4 py-3', i > 0 && 'border-t border-slate-50')}>
+                        <p className="text-sm font-semibold text-slate-700">{item.name}</p>
+                        {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
+                        {item.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </InfoCard>
+
+              {po.attachments && po.attachments.length > 0 && (
+                <InfoCard title="Attachments" icon={<Paperclip size={12} className="text-slate-400" />}>
+                  <AttachmentList attachments={po.attachments} />
+                </InfoCard>
+              )}
             </div>
 
             {/* Supplier & contract side panel */}
@@ -299,6 +305,7 @@ export default function POSupplierDetailPage() {
               <InfoCard title={po.type === 'supplier' ? 'Supplier' : 'Subcontractor'}>
                 <InfoRow label="Name" value={po.supplier_name || '-'} />
                 <InfoRow label="Email" value={po.supplier_email || '-'} />
+                <InfoRow label="Phone" value={po.supplier_phone || '-'} />
               </InfoCard>
 
               <InfoCard title="Client">
@@ -315,14 +322,6 @@ export default function POSupplierDetailPage() {
               </InfoCard>
             </div>
           </div>
-
-          {po.attachments && po.attachments.length > 0 && (
-            <div className="mt-4">
-              <InfoCard title="Attachments" icon={<Paperclip size={12} className="text-slate-400" />}>
-                <AttachmentList attachments={po.attachments} />
-              </InfoCard>
-            </div>
-          )}
         </>
       ) : (
         <div className="flex items-center justify-center flex-1 text-slate-400">
