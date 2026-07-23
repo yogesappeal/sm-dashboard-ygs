@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Building2, Mail, Phone, MapPin, FileText, Edit2, Check, Loader2 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { updateSupplierStatus, updateSupplierData } from '@/lib/api'
 import { supplierSchema } from '@/lib/utils/validation'
 import { useToast } from '@/components/shared/toast'
@@ -100,13 +101,15 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
             <p className="font-medium text-slate-800 truncate">{supplier.supplier_code || '-'}</p>
           </div>
           {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
-            >
-              <Edit2 size={14} />
-              Edit
-            </button>
+            <PermissionGuard action="supplier:edit">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
+              >
+                <Edit2 size={14} />
+                Edit
+              </button>
+            </PermissionGuard>
           )}
         </div>
 

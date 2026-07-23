@@ -16,6 +16,8 @@ import {
 import { cn, buildScopeSnapshot, normalizeOrderItems } from '@/lib/utils'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
 import { RichTextEditor } from '@/components/forms/rich-text-editor'
+import { AccessRestrictedNotice } from '@/components/shared/access-restricted-notice'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { useToast } from '@/components/shared/toast'
 import type { ScopeData, InsertPurchaseOrderBody, UpdatePurchaseOrderBody } from '@/lib/types'
 
@@ -38,6 +40,10 @@ interface TradeSection {
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 
 export default function POSubsFormPage() {
+  const canCreate = usePermission('po:create')
+  if (!canCreate) {
+    return <AccessRestrictedNotice message="You don't have permission to create a purchase order." />
+  }
   return <Suspense><POSubsFormInner /></Suspense>
 }
 

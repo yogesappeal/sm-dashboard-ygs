@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, CheckSquare, X, AlertTriangle } from 'lucide-react'
 import { cn, formatDate, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { useAuthStore } from '@/lib/store'
 import { getScopeDetailByContractId, updateScopeItems, ApiError } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
@@ -375,24 +376,26 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
           <>
             {/* Quick-create buttons */}
             <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-t border-b border-slate-100">
-              <div className="flex gap-2">
-                {allowedPoTypes.includes('supplier') && (
-                  <button
-                    onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
-                  >
-                    <Plus size={11} /> Supplier
-                  </button>
-                )}
-                {allowedPoTypes.includes('subcontractor') && (
-                  <button
-                    onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
-                  >
-                    <Plus size={11} /> Subs
-                  </button>
-                )}
-              </div>
+              <PermissionGuard action="po:create">
+                <div className="flex gap-2">
+                  {allowedPoTypes.includes('supplier') && (
+                    <button
+                      onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
+                    >
+                      <Plus size={11} /> Supplier
+                    </button>
+                  )}
+                  {allowedPoTypes.includes('subcontractor') && (
+                    <button
+                      onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
+                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
+                    >
+                      <Plus size={11} /> Subs
+                    </button>
+                  )}
+                </div>
+              </PermissionGuard>
               <button
                 onClick={toggleEditMode}
                 className={cn(
@@ -476,17 +479,19 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                                     {formatDate(trade.planned_po_date)}
                                   </span>
                                 )}
-                                <button
-                                  onClick={() => onCanvas({
-                                    type: 'SHOW_CREATE_PO',
-                                    poType: inlinePoType,
-                                    buildingName: building.building_name,
-                                    tradeName: trade.trade_name,
-                                  })}
-                                  className="hidden group-hover:flex items-center gap-1 text-[10px] text-[#6692C5] hover:text-[#4F7CB3] font-medium whitespace-nowrap"
-                                >
-                                  <Plus size={10} /> Create PO
-                                </button>
+                                <PermissionGuard action="po:create">
+                                  <button
+                                    onClick={() => onCanvas({
+                                      type: 'SHOW_CREATE_PO',
+                                      poType: inlinePoType,
+                                      buildingName: building.building_name,
+                                      tradeName: trade.trade_name,
+                                    })}
+                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-[#6692C5] hover:text-[#4F7CB3] font-medium whitespace-nowrap"
+                                  >
+                                    <Plus size={10} /> Create PO
+                                  </button>
+                                </PermissionGuard>
                               </>
                             )}
                           </div>
@@ -549,12 +554,14 @@ function POTracker({ pos, onCanvas }: {
         </div>
         <p className="text-sm text-slate-500 font-medium">No purchase orders</p>
         <p className="text-xs text-slate-400 mt-1">Create your first PO to get started</p>
-        <button
-          onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-          className="flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
-        >
-          <Plus size={14} /> Create PO
-        </button>
+        <PermissionGuard action="po:create">
+          <button
+            onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+            className="flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+          >
+            <Plus size={14} /> Create PO
+          </button>
+        </PermissionGuard>
       </div>
     )
   }
@@ -659,12 +666,14 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
       {tab === 'po' && (
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white flex-shrink-0">
           <p className="text-xs font-semibold text-slate-600">PO List</p>
-          <button
-            onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
-          >
-            <Plus size={12} /> New PO
-          </button>
+          <PermissionGuard action="po:create">
+            <button
+              onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+            >
+              <Plus size={12} /> New PO
+            </button>
+          </PermissionGuard>
         </div>
       )}
 

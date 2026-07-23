@@ -6,6 +6,7 @@ import { Search, Users, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { SupplierRow, SupplierTableHeader } from '@/components/cards/supplier-row'
 import { SupplierSlideOver } from '@/components/cards/supplier-slide-over'
 import { SupplierCreateModal } from '@/components/forms/supplier-create-modal'
@@ -115,12 +116,14 @@ export default function SuppliersPage() {
         title="Suppliers"
         description="Manage suppliers and subcontractors"
         action={
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            + Add Supplier
-          </button>
+          <PermissionGuard action="supplier:create">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              + Add Supplier
+            </button>
+          </PermissionGuard>
         }
       />
 

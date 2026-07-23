@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, ClipboardList, FileText, Layers, Edit2, Loader2 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { updateScopeData } from '@/lib/api'
 import { scopeDraftsToItems, scopeDetailsToDrafts, normalizeScopeType, scopeTypeToLabel } from '@/lib/utils/scope'
 import { ScopeItemsBuilder } from '@/components/forms/scope-items-builder'
@@ -96,13 +97,15 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
             <p className="font-medium text-slate-800 truncate">{scope.scope_number || '-'}</p>
           </div>
           {!isEditing && (
-            <button
-              onClick={handleStartEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
-            >
-              <Edit2 size={14} />
-              Edit
-            </button>
+            <PermissionGuard action="scope:edit">
+              <button
+                onClick={handleStartEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
+              >
+                <Edit2 size={14} />
+                Edit
+              </button>
+            </PermissionGuard>
           )}
         </div>
 

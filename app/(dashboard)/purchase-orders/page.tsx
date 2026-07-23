@@ -5,11 +5,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ShoppingCart, ChevronDown, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
-import { getPurchaseOrdersPaginated } from '@/lib/api'
+import { getPurchaseOrdersPaginated, getPurchaseOrderStatusSummary } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { PORow, POTableHeader } from '@/components/cards/po-row'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { TableRowSkeleton } from '@/components/ui/skeleton'
+import { TableRowSkeleton, Skeleton } from '@/components/ui/skeleton'
 import { PaginationBar } from '@/components/ui/pagination-bar'
 import { cn } from '@/lib/utils'
 
@@ -19,13 +21,30 @@ const TYPE_FILTERS = [
   { value: 'subcontractor', label: 'Subcontractor' },
 ]
 
+// Every status StatusBadge knows how to render (components/ui/status-badge.tsx)
+// — the filter dropdown covers all of them; the summary tiles below only
+// show the subset worth a glance at (SUMMARY_STATUSES).
+const PO_STATUSES = [
+  'PO Draft',
+  'PO Submitted',
+  'PO Sent',
+  'PO Confirmed',
+  'PO Rescheduled',
+  'PO Completed',
+  'PO Rejected',
+  'PO Cancelled',
+]
+
+const SUMMARY_STATUSES = [
+  'PO Confirmed',
+  'PO Rescheduled',
+  'PO Completed',
+  'PO Rejected',
+]
+
 const STATUS_FILTERS = [
   { value: '', label: 'All Status' },
-  { value: 'PO Draft', label: 'Draft' },
-  { value: 'PO Submitted', label: 'Submitted' },
-  { value: 'PO Sent', label: 'Sent' },
-  { value: 'PO Rejected', label: 'Rejected' },
-  { value: 'PO Cancelled', label: 'Cancelled' },
+  ...PO_STATUSES.map((status) => ({ value: status, label: status.replace('PO ', '') })),
 ]
 
 export default function PurchaseOrdersPage() {
@@ -55,6 +74,12 @@ export default function PurchaseOrdersPage() {
     staleTime: 0,
   })
 
+  const { data: statusSummary, isLoading: isSummaryLoading } = useQuery({
+    queryKey: ['purchase-orders-status-summary'],
+    queryFn: () => getPurchaseOrderStatusSummary(token!),
+    enabled: !!token,
+  })
+
   const pos = data?.data ?? []
   const pagination = data?.pagination
 
@@ -81,36 +106,57 @@ export default function PurchaseOrdersPage() {
         title="Purchase Order"
         description="View and manage all purchase orders"
         action={
-          <div className="relative">
-            <button
-              onClick={() => setNewPOOpen((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              + New PO
-              <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
-            </button>
-            {newPOOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setNewPOOpen(false)} />
-                <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                  <button
-                    onClick={() => { router.push('/purchase-orders/supplier/new'); setNewPOOpen(false) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    Supplier PO
-                  </button>
-                  <button
-                    onClick={() => { router.push('/purchase-orders/subcontractor/new'); setNewPOOpen(false) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    Subcontractor PO
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <PermissionGuard action="po:create">
+            <div className="relative">
+              <button
+                onClick={() => setNewPOOpen((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                + New PO
+                <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
+              </button>
+              {newPOOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setNewPOOpen(false)} />
+                  <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                    <button
+                      onClick={() => { router.push('/purchase-orders/supplier/new'); setNewPOOpen(false) }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Supplier PO
+                    </button>
+                    <button
+                      onClick={() => { router.push('/purchase-orders/subcontractor/new'); setNewPOOpen(false) }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Subcontractor PO
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </PermissionGuard>
         }
       />
+
+      {/* Status summary */}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+        {isSummaryLoading ? (
+          Array.from({ length: SUMMARY_STATUSES.length }).map((_, i) => (
+            <Skeleton key={i} className="h-[68px] w-28 rounded-xl flex-shrink-0" />
+          ))
+        ) : (
+          SUMMARY_STATUSES.map((status) => (
+            <PoStatusTile
+              key={status}
+              status={status}
+              count={statusSummary?.[status] ?? 0}
+              isActive={statusFilter === status}
+              onClick={() => handleFilterChange(typeFilter, statusFilter === status ? '' : status)}
+            />
+          ))
+        )}
+      </div>
 
       {/* Filters + Search */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -191,5 +237,25 @@ export default function PurchaseOrdersPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function PoStatusTile({ status, count, isActive, onClick }: {
+  status: string
+  count: number
+  isActive: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex-shrink-0 flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-colors',
+        isActive ? 'bg-[#6692C5]/10 border-[#6692C5]/40' : 'bg-white border-slate-200 hover:border-slate-300'
+      )}
+    >
+      <StatusBadge status={status} />
+      <p className="text-xl font-bold text-slate-800 leading-none">{count}</p>
+    </button>
   )
 }
