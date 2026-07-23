@@ -35,8 +35,13 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/forgot-password') ||
     request.nextUrl.pathname.startsWith('/reset-password')
 
+  // Public, no-login pages — reached via emailed magic links (supplier/
+  // subcontractor accepting/rejecting/rescheduling a PO), never gated by
+  // Supabase auth in either direction.
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/po-response')
+
   // Redirect unauthenticated users to login
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', request.nextUrl.pathname)
