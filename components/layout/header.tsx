@@ -5,8 +5,10 @@ import { useAuthStore, useAppStore } from '@/lib/store'
 import { Bell, Menu, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
 import { GlobalSearch } from './global-search'
-import { NotificationPanel, unreadCount } from './notification-panel'
+import { NotificationPanel } from './notification-panel'
 import { ToolboxPanel } from './toolbox-panel'
+import { PermissionGuard } from '@/components/shared/permission-guard'
+import { useNotificationsUnreadCount } from '@/lib/hooks/use-notifications'
 
 const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
 
@@ -15,6 +17,7 @@ export function Header() {
   const { setMobileSidebarOpen } = useAppStore()
   const [notifOpen, setNotifOpen] = useState(false)
   const [toolboxOpen, setToolboxOpen] = useState(false)
+  const { data: unreadCount = 0 } = useNotificationsUnreadCount()
 
   const initials = user?.first_name?.[0]?.toUpperCase() ?? '?'
   const avatarUrl = user?.image_url
@@ -47,16 +50,18 @@ export function Header() {
       <div className="flex items-center gap-3 shrink-0">
 
         {/* SM Toolbox */}
-        <div className="relative">
-          <button
-            onClick={() => setToolboxOpen((v) => !v)}
-            className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-            aria-label="SM Toolbox"
-          >
-            <LayoutGrid size={18} />
-          </button>
-          <ToolboxPanel open={toolboxOpen} onClose={() => setToolboxOpen(false)} />
-        </div>
+        <PermissionGuard action="toolbox:view">
+          <div className="relative">
+            <button
+              onClick={() => setToolboxOpen((v) => !v)}
+              className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+              aria-label="SM Toolbox"
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <ToolboxPanel open={toolboxOpen} onClose={() => setToolboxOpen(false)} />
+          </div>
+        </PermissionGuard>
 
         {/* Notification bell + panel */}
         <div className="relative">
@@ -79,7 +84,9 @@ export function Header() {
             <p className="text-sm font-semibold text-slate-800 leading-tight">
               {user?.full_name || user?.first_name || 'User'}
             </p>
-            <p className="text-[11px] text-slate-400 leading-tight">Site Manager</p>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              {user?.job_title === 'Ops' ? 'Operations' : user?.job_title}
+            </p>
           </div>
 
           {avatarUrl ? (
