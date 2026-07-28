@@ -166,9 +166,10 @@ export interface InsertPurchaseOrderBody {
   po_amount: number
   delivery_method: 'Delivery' | 'Pick Up'
   site_information: string
-  // Supplier POs send a free-text note; subcontractor POs send it wrapped
-  // as { details: string }.
-  order_details: string | { details: string }
+  // Supplier POs send a structured array (one item per trade/building with
+  // notes, see buildOrderDetailsItems in lib/utils/scope.ts); subcontractor
+  // POs send a single free-text note wrapped as { details: string }.
+  order_details: PODetailOrderItem[] | { details: string }
   scope_snapshot: ScopeSnapshotBuilding[]
   attachment_ids: string[]
   send_email: boolean
@@ -196,7 +197,7 @@ export interface UpdatePurchaseOrderBody {
   _po_amount: number
   _delivery_method: 'Delivery' | 'Pick Up'
   _site_information: string
-  _order_details: { details: string }
+  _order_details: PODetailOrderItem[] | { details: string }
   _scope_snapshot: ScopeSnapshotBuilding[]
 }
 

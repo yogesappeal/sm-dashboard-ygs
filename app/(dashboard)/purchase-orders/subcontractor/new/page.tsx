@@ -12,10 +12,11 @@ import {
   getPurchaseOrderDetailsFull,
   insertPurchaseOrder,
   updatePurchaseOrder,
+  autoSendEmailPurchaseOrder,
 } from '@/lib/api'
 import { cn, buildScopeSnapshot, normalizeOrderItems } from '@/lib/utils'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
-import { RichTextEditor } from '@/components/forms/rich-text-editor'
+import { BulletNotesInput } from '@/components/forms/bullet-notes-input'
 import { AccessRestrictedNotice } from '@/components/shared/access-restricted-notice'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { useToast } from '@/components/shared/toast'
@@ -59,7 +60,6 @@ function POSubsFormInner() {
   const [contractId, setContractId]     = useState('')
   const [subsId, setSubsId]             = useState('')
   const [subsName, setSubsName]         = useState('')
-  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
   const [deliveryDate, setDeliveryDate] = useState('')
   const [siteInfo, setSiteInfo]         = useState('')
   const [jobDetails, setJobDetails]     = useState('')
@@ -108,7 +108,6 @@ function POSubsFormInner() {
     setContractId(poDetail.contract_id)
     setSubsId(poDetail.supplier_id)
     setSubsName(poDetail.supplier_name)
-    setDeliveryMethod(poDetail.delivery_method === 'Pick Up' ? 'Pick Up' : 'Delivery')
     setDeliveryDate(poDetail.scheduled_date ? poDetail.scheduled_date.slice(0, 10) : '')
     setSiteInfo(poDetail.site_information ?? '')
     setJobDetails(normalizeOrderItems(poDetail.order_details)[0]?.description ?? '')
@@ -171,8 +170,14 @@ function POSubsFormInner() {
 
   const insertMutation = useMutation({
     mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
-    onSuccess: (res) => {
-      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+    onSuccess: (res, variables) => {
+      if (!variables.send_email) {
+        toast('PO saved as draft.', 'success')
+      } else if (res.email_error) {
+        toast(`PO submitted, but the email failed to send: ${res.email_error}`, 'error')
+      } else {
+        toast('PO submitted and sent successfully.', 'success')
+      }
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
       router.push('/purchase-orders')
     },
@@ -180,11 +185,6 @@ function POSubsFormInner() {
 
   const updateMutation = useMutation({
     mutationFn: (body: UpdatePurchaseOrderBody) => updatePurchaseOrder(token!, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
-      router.push('/purchase-orders')
-    },
   })
 
   // ── Unsaved-changes guard ─────────────────────────────────────────────────
@@ -231,31 +231,52 @@ function POSubsFormInner() {
   const handleSubmit = (isDraft: boolean) => {
     if (!validate()) return
     if (attachmentsUploading) return
-    const status = isDraft ? 'PO Draft' : 'PO Submitted'
     if (editId) {
       updateMutation.mutate({
         _id:               editId,
         _contract_id:      contractId,
         _supplier_id:      subsId,
         _scheduled_date:   deliveryDate,
-        _status:           status,
+        // update-purchase-order only ever saves as Draft — Submit sends the
+        // email below, and a successful send is what promotes the PO to
+        // Sent server-side. This way a failed send just leaves it as Draft
+        // instead of stuck "Submitted" with nothing actually sent.
+        _status:           'PO Draft',
         _type:             'subcontractor',
         _po_amount:        parseFloat(totalPrice) || 0,
-        _delivery_method:  deliveryMethod,
+        _delivery_method:  'Delivery',
         _site_information: siteInfo,
         _order_details:    { details: jobDetails },
         _scope_snapshot:   buildScopeSnapshot(trades),
+      }, {
+        onSuccess: async () => {
+          queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
+          queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+          if (!isDraft) {
+            try {
+              await autoSendEmailPurchaseOrder(token!, editId, 'subcontractor')
+              queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
+              queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+              toast('PO submitted and sent successfully.', 'success')
+            } catch {
+              toast('Failed to send the email — PO kept as Draft, please try submitting again.', 'error')
+            }
+          } else {
+            toast('PO saved as draft.', 'success')
+          }
+          router.push('/purchase-orders')
+        },
       })
     } else {
       insertMutation.mutate({
         contract_id:      contractId,
         supplier_id:      subsId,
-        delivery_method:  deliveryMethod,
+        delivery_method:  'Delivery',
         scheduled_date:   deliveryDate,
         site_information: siteInfo,
         type:             'subcontractor',
         service_type:     'subcontractor',
-        status,
+        status:           isDraft ? 'PO Draft' : 'PO Submitted',
         po_amount:        parseFloat(totalPrice) || 0,
         order_details:    { details: jobDetails },
         scope_snapshot:   buildScopeSnapshot(trades),
@@ -344,24 +365,6 @@ function POSubsFormInner() {
                 <input type="number" min="0" step="0.01" value={totalPrice} placeholder="0.00"
                   onChange={(e) => setTotalPrice(e.target.value)} className={fieldCls('totalPrice')} />
                 {errors.totalPrice && <p className="text-xs text-red-400 mt-1">{errors.totalPrice}</p>}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
-              <div className="flex items-center gap-4">
-                {(['Delivery', 'Pick Up'] as const).map((method) => (
-                  <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="deliveryMethod"
-                      checked={deliveryMethod === method}
-                      onChange={() => setDeliveryMethod(method)}
-                      className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
-                    />
-                    {method}
-                  </label>
-                ))}
               </div>
             </div>
 
@@ -483,9 +486,10 @@ function POSubsFormInner() {
             {/* Job description */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Job Description</label>
-              <RichTextEditor
+              <BulletNotesInput
                 value={jobDetails}
                 onChange={setJobDetails}
+                rows={5}
                 placeholder="Describe the job scope, materials to be used, work requirements..."
               />
             </div>
@@ -597,9 +601,9 @@ function EmailPreview({
         {/* Scope of work */}
         <div>
           <p className="font-bold text-slate-800 mb-2">Scope of Work</p>
-          {scopeData && (
+          {/* {scopeData && (
             <p className="text-xs text-slate-500 font-mono mb-2">{scopeData.scope_name}</p>
-          )}
+          )} */}
           {checkedTrades.length === 0 ? (
             <p className="text-slate-300 italic text-xs">No trades selected yet</p>
           ) : (
@@ -626,11 +630,8 @@ function EmailPreview({
         {/* Job description */}
         <div>
           <p className="font-bold text-slate-800 mb-1">Job Description</p>
-          {jobDetails && jobDetails !== '<br>' ? (
-            <div
-              className="text-slate-600 text-xs [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5"
-              dangerouslySetInnerHTML={{ __html: jobDetails }}
-            />
+          {jobDetails ? (
+            <p className="text-slate-600 text-xs whitespace-pre-wrap">{jobDetails}</p>
           ) : (
             <p className="text-slate-300 italic text-xs">No description added yet</p>
           )}

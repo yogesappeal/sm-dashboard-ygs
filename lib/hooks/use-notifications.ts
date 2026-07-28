@@ -22,7 +22,7 @@ export function useNotificationsUnreadCount() {
     queryKey: notificationKeys.unreadCount,
     queryFn: () => getNotifications(token!, { limit: 1 }),
     enabled: !!token,
-    refetchInterval: 45000,
+    refetchInterval: 3 * 60 * 1000,
     select: (res) => res.unread_count,
   })
 }

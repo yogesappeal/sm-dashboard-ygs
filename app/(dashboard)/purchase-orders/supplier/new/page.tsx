@@ -12,9 +12,11 @@ import {
   getPurchaseOrderDetailsFull,
   insertPurchaseOrder,
   updatePurchaseOrder,
+  autoSendEmailPurchaseOrder,
 } from '@/lib/api'
-import { cn, buildScopeSnapshot, buildOrderDetailsNote, parseOrderDetailsNotes } from '@/lib/utils'
+import { cn, buildScopeSnapshot, buildOrderDetailsItems, matchOrderDetailsToBuildings, orderItemId } from '@/lib/utils'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { BulletNotesInput } from '@/components/forms/bullet-notes-input'
 import { useToast } from '@/components/shared/toast'
 import { AccessRestrictedNotice } from '@/components/shared/access-restricted-notice'
 import { usePermission } from '@/lib/hooks/use-permission'
@@ -152,7 +154,9 @@ function POSupplierFormInner() {
 
     const checkedTradeIds = new Set<string>()
     const checkedPairs = new Set<string>()
-    const notesByPair = editId ? parseOrderDetailsNotes(poDetail?.order_details) : new Map<string, string>()
+    const notes = editId
+      ? matchOrderDetailsToBuildings(poDetail?.order_details)
+      : { byId: new Map<string, string>(), byName: new Map<string, string>() }
     if (editId) {
       for (const building of poDetail?.scope_snapshot ?? []) {
         for (const trade of building.trades ?? []) {
@@ -174,7 +178,11 @@ function POSupplierFormInner() {
           buildingName: b.buildingName,
           checked,
           open:         true,
-          notes:        checked ? notesByPair.get(`${t.tradeName.toLowerCase()}::${b.buildingName.toLowerCase()}`) ?? '' : '',
+          notes:        checked
+            ? notes.byId.get(orderItemId(t.tradeId, b.buildingId))
+              ?? notes.byName.get(`${t.tradeName.toLowerCase()}::${b.buildingName.toLowerCase()}`)
+              ?? ''
+            : '',
         }
       }),
     }))
@@ -198,8 +206,14 @@ function POSupplierFormInner() {
 
   const insertMutation = useMutation({
     mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
-    onSuccess: (res) => {
-      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
+    onSuccess: (res, variables) => {
+      if (!variables.send_email) {
+        toast('PO saved as draft.', 'success')
+      } else if (res.email_error) {
+        toast(`PO submitted, but the email failed to send: ${res.email_error}`, 'error')
+      } else {
+        toast('PO submitted and sent successfully.', 'success')
+      }
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
       router.push('/purchase-orders')
     },
@@ -207,11 +221,6 @@ function POSupplierFormInner() {
 
   const updateMutation = useMutation({
     mutationFn: (body: UpdatePurchaseOrderBody) => updatePurchaseOrder(token!, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
-      router.push('/purchase-orders')
-    },
   })
 
   // ── Trade handlers ────────────────────────────────────────────────────────
@@ -285,20 +294,41 @@ function POSupplierFormInner() {
     if (!validate()) return
     if (attachmentsUploading) return
     const allTrades = scopes.flatMap((s) => s.trades)
-    const status = isDraft ? 'PO Draft' : 'PO Submitted'
     if (editId) {
       updateMutation.mutate({
         _id:               editId,
         _contract_id:      contractId,
         _supplier_id:      supplierId,
         _scheduled_date:   deliveryDate,
-        _status:           status,
+        // update-purchase-order only ever saves as Draft — Submit sends the
+        // email below, and a successful send is what promotes the PO to
+        // Sent server-side. This way a failed send just leaves it as Draft
+        // instead of stuck "Submitted" with nothing actually sent.
+        _status:           'PO Draft',
         _type:             'supplier',
         _po_amount:        0,
         _delivery_method:  deliveryMethod,
         _site_information: siteInfo,
-        _order_details:    { details: buildOrderDetailsNote(allTrades) },
+        _order_details:    buildOrderDetailsItems(allTrades),
         _scope_snapshot:   buildScopeSnapshot(allTrades),
+      }, {
+        onSuccess: async () => {
+          queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
+          queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+          if (!isDraft) {
+            try {
+              await autoSendEmailPurchaseOrder(token!, editId, 'supplier')
+              queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
+              queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+              toast('PO submitted and sent successfully.', 'success')
+            } catch {
+              toast('Failed to send the email — PO kept as Draft, please try submitting again.', 'error')
+            }
+          } else {
+            toast('PO saved as draft.', 'success')
+          }
+          router.push('/purchase-orders')
+        },
       })
     } else {
       insertMutation.mutate({
@@ -309,9 +339,9 @@ function POSupplierFormInner() {
         site_information: siteInfo,
         type:             'supplier',
         service_type:     'supplier',
-        status,
+        status:           isDraft ? 'PO Draft' : 'PO Submitted',
         po_amount:        0,
-        order_details:    buildOrderDetailsNote(allTrades),
+        order_details:    buildOrderDetailsItems(allTrades),
         scope_snapshot:   buildScopeSnapshot(allTrades),
         attachment_ids:   attachmentIds,
         send_email:       !isDraft,
@@ -603,12 +633,10 @@ function ScopeBlock({
                     {/* Free-text notes */}
                     {building.checked && building.open && (
                       <div className="px-8 pb-4 pt-2">
-                        <textarea
+                        <BulletNotesInput
                           value={building.notes}
-                          onChange={(e) => onUpdateNotes(scope.scopeId, trade.tradeId, building.buildingId, e.target.value)}
-                          rows={3}
+                          onChange={(notes) => onUpdateNotes(scope.scopeId, trade.tradeId, building.buildingId, notes)}
                           placeholder="Describe what you need to order for this building…"
-                          className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#6692C5]/40 focus:border-[#6692C5] resize-y placeholder:text-slate-300"
                         />
                       </div>
                     )}
@@ -665,7 +693,7 @@ function EmailPreview({
   const orderItems = scopes.flatMap((s) =>
     s.trades.filter((t) => t.checked).flatMap((t) =>
       t.buildings.filter((b) => b.checked).map((b) => ({
-        title: `${t.tradeName} — ${b.buildingName}`,
+        title: `${t.tradeName} | ${b.buildingName}`,
         notes: b.notes,
       }))
     )

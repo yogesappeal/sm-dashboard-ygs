@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar, Paperclip } from 'lucide-react'
-import { cn, normalizeOrderItems, scopeAllowedPoTypes, buildScopeSnapshot, buildOrderDetailsNote } from '@/lib/utils'
+import { cn, normalizeOrderItems, scopeAllowedPoTypes, buildScopeSnapshot, buildOrderDetailsItems } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
@@ -604,7 +604,7 @@ function CreatePOCanvas({
       service_type:     type,
       status:           isDraft ? 'PO Draft' : 'PO Submitted',
       po_amount:        type === 'subcontractor' ? (parseFloat(totalPrice) || 0) : 0,
-      order_details:    type === 'supplier' ? buildOrderDetailsNote(trades) : { details: jobDetails },
+      order_details:    type === 'supplier' ? buildOrderDetailsItems(trades) : { details: jobDetails },
       scope_snapshot:   buildScopeSnapshot(trades),
       attachment_ids:   attachmentIds,
       send_email:       !isDraft,

@@ -1,4 +1,5 @@
-import type { ScopeItem, Items, ScopeTradeDraft, ScopeDetail, ScopeSnapshotBuilding } from '../types'
+import type { ScopeItem, Items, ScopeTradeDraft, ScopeDetail, ScopeSnapshotBuilding, PODetailOrderItem } from '../types'
+import { normalizeOrderItems } from './format'
 
 export function generateScopeItem(
   buildingName: string,
@@ -124,41 +125,54 @@ export function buildScopeSnapshot(trades: OrderTradeSelection[]): ScopeSnapshot
   return Array.from(buildingMap.values())
 }
 
-// order_details is a single free-text note on the backend — fold the
-// per-building notes from the trade-first builder into one readable string.
-export function buildOrderDetailsNote(trades: OrderTradeSelection[]): string {
-  const lines: string[] = []
+// Stable join key between a scope_snapshot trade/building pair and its
+// order_details entry — lets edit prefill match notes straight back to a
+// trade/building by id instead of guessing from text.
+export function orderItemId(tradeId: string, buildingId: string): string {
+  return `${tradeId}::${buildingId}`
+}
+
+// order_details for supplier POs: one structured item per (trade, building)
+// pair with a note, matching the documented {id, name, shortDescription,
+// description} shape (name = trade name, shortDescription = building name) —
+// the same shape the legacy app already wrote and PODetailOrderItem models.
+export function buildOrderDetailsItems(trades: OrderTradeSelection[]): PODetailOrderItem[] {
+  const items: PODetailOrderItem[] = []
   for (const trade of trades) {
     if (!trade.checked) continue
     for (const building of trade.buildings) {
       const notes = building.notes?.trim()
       if (!building.checked || !notes) continue
-      lines.push(`${trade.tradeName} — ${building.buildingName}: ${notes}`)
+      items.push({
+        id: orderItemId(trade.tradeId, building.buildingId),
+        name: trade.tradeName,
+        shortDescription: building.buildingName,
+        description: notes,
+      })
     }
   }
-  return lines.join('\n')
+  return items
 }
 
-// Best-effort inverse of buildOrderDetailsNote, for edit prefill — the backend
-// only stores the flattened string, so per-building notes are recovered by
-// matching the "Trade — Building: " headers it writes and taking everything up
-// to the next header as that building's note (supports multi-line notes).
-// Free-text headers that happen to collide with this pattern would misparse —
-// acceptable since this only seeds the edit form, not the source of truth.
-export function parseOrderDetailsNotes(raw: unknown): Map<string, string> {
-  const map = new Map<string, string>()
-  if (typeof raw !== 'string' || !raw) return map
-
-  const headerRe = /^(.+?) — (.+?): /gm
-  const matches = [...raw.matchAll(headerRe)]
-  for (let i = 0; i < matches.length; i++) {
-    const m = matches[i]
-    const start = m.index! + m[0].length
-    const end = i + 1 < matches.length ? matches[i + 1].index! : raw.length
-    const key = `${m[1].trim().toLowerCase()}::${m[2].trim().toLowerCase()}`
-    map.set(key, raw.slice(start, end).trim())
+// Recovers each building's note from a saved PO's order_details for edit
+// prefill. Tries the tradeId::buildingId key first (what buildOrderDetailsItems
+// writes); falls back to a case-insensitive trade/building name match for POs
+// saved before that shape existed, or created by the legacy FlutterFlow app
+// (whose order_details items only carry name/shortDescription text, no ids).
+export function matchOrderDetailsToBuildings(raw: unknown): {
+  byId: Map<string, string>
+  byName: Map<string, string>
+} {
+  const byId = new Map<string, string>()
+  const byName = new Map<string, string>()
+  for (const item of normalizeOrderItems(raw)) {
+    if (!item.description) continue
+    byId.set(item.id, item.description)
+    if (item.name && item.shortDescription) {
+      byName.set(`${item.name.trim().toLowerCase()}::${item.shortDescription.trim().toLowerCase()}`, item.description)
+    }
   }
-  return map
+  return { byId, byName }
 }
 
 // Inverts existing backend scope_details (building-first: building -> trades) into the

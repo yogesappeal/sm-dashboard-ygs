@@ -122,9 +122,13 @@ export async function respondNewDateRequest(token: string, body: RespondNewDateR
 
 export async function autoSendEmailPurchaseOrder(
   token: string,
-  poId: string
+  poId: string,
+  serviceType: 'supplier' | 'subcontractor'
 ) {
-  return api.post('/functions/v1/auto-po-send', token, { po_id: poId })
+  return api.post<{ message: string }>('/functions/v1/auto-po-send', token, {
+    purchase_order_id: poId,
+    service_type: serviceType,
+  })
 }
 
 // Attachments — gated behind NEXT_PUBLIC_FEATURE_ATTACHMENTS, see po-attachments-section.tsx

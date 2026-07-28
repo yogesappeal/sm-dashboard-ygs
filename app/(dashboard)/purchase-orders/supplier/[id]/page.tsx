@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentList } from '@/components/shared/attachment-list'
+import { useToast } from '@/components/shared/toast'
 import { cn, formatDate, formatDateTime, normalizeOrderItems } from '@/lib/utils'
 
 export default function POSupplierDetailPage() {
@@ -23,6 +24,7 @@ export default function POSupplierDetailPage() {
   const { token } = useAuthStore()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [rejectDialog, setRejectDialog] = useState(false)
   const [acceptDialog, setAcceptDialog] = useState(false)
@@ -50,10 +52,14 @@ export default function POSupplierDetailPage() {
   })
 
   const emailMutation = useMutation({
-    mutationFn: () => autoSendEmailPurchaseOrder(token!, id),
+    mutationFn: () => autoSendEmailPurchaseOrder(token!, id, 'supplier'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po-detail', id] })
       setSendEmailDialog(false)
+      toast('PO email sent successfully.', 'success')
+    },
+    onError: () => {
+      toast('Failed to send the PO email. Please try again.', 'error')
     },
   })
 

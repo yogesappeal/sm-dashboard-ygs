@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentList } from '@/components/shared/attachment-list'
+import { useToast } from '@/components/shared/toast'
 import { cn, formatDate, formatDateTime, normalizeOrderItems } from '@/lib/utils'
 
 export default function POSubsDetailPage() {
@@ -23,6 +24,7 @@ export default function POSubsDetailPage() {
   const { token } = useAuthStore()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [rejectDialog, setRejectDialog] = useState(false)
   const [acceptDialog, setAcceptDialog] = useState(false)
@@ -50,10 +52,14 @@ export default function POSubsDetailPage() {
   })
 
   const emailMutation = useMutation({
-    mutationFn: () => autoSendEmailPurchaseOrder(token!, id),
+    mutationFn: () => autoSendEmailPurchaseOrder(token!, id, 'subcontractor'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po-detail', id] })
       setSendEmailDialog(false)
+      toast('PO email sent successfully.', 'success')
+    },
+    onError: () => {
+      toast('Failed to send the PO email. Please try again.', 'error')
     },
   })
 
@@ -278,10 +284,7 @@ export default function POSubsDetailPage() {
                         <p className="text-sm font-semibold text-slate-700">{item.name}</p>
                         {item.shortDescription && <p className="text-xs text-slate-400 mt-0.5">{item.shortDescription}</p>}
                         {item.description && (
-                          <div
-                            className="text-sm text-slate-600 mt-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
-                            dangerouslySetInnerHTML={{ __html: item.description }}
-                          />
+                          <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.description}</p>
                         )}
                       </div>
                     ))}

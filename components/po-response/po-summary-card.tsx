@@ -16,7 +16,7 @@ export function PoSummaryCard({ po }: { po: PoResponsePo }) {
         <div className="grid grid-cols-2 gap-3">
           <SummaryRow label="Supplier" value={po.supplier_name} />
           <SummaryRow label="Scheduled Date" value={formatDate(po.scheduled_date) || po.scheduled_date} />
-          <SummaryRow label="Delivery Method" value={po.method} />
+          {po.type !== 'subcontractor' && <SummaryRow label="Delivery Method" value={po.method} />}
           {po.type === 'subcontractor' && po.po_amount > 0 && (
             <SummaryRow label="Total Price" value={formatCurrency(po.po_amount)} />
           )}
