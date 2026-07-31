@@ -26,7 +26,7 @@ export function ScopeRow({ scope, onClick }: ScopeRowProps) {
         {scope.scope_name || '-'}
       </span>
       <span className="flex-[4] text-sm text-slate-500 truncate hidden md:block">
-        {scope.client_ra_number ? `${scope.client_ra_number} — ${scope.client_full_name || ''}` : scope.client_full_name || '-'}
+        {scope.client_ra_number ? `${scope.client_ra_number} - ${scope.client_full_name || ''}` : scope.client_full_name || '-'}
       </span>
       <div className="flex-[3] flex items-center gap-1.5 flex-wrap">
         {scope.type

@@ -31,6 +31,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
   // TEMP: testing a trade-first input flow — see scope-items-builder.tsx.
   const [buildings, setBuildings] = useState<string[]>([])
   const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
+  const [itemsError, setItemsError] = useState<string | null>(null)
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
     defaultValues: { type: 'supplier', notes: '', contractId: '' },
@@ -64,6 +65,28 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
     },
   })
 
+  function validateItems() {
+    if (buildings.length === 0) {
+      setItemsError('At least one building is required')
+      return false
+    }
+    if (trades.length === 0) {
+      setItemsError('At least one trade is required')
+      return false
+    }
+    if (trades.some((t) => t.buildingNames.length === 0)) {
+      setItemsError('Every trade must have at least one building assigned')
+      return false
+    }
+    setItemsError(null)
+    return true
+  }
+
+  const onSubmit = (data: ScopeForm) => {
+    if (!validateItems()) return
+    return createMutation.mutateAsync(data)
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -84,7 +107,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
 
         {/* Form */}
         <form
-          onSubmit={handleSubmit((d) => createMutation.mutateAsync(d))}
+          onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
         >
           <Field label="Scope Name *" error={errors.scopeName?.message}>
@@ -118,13 +141,14 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           </Field>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 block mb-2">Scope Items</label>
+            <label className="text-xs font-medium text-slate-600 block mb-2">Scope Items *</label>
             <ScopeItemsBuilder
               buildings={buildings}
               trades={trades}
-              onBuildingsChange={setBuildings}
-              onTradesChange={setTrades}
+              onBuildingsChange={(b) => { setBuildings(b); setItemsError(null) }}
+              onTradesChange={(t) => { setTrades(t); setItemsError(null) }}
             />
+            {itemsError && <p className="text-xs text-red-500 mt-1.5">{itemsError}</p>}
           </div>
 
           <Field label="Notes" error={undefined}>

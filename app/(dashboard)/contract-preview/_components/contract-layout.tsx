@@ -292,7 +292,10 @@ export function ContractLayout({ contract, crew, pod, scopes, pos, projects, cur
       <TopBar contract={contract} pos={pos} projects={projects} currentProjectId={currentProjectId} projectId={projectId ?? undefined} />
 
       {/* 3-panel row */}
-      <div className="relative flex flex-1 overflow-hidden min-h-0">
+      {/* isolate: keeps the z-10 collapse handles below from bleeding past
+          this row and competing with the sticky header's own stacking
+          context (see the same fix in center-panel.tsx's ActivityCanvas). */}
+      <div className="relative isolate flex flex-1 overflow-hidden min-h-0">
         {/* TEMP: floating collapse handles — sit on the panel borders, remove this block to revert */}
         {isCreatingPo && (
           <>

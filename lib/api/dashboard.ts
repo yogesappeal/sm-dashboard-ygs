@@ -2,7 +2,7 @@ import { api } from './fetcher'
 import type { DashboardMetrics, DashboardResponse } from '../types'
 
 function normalizeMetrics(res: DashboardResponse): DashboardMetrics {
-  const item = res.response?.[0]
+  const item = Array.isArray(res.response) ? res.response[0] : res.response
   return { metrics: item?.metrics ?? [] }
 }
 

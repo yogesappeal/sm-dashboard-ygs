@@ -29,6 +29,9 @@ export default function DashboardPage() {
   const { token, role, user } = useAuthStore()
   const queryClient = useQueryClient()
   const isOps = role === 'Operations'
+  // Admin sees the same unfiltered contract list as Ops (all-client-paginated),
+  // distinct from isOps above which also drives the metrics/row variant.
+  const usesAllClientsApi = role === 'Operations' || role === 'Admin'
 
   const [activeFilter, setActiveFilter] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -66,7 +69,7 @@ export default function DashboardPage() {
     queryKey: contractsQueryKey,
     queryFn: () => {
       const params = { page: currentPage, limit: 10, status: activeStatus, search: search || undefined }
-      return isOps
+      return usesAllClientsApi
         ? getAllClientsPaginatedForOps(token!, params)
         : getClientsPaginated(token!, params)
     },
@@ -249,13 +252,18 @@ function OpsMetricsRow({
   metrics: { name: string; total: number }[]
   firstName: string
 }) {
+  // Look up by name (confirmed lowercase: 'scope', 'supplier') rather than
+  // array position — the API doesn't guarantee ordering.
+  const getTotal = (name: string) =>
+    metrics.find((m) => m.name.toLowerCase() === name)?.total ?? '-'
+
   return (
     <div className="flex gap-3 h-[130px]">
       <div className="flex-[5] min-w-0">
         <WelcomeCard firstName={firstName} variant="ops" />
       </div>
-      <OpsMetricCard label="Scope" value={metrics[0]?.total ?? '-'} href="/scope" />
-      <OpsMetricCard label="Supplier" value={metrics[1]?.total ?? '-'} href="/suppliers" />
+      <OpsMetricCard label="Scope" value={getTotal('scope')} href="/scope" />
+      <OpsMetricCard label="Supplier" value={getTotal('supplier')} href="/suppliers" />
       <div className="flex-[2]" />
     </div>
   )

@@ -50,22 +50,6 @@ export async function getPurchaseOrdersPaginated(
   )
 }
 
-// DUMMY — no backend endpoint returns a per-status PO count yet. Placeholder
-// values only; swap the body for a real call once the endpoint exists (the
-// caller in app/(dashboard)/purchase-orders/page.tsx doesn't need to change).
-export async function getPurchaseOrderStatusSummary(_token: string): Promise<Record<string, number>> {
-  return {
-    'PO Draft': 4,
-    'PO Submitted': 9,
-    'PO Sent': 6,
-    'PO Confirmed': 12,
-    'PO Rescheduled': 2,
-    'PO Completed': 31,
-    'PO Rejected': 3,
-    'PO Cancelled': 1,
-  }
-}
-
 export async function getPOSupplierInformation(token: string, poId: string) {
   const q = new URLSearchParams({ po_id: poId })
   return api.get<POSupplierInfo>(`/functions/v1/po-information?${q}`, token)

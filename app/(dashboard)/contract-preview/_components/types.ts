@@ -61,4 +61,5 @@ export interface PurchaseOrder {
   status: string
   supplier_name: string
   amount?: number
+  last_modified: string
 }

@@ -1,16 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Send, Check, XCircle, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Mail, Calendar, Paperclip } from 'lucide-react'
-import { cn, normalizeOrderItems, scopeAllowedPoTypes, buildScopeSnapshot, buildOrderDetailsItems } from '@/lib/utils'
+import { X, Send, Check, XCircle, Edit2, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Calendar, Paperclip } from 'lucide-react'
+import { cn, normalizeOrderItems, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { useAuthStore } from '@/lib/store'
-import { getSuppliersPaginated, getScopeDetailByContractId, insertPurchaseOrder, getPurchaseOrderDetailsFull, respondNewDateRequest } from '@/lib/api'
+import { getPurchaseOrderDetailsFull, respondNewDateRequest, autoSendEmailPurchaseOrder } from '@/lib/api'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
+import { BulletNotesInput } from '@/components/forms/bullet-notes-input'
 import { AttachmentList } from '@/components/shared/attachment-list'
 import { useToast } from '@/components/shared/toast'
-import type { ScopeData, InsertPurchaseOrderBody } from '@/lib/types'
+import { usePurchaseOrderForm, type POFormTradeSection as TradeSection } from '@/lib/hooks/use-purchase-order-form'
+import type { ScopeData } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
 import { useContractId } from './contract-id-context'
 
@@ -34,7 +38,12 @@ function ActivityCanvas() {
           <h2 className="text-sm font-semibold text-slate-700">Activity</h2>
         </div>
 
-        <div className="relative">
+        {/* isolate: contains the timeline icons' z-10 (flex items respect
+            z-index even at position:static) so it can't bleed past this
+            timeline and compete with the sticky header's own stacking
+            context — it was winning ties against the header's z-10 by DOM
+            order and rendering over the search dropdown. */}
+        <div className="relative isolate">
           <div className="absolute left-5 top-5 bottom-5 w-px bg-slate-100" />
           <div className="flex flex-col gap-1">
             {ACTIVITIES.map((a) => (
@@ -59,42 +68,25 @@ function ActivityCanvas() {
   )
 }
 
-// ─── Create PO Canvas types ───────────────────────────────────────────────────
-
-interface BuildingEntry {
-  buildingId: string
-  buildingName: string
-  checked: boolean
-  open: boolean
-  notes: string
-}
-
-interface TradeSection {
-  tradeId: string
-  tradeName: string
-  checked: boolean
-  open: boolean
-  buildings: BuildingEntry[]
-}
-
 // ─── Supplier Email Body (used inside modal) ──────────────────────────────────
 
 function SupplierEmailBody({
-  vendorName, deliveryDate, siteInfo, scopeData, trades, smName,
+  vendorName, deliveryMethod, deliveryDate, siteInfo, siteAddress, scopeData, trades, smName,
 }: {
   vendorName: string
+  deliveryMethod: 'Delivery' | 'Pick Up'
   deliveryDate: string
   siteInfo: string
+  siteAddress: string
   scopeData: ScopeData | undefined
   trades: TradeSection[]
   smName: string
 }) {
+  const methodVerb = deliveryMethod === 'Delivery' ? 'delivery' : 'pick up'
   const formattedDate = deliveryDate
     ? new Intl.DateTimeFormat('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         .format(new Date(deliveryDate + 'T00:00:00'))
     : '—'
-
-  const siteAddress = scopeData ? [scopeData.street_address].filter(Boolean).join(', ') : ''
 
   const orderItems = trades.flatMap((t) =>
     t.checked ? t.buildings.filter((b) => b.checked).map((b) => ({
@@ -108,11 +100,11 @@ function SupplierEmailBody({
       <p><strong>Hello {vendorName || <span className="text-slate-300 italic">Supplier Name</span>},</strong></p>
       <p>
         Review PO Scope &amp; Schedule for PO Number: <strong className="text-slate-400 italic">TBD</strong>.
-        {deliveryDate && <> To accept the order and delivery on <strong>{formattedDate}</strong>.</>}
+        {deliveryDate && <> To accept the order and {methodVerb} on <strong>{formattedDate}</strong>.</>}
       </p>
       <div>
         <span>Click here → </span>
-        <span className="inline-block px-4 py-1.5 rounded bg-[#5b7db1] text-white text-xs font-medium">Accept Order</span>
+        <span className="inline-block px-4 py-1.5 rounded bg-slate-300 text-slate-500 text-xs font-medium">Accept Order</span>
       </div>
       <hr className="border-slate-200" />
       <div>
@@ -152,11 +144,11 @@ function SupplierEmailBody({
       <hr className="border-slate-200" />
       <div>
         <p className="font-bold text-slate-800 mb-1">Schedule and Confirm</p>
-        {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm delivery on {formattedDate}</p>}
+        {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm {methodVerb} on {formattedDate}</p>}
         <div className="flex flex-wrap gap-2 mt-2">
-          <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Accept</span>
-          <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Reschedule</span>
-          <span className="px-3 py-1 rounded border border-red-400 text-red-400 text-xs">Reject</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Accept</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reschedule</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reject</span>
         </div>
       </div>
       <hr className="border-slate-200" />
@@ -174,11 +166,12 @@ function SupplierEmailBody({
 // ─── Subs Email Body (used inside modal) ─────────────────────────────────────
 
 function SubsEmailBody({
-  subsName, deliveryDate, siteInfo, scopeData, trades, jobDetails, totalPrice, smName,
+  subsName, deliveryDate, siteInfo, siteAddress, scopeData, trades, jobDetails, totalPrice, smName,
 }: {
   subsName: string
   deliveryDate: string
   siteInfo: string
+  siteAddress: string
   scopeData: ScopeData | undefined
   trades: TradeSection[]
   jobDetails: string
@@ -190,7 +183,6 @@ function SubsEmailBody({
         .format(new Date(deliveryDate + 'T00:00:00'))
     : '—'
 
-  const siteAddress = scopeData ? [scopeData.street_address].filter(Boolean).join(', ') : ''
   const formattedPrice = totalPrice && parseFloat(totalPrice) > 0
     ? `$${parseFloat(totalPrice).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`
     : null
@@ -205,7 +197,7 @@ function SubsEmailBody({
       </p>
       <div>
         <span>Click here → </span>
-        <span className="inline-block px-4 py-1.5 rounded bg-[#5b7db1] text-white text-xs font-medium">Accept Order</span>
+        <span className="inline-block px-4 py-1.5 rounded bg-slate-300 text-slate-500 text-xs font-medium">Accept Order</span>
       </div>
       <hr className="border-slate-200" />
       <div>
@@ -263,9 +255,9 @@ function SubsEmailBody({
         <p className="font-bold text-slate-800 mb-1">Schedule and Confirm</p>
         {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm work date on {formattedDate}</p>}
         <div className="flex flex-wrap gap-2 mt-2">
-          <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Accept</span>
-          <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Reschedule</span>
-          <span className="px-3 py-1 rounded border border-red-400 text-red-400 text-xs">Reject</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Accept</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reschedule</span>
+          <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reject</span>
         </div>
       </div>
       <hr className="border-slate-200" />
@@ -375,12 +367,11 @@ function ScopeSelector({
                     </div>
                     {isSupplier && building.checked && building.open && (
                       <div className="px-8 pb-3 pt-1.5">
-                        <textarea
+                        <BulletNotesInput
                           value={building.notes}
-                          onChange={(e) => onUpdateNotes(trade.tradeId, building.buildingId, e.target.value)}
+                          onChange={(notes) => onUpdateNotes(trade.tradeId, building.buildingId, notes)}
                           rows={2}
                           placeholder="Describe what you need to order for this building…"
-                          className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#6692C5]/40 resize-y placeholder:text-slate-300"
                         />
                       </div>
                     )}
@@ -398,18 +389,24 @@ function ScopeSelector({
 // ─── Email Preview Modal ──────────────────────────────────────────────────────
 
 function EmailPreviewModal({
-  type, vendorName, deliveryDate, siteInfo, scopeData, trades, jobDetails, totalPrice, smName, onClose,
+  type, vendorName, deliveryMethod, deliveryDate, siteInfo, siteAddress, scopeData, trades, jobDetails, totalPrice, smName,
+  isPending, onClose, onSendLater, onSendNow,
 }: {
   type: 'supplier' | 'subcontractor'
   vendorName: string
+  deliveryMethod: 'Delivery' | 'Pick Up'
   deliveryDate: string
   siteInfo: string
+  siteAddress: string
   scopeData: ScopeData | undefined
   trades: TradeSection[]
   jobDetails: string
   totalPrice: string
   smName: string
+  isPending: boolean
   onClose: () => void
+  onSendLater: () => void
+  onSendNow: () => void
 }) {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
@@ -417,7 +414,7 @@ function EmailPreviewModal({
         {/* Modal header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex-shrink-0">
           <div>
-            <p className="text-sm font-semibold text-slate-800">Email Preview</p>
+            <p className="text-sm font-semibold text-slate-800">Review Email</p>
             <p className="text-xs text-slate-400 mt-0.5">
               {type === 'supplier' ? 'Sent to supplier on submit' : 'Sent to subcontractor on submit'}
             </p>
@@ -431,9 +428,21 @@ function EmailPreviewModal({
         {/* Email body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-[13px] leading-relaxed text-slate-700" style={{ fontFamily: 'Arial, sans-serif' }}>
           {type === 'supplier'
-            ? <SupplierEmailBody vendorName={vendorName} deliveryDate={deliveryDate} siteInfo={siteInfo} scopeData={scopeData} trades={trades} smName={smName} />
-            : <SubsEmailBody subsName={vendorName} deliveryDate={deliveryDate} siteInfo={siteInfo} scopeData={scopeData} trades={trades} jobDetails={jobDetails} totalPrice={totalPrice} smName={smName} />
+            ? <SupplierEmailBody vendorName={vendorName} deliveryMethod={deliveryMethod} deliveryDate={deliveryDate} siteInfo={siteInfo} siteAddress={siteAddress} scopeData={scopeData} trades={trades} smName={smName} />
+            : <SubsEmailBody subsName={vendorName} deliveryDate={deliveryDate} siteInfo={siteInfo} siteAddress={siteAddress} scopeData={scopeData} trades={trades} jobDetails={jobDetails} totalPrice={totalPrice} smName={smName} />
           }
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-200 flex-shrink-0">
+          <button onClick={onSendLater} disabled={isPending}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
+            Send Later
+          </button>
+          <button onClick={onSendNow} disabled={isPending}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors disabled:opacity-50">
+            {isPending ? 'Sending…' : 'Send Now'}
+          </button>
         </div>
       </div>
     </div>
@@ -449,171 +458,75 @@ function CreatePOCanvas({
   canvas: Extract<CanvasContext, { view: 'create-po' }>
   onCanvas: (a: CanvasAction) => void
 }) {
-  const { token, user } = useAuthStore()
+  const { user } = useAuthStore()
   const contractId = useContractId()
-  const toast = useToast()
+  const queryClient = useQueryClient()
+  const editId = canvas.editId
 
-  const [type, setType]             = useState<'supplier' | 'subcontractor'>(canvas.poType)
-  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
-  const [vendorId, setVendorId]     = useState('')
-  const [vendorName, setVendorName] = useState('')
-  const [deliveryDate, setDeliveryDate] = useState('')
-  const [siteInfo, setSiteInfo]     = useState('')
-  const [jobDetails, setJobDetails] = useState('')
-  const [totalPrice, setTotalPrice] = useState('')
-  const [trades, setTrades]         = useState<TradeSection[]>([])
-  const [attachmentIds, setAttachmentIds] = useState<string[]>([])
-  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
-  const [errors, setErrors]         = useState<Record<string, string>>({})
+  // Type is only mutable pre-submit and only in create mode — an existing PO's
+  // type is fixed, so the toggle below is hidden entirely while editing.
+  const [type, setType] = useState<'supplier' | 'subcontractor'>(canvas.poType)
   const [showEmailPreview, setShowEmailPreview] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
 
-  // Capture canvas values at mount — stable reference for the effect closure
-  const initialPreSelect = useRef({ tradeName: canvas.tradeName, buildingName: canvas.buildingName })
+  const closeTarget: CanvasAction = editId ? { type: 'SHOW_PO_DETAIL', poId: editId } : { type: 'SHOW_ACTIVITY' }
 
-  // ── Queries ────────────────────────────────────────────────────────────────
-
-  const { data: vendorsData } = useQuery({
-    queryKey: ['vendors-dropdown', type],
-    queryFn: () => getSuppliersPaginated(token!, { limit: 100, type: type === 'supplier' ? 'Supplier' : 'Subcontractor' }),
-    enabled: !!token,
-  })
-
-  const { data: scopeData, isLoading: scopeLoading, isError: scopeError } = useQuery({
-    queryKey: ['scope-by-contract', contractId],
-    queryFn: () => getScopeDetailByContractId(token!, contractId),
-    enabled: !!token,
-  })
-
-  const vendors = vendorsData?.data ?? []
-
-  // A scope whose type is supplier-only (or subcontractor-only) can't have
-  // the other kind of PO raised against it — snap back to an allowed type if
-  // the scope loads (or changes) after the canvas already picked one.
-  const allowedTypes = scopeData ? scopeAllowedPoTypes(scopeData.type) : ['supplier', 'subcontractor'] as const
-  useEffect(() => {
-    if (!scopeData) return
-    if (!allowedTypes.includes(type)) setType(allowedTypes[0])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeData])
-
-  // ── Parse scope + apply pre-select in one effect ───────────────────────────
-
-  useEffect(() => {
-    if (!scopeData) { setTrades([]); return }
-
-    const tradeMap = new Map<string, { tradeId: string; tradeName: string; buildings: { buildingId: string; buildingName: string }[] }>()
-    for (const building of scopeData.scope_details ?? []) {
-      for (const trade of building.trades ?? []) {
-        const key = trade.trade_name.trim().toLowerCase()
-        if (!tradeMap.has(key)) tradeMap.set(key, { tradeId: trade.trade_id, tradeName: trade.trade_name, buildings: [] })
-        tradeMap.get(key)!.buildings.push({ buildingId: building.building_id, buildingName: building.building_name })
-      }
-    }
-
-    const newTrades: TradeSection[] = Array.from(tradeMap.values()).map((t) => ({
-      tradeId: t.tradeId, tradeName: t.tradeName, checked: false, open: true,
-      buildings: t.buildings.map((b) => ({ ...b, checked: false, open: true, notes: '' })),
-    }))
-
-    const { tradeName, buildingName } = initialPreSelect.current
-
-    setTrades((prev) => {
-      // Don't overwrite user's manual changes on background refetch
-      if (prev.length > 0) return prev
-
-      // First load — apply pre-selection if opened via trade hover
-      if (tradeName) {
-        return newTrades.map((t) => {
-          if (t.tradeName.toLowerCase() !== tradeName.toLowerCase()) return t
-          return {
-            ...t, checked: true, open: true,
-            buildings: t.buildings.map((b) =>
-              buildingName && b.buildingName.toLowerCase() === buildingName.toLowerCase()
-                ? { ...b, checked: true, open: true }
-                : b
-            ),
-          }
-        })
-      }
-      return newTrades
-    })
-  }, [scopeData])
-
-  // ── Trade/building handlers ────────────────────────────────────────────────
-
-  const toggleTradeChecked = useCallback((tradeId: string) =>
-    setTrades((prev) => prev.map((t) => t.tradeId !== tradeId ? t : { ...t, checked: !t.checked })), [])
-
-  const toggleTradeOpen = useCallback((tradeId: string) =>
-    setTrades((prev) => prev.map((t) => t.tradeId !== tradeId ? t : { ...t, open: !t.open })), [])
-
-  const toggleBuildingChecked = useCallback((tradeId: string, buildingId: string) =>
-    setTrades((prev) => prev.map((t) => t.tradeId !== tradeId ? t : {
-      ...t,
-      buildings: t.buildings.map((b) =>
-        b.buildingId !== buildingId ? b : { ...b, checked: !b.checked, open: !b.checked }
-      ),
-    })), [])
-
-  const toggleBuildingOpen = useCallback((tradeId: string, buildingId: string) =>
-    setTrades((prev) => prev.map((t) => t.tradeId !== tradeId ? t : {
-      ...t,
-      buildings: t.buildings.map((b) => b.buildingId !== buildingId ? b : { ...b, open: !b.open }),
-    })), [])
-
-  const updateNotes = useCallback((tradeId: string, buildingId: string, notes: string) =>
-    setTrades((prev) => prev.map((t) => t.tradeId !== tradeId ? t : {
-      ...t,
-      buildings: t.buildings.map((b) => b.buildingId !== buildingId ? b : { ...b, notes }),
-    })), [])
-
-  // ── Submit ─────────────────────────────────────────────────────────────────
-
-  const insertMutation = useMutation({
-    mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
-    onSuccess: (res) => {
-      if (res.email_error) toast(`PO created, but the email failed to send: ${res.email_error}`, 'error')
-      onCanvas({ type: 'SHOW_ACTIVITY' })
+  const form = usePurchaseOrderForm({
+    type,
+    editId,
+    contractId,
+    onSaved: () => {
+      queryClient.invalidateQueries({ queryKey: ['po-detail-full', editId] })
+      queryClient.invalidateQueries({ queryKey: ['contract-details-full'] })
+      onCanvas(closeTarget)
     },
   })
 
-  const isPending = insertMutation.isPending || attachmentsUploading
-  const isSubmitError = insertMutation.isError
-  const checkedTradeCount = trades.filter((t) => t.checked).length
-
-  const validate = () => {
-    const e: Record<string, string> = {}
-    if (!vendorId)     e.vendorId     = `Select a ${type === 'supplier' ? 'supplier' : 'subcontractor'}`
-    if (!deliveryDate) e.deliveryDate = 'Select a date'
-    if (type === 'subcontractor' && (!totalPrice || parseFloat(totalPrice) <= 0)) e.totalPrice = 'Enter total price'
-    if (checkedTradeCount === 0) e.trades = 'Select at least one trade'
-    setErrors(e)
-    return Object.keys(e).length === 0
+  // Ask for confirmation before discarding unsaved input — parallels the
+  // beforeunload/back-button guard on the dedicated supplier/subcontractor
+  // forms, just as an in-app dialog since this "close" only switches canvases
+  // rather than navigating the browser away.
+  const requestClose = () => {
+    if (form.isDirty && !form.isSuccess) setShowLeaveConfirm(true)
+    else onCanvas(closeTarget)
   }
 
-  const handleSubmit = (isDraft: boolean) => {
-    if (!validate()) return
-    if (attachmentsUploading) return
-    insertMutation.mutate({
-      contract_id:      contractId,
-      supplier_id:      vendorId,
-      delivery_method:  deliveryMethod,
-      scheduled_date:   deliveryDate,
-      site_information: siteInfo,
-      type,
-      service_type:     type,
-      status:           isDraft ? 'PO Draft' : 'PO Submitted',
-      po_amount:        type === 'subcontractor' ? (parseFloat(totalPrice) || 0) : 0,
-      order_details:    type === 'supplier' ? buildOrderDetailsItems(trades) : { details: jobDetails },
-      scope_snapshot:   buildScopeSnapshot(trades),
-      attachment_ids:   attachmentIds,
-      send_email:       !isDraft,
-    })
-  }
+  // A scope whose type is supplier-only (or subcontractor-only) can't have
+  // the other kind of PO raised against it — snap back to an allowed type if
+  // the scope loads (or changes) after the canvas already picked one. Only
+  // relevant in create mode; an existing PO's type never changes.
+  const allowedTypes = form.scopeData ? scopeAllowedPoTypes(form.scopeData.type) : ['supplier', 'subcontractor'] as const
+  useEffect(() => {
+    if (editId || !form.scopeData) return
+    if (!allowedTypes.includes(type)) setType(allowedTypes[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.scopeData, editId])
+
+  // Pre-select a trade/building when the canvas was opened by hovering one in
+  // the right panel — applied once, as soon as trades first populate. Not
+  // relevant in edit mode (the PO's own scope_snapshot already drives selection).
+  const initialPreSelect = useRef({ tradeName: canvas.tradeName, buildingName: canvas.buildingName })
+  const appliedPreSelect = useRef(false)
+  useEffect(() => {
+    if (appliedPreSelect.current || editId) return
+    if (form.trades.length === 0) return
+    appliedPreSelect.current = true
+
+    const { tradeName, buildingName } = initialPreSelect.current
+    if (!tradeName) return
+    const trade = form.trades.find((t) => t.tradeName.toLowerCase() === tradeName.toLowerCase())
+    if (!trade) return
+    if (!trade.checked) form.toggleTradeChecked(trade.tradeId)
+    if (buildingName) {
+      const building = trade.buildings.find((b) => b.buildingName.toLowerCase() === buildingName.toLowerCase())
+      if (building && !building.checked) form.toggleBuildingChecked(trade.tradeId, building.buildingId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.trades, editId])
 
   const fieldCls = (k: string) =>
     cn('w-full text-sm border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
-      errors[k] ? 'border-red-300' : 'border-slate-200')
+      form.errors[k] ? 'border-red-300' : 'border-slate-200')
 
   const smName = user?.full_name ?? ''
 
@@ -624,14 +537,16 @@ function CreatePOCanvas({
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 bg-white flex-shrink-0">
         <div>
-          <h2 className="text-sm font-semibold text-slate-800">Create Purchase Order</h2>
+          <h2 className="text-sm font-semibold text-slate-800">
+            {editId ? 'Edit Purchase Order' : 'Create Purchase Order'}
+          </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {canvas.buildingName && canvas.tradeName
               ? `${canvas.buildingName} · ${canvas.tradeName}`
               : 'Fill in details and select scope'}
           </p>
         </div>
-        <button onClick={() => onCanvas({ type: 'SHOW_ACTIVITY' })}
+        <button onClick={requestClose}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
           <X size={16} />
         </button>
@@ -641,16 +556,24 @@ function CreatePOCanvas({
       <div className="flex-1 overflow-y-auto bg-slate-50 p-5 pb-24">
         <div className="space-y-4">
 
-          {/* Type toggle — only shows types this scope allows */}
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-            {allowedTypes.map((t) => (
-              <button key={t} onClick={() => { setType(t); setVendorId(''); setVendorName('') }}
-                className={cn('px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize',
-                  type === t ? 'bg-[#6692C5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
-                {t}
-              </button>
-            ))}
-          </div>
+          {/* Type toggle — only shows types this scope allows, locked once editing */}
+          {editId ? (
+            <div className="flex items-center gap-2">
+              <span className="px-5 py-2 text-sm font-medium rounded-lg bg-[#6692C5] text-white shadow-sm capitalize w-fit">
+                {type}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
+              {allowedTypes.map((t) => (
+                <button key={t} onClick={() => { setType(t); form.selectVendor('') }}
+                  className={cn('px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize',
+                    type === t ? 'bg-[#6692C5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Order information */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -660,23 +583,20 @@ function CreatePOCanvas({
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   {type === 'supplier' ? 'Supplier' : 'Subcontractor'} <span className="text-red-400">*</span>
                 </label>
-                <select value={vendorId} onChange={(e) => {
-                  setVendorId(e.target.value)
-                  setVendorName(vendors.find((v) => v.id === e.target.value)?.name ?? '')
-                }} className={fieldCls('vendorId')}>
+                <select value={form.vendorId} onChange={(e) => form.selectVendor(e.target.value)} className={fieldCls('vendorId')}>
                   <option value="">Select {type === 'supplier' ? 'supplier' : 'subcontractor'}...</option>
-                  {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  {form.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </select>
-                {errors.vendorId && <p className="text-xs text-red-400 mt-1">{errors.vendorId}</p>}
+                {form.errors.vendorId && <p className="text-xs text-red-400 mt-1">{form.errors.vendorId}</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  {type === 'supplier' ? 'Delivery Date' : 'Work Date'} <span className="text-red-400">*</span>
+                  {form.dateLabel} <span className="text-red-400">*</span>
                 </label>
-                <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)}
+                <input type="date" value={form.deliveryDate} onChange={(e) => form.setDeliveryDate(e.target.value)}
                   className={fieldCls('deliveryDate')} />
-                {errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{errors.deliveryDate}</p>}
+                {form.errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{form.errors.deliveryDate}</p>}
               </div>
 
               {type === 'subcontractor' && (
@@ -684,33 +604,35 @@ function CreatePOCanvas({
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">
                     Total Price (AUD) <span className="text-red-400">*</span>
                   </label>
-                  <input type="number" min="0" step="0.01" value={totalPrice} placeholder="0.00"
-                    onChange={(e) => setTotalPrice(e.target.value)} className={fieldCls('totalPrice')} />
-                  {errors.totalPrice && <p className="text-xs text-red-400 mt-1">{errors.totalPrice}</p>}
+                  <input type="number" min="0" step="0.01" value={form.totalPrice} placeholder="0.00"
+                    onChange={(e) => form.setTotalPrice(e.target.value)} className={fieldCls('totalPrice')} />
+                  {form.errors.totalPrice && <p className="text-xs text-red-400 mt-1">{form.errors.totalPrice}</p>}
                 </div>
               )}
 
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
-                <div className="flex items-center gap-4">
-                  {(['Delivery', 'Pick Up'] as const).map((method) => (
-                    <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="deliveryMethod"
-                        checked={deliveryMethod === method}
-                        onChange={() => setDeliveryMethod(method)}
-                        className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
-                      />
-                      {method}
-                    </label>
-                  ))}
+              {type === 'supplier' && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Delivery Method</label>
+                  <div className="flex items-center gap-4">
+                    {(['Delivery', 'Pick Up'] as const).map((method) => (
+                      <label key={method} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="deliveryMethod"
+                          checked={form.deliveryMethod === method}
+                          onChange={() => form.setDeliveryMethod(method)}
+                          className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                        />
+                        {method}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className={type === 'subcontractor' ? '' : 'col-span-2'}>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
-                <textarea value={siteInfo} onChange={(e) => setSiteInfo(e.target.value)} rows={2}
+                <textarea value={form.siteInfo} onChange={(e) => form.setSiteInfo(e.target.value)} rows={2}
                   placeholder="Enter site information..."
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
               </div>
@@ -729,18 +651,18 @@ function CreatePOCanvas({
                   : 'Tick the trades and buildings this subcontractor will work on'}
               </p>
             </div>
-            {errors.trades && <p className="text-xs text-red-400 mb-2">{errors.trades}</p>}
+            {form.errors.scopes && <p className="text-xs text-red-400 mb-2">{form.errors.scopes}</p>}
             <ScopeSelector
-              scopeData={scopeData}
-              trades={trades}
-              isLoading={scopeLoading}
-              isError={scopeError}
+              scopeData={form.scopeData}
+              trades={form.trades}
+              isLoading={form.scopeLoading}
+              isError={form.scopeError}
               isSupplier={type === 'supplier'}
-              onToggleTradeChecked={toggleTradeChecked}
-              onToggleTradeOpen={toggleTradeOpen}
-              onToggleBuildingChecked={toggleBuildingChecked}
-              onToggleBuildingOpen={toggleBuildingOpen}
-              onUpdateNotes={updateNotes}
+              onToggleTradeChecked={form.toggleTradeChecked}
+              onToggleTradeOpen={form.toggleTradeOpen}
+              onToggleBuildingChecked={form.toggleBuildingChecked}
+              onToggleBuildingOpen={form.toggleBuildingOpen}
+              onUpdateNotes={form.updateNotes}
             />
           </div>
 
@@ -748,17 +670,21 @@ function CreatePOCanvas({
           {type === 'subcontractor' && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Job Description</label>
-              <textarea value={jobDetails} onChange={(e) => setJobDetails(e.target.value)} rows={4}
+              <BulletNotesInput
+                value={form.jobDetails}
+                onChange={form.setJobDetails}
+                rows={5}
                 placeholder="Describe the job scope, materials to be used, work requirements..."
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
+              />
             </div>
           )}
 
-          {FEATURE_ATTACHMENTS && (
+          {FEATURE_ATTACHMENTS && (!editId || form.poDetail) && (
             <PoAttachmentsSection
-              attachmentIds={attachmentIds}
-              onAttachmentIdsChange={setAttachmentIds}
-              onUploadingChange={setAttachmentsUploading}
+              attachmentIds={form.attachmentIds}
+              onAttachmentIdsChange={form.setAttachmentIds}
+              onUploadingChange={form.setAttachmentsUploading}
+              initialAttachments={form.poDetail?.attachments}
             />
           )}
         </div>
@@ -766,37 +692,48 @@ function CreatePOCanvas({
 
       {/* Fixed footer */}
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-5 py-3.5 flex items-center gap-2 flex-shrink-0">
-        <button onClick={() => setShowEmailPreview(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
-          <Mail size={15} /> Preview Email
-        </button>
         <div className="flex-1" />
-        {isSubmitError && <p className="text-xs text-red-400">Failed to save. Try again.</p>}
-        <button onClick={() => handleSubmit(true)} disabled={isPending}
+        {form.isError && <p className="text-xs text-red-400">Failed to save. Try again.</p>}
+        <button onClick={() => form.handleSubmit(true)} disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
           className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
           Save as Draft
         </button>
-        <button onClick={() => handleSubmit(false)} disabled={isPending}
+        <button onClick={() => { if (form.validate()) setShowEmailPreview(true) }} disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors disabled:opacity-50">
-          {attachmentsUploading ? 'Uploading attachments…' : insertMutation.isPending ? 'Submitting…' : 'Submit PO'}
+          {form.attachmentsUploading ? 'Uploading attachments…' : 'Send PO'}
         </button>
       </div>
 
-      {/* Email preview modal */}
+      {/* Email preview modal — shown before actually sending, gates the final Send Later / Send Now decision */}
       {showEmailPreview && (
         <EmailPreviewModal
           type={type}
-          vendorName={vendorName}
-          deliveryDate={deliveryDate}
-          siteInfo={siteInfo}
-          scopeData={scopeData}
-          trades={trades}
-          jobDetails={jobDetails}
-          totalPrice={totalPrice}
+          vendorName={form.vendorName}
+          deliveryMethod={form.deliveryMethod}
+          deliveryDate={form.deliveryDate}
+          siteInfo={form.siteInfo}
+          siteAddress={form.siteAddress}
+          scopeData={form.scopeData}
+          trades={form.trades}
+          jobDetails={form.jobDetails}
+          totalPrice={form.totalPrice}
           smName={smName}
+          isPending={form.isPending}
           onClose={() => setShowEmailPreview(false)}
+          onSendLater={() => form.handleSubmit(true)}
+          onSendNow={() => form.handleSubmit(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={showLeaveConfirm}
+        title="Leave without saving?"
+        description="You have unsaved changes. Are you sure you want to leave this form?"
+        confirmLabel="Leave"
+        variant="danger"
+        onConfirm={() => onCanvas(closeTarget)}
+        onCancel={() => setShowLeaveConfirm(false)}
+      />
     </div>
   )
 }
@@ -813,7 +750,9 @@ function PODetailCanvas({
   const { token } = useAuthStore()
   const contractId = useContractId()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [showReject, setShowReject] = useState(false)
+  const [sendEmailDialog, setSendEmailDialog] = useState(false)
   const [rescheduleHandled, setRescheduleHandled] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'approve' | 'decline' | null>(null)
   const [responseMessage, setResponseMessage] = useState<string | null>(null)
@@ -833,6 +772,22 @@ function PODetailCanvas({
       setResponseMessage(res.message)
       queryClient.invalidateQueries({ queryKey: ['po-detail-full', canvas.poId] })
       queryClient.invalidateQueries({ queryKey: ['contract-details-full', contractId] })
+    },
+  })
+
+  // Manual (re)send — distinct from the auto-send that happens when a Draft
+  // is submitted via Edit; this is for a PO that's already Submitted, same
+  // as the "Send PO" action on the dedicated PO detail page.
+  const emailMutation = useMutation({
+    mutationFn: () => autoSendEmailPurchaseOrder(token!, canvas.poId, po!.type),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['po-detail-full', canvas.poId] })
+      queryClient.invalidateQueries({ queryKey: ['contract-details-full'] })
+      setSendEmailDialog(false)
+      toast('PO email sent successfully.', 'success')
+    },
+    onError: () => {
+      toast('Failed to send the PO email. Please try again.', 'error')
     },
   })
 
@@ -888,12 +843,21 @@ function PODetailCanvas({
         </div>
         <div className="flex items-center gap-2">
           {po.status === 'PO Draft' && (
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#b55fd4] text-white font-medium rounded-lg transition-colors">
-              <Send size={12} /> Send PO
-            </button>
+            <PermissionGuard action="po:edit">
+              <button
+                onClick={() => onCanvas({ type: 'SHOW_EDIT_PO', poId: canvas.poId, poType: po.type })}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                <Edit2 size={12} /> Edit
+              </button>
+            </PermissionGuard>
           )}
           {po.status === 'PO Submitted' && (
             <>
+              <button
+                onClick={() => setSendEmailDialog(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#4F7CB3] text-white font-medium rounded-lg transition-colors">
+                <Send size={12} /> Send PO
+              </button>
               <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors">
                 <Check size={12} /> Accept
               </button>
@@ -1142,11 +1106,24 @@ function PODetailCanvas({
                 <Paperclip size={12} className="text-slate-400" />
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attachments</p>
               </div>
-              <AttachmentList attachments={po.attachments} />
+              <div className="px-4 py-2">
+                <AttachmentList attachments={po.attachments} />
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={sendEmailDialog}
+        title="Send PO Email"
+        description={`This will automatically send the PO email to the ${po.type}. Continue?`}
+        confirmLabel="Send Email"
+        variant="default"
+        isLoading={emailMutation.isPending}
+        onConfirm={() => emailMutation.mutate()}
+        onCancel={() => setSendEmailDialog(false)}
+      />
     </div>
   )
 }

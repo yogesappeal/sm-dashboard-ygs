@@ -1,53 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ChevronDown, PackagePlus, Loader2 } from 'lucide-react'
+import { Suspense, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
-import {
-  getDropdownContractScope,
-  getSuppliersPaginated,
-  getScopeDetailByContractId,
-  getPurchaseOrderDetailsFull,
-  insertPurchaseOrder,
-  updatePurchaseOrder,
-  autoSendEmailPurchaseOrder,
-} from '@/lib/api'
-import { cn, buildScopeSnapshot, buildOrderDetailsItems, matchOrderDetailsToBuildings, orderItemId } from '@/lib/utils'
+import { ArrowLeft, ChevronDown, PackagePlus, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
 import { BulletNotesInput } from '@/components/forms/bullet-notes-input'
-import { useToast } from '@/components/shared/toast'
 import { AccessRestrictedNotice } from '@/components/shared/access-restricted-notice'
 import { usePermission } from '@/lib/hooks/use-permission'
-import type { InsertPurchaseOrderBody, UpdatePurchaseOrderBody } from '@/lib/types'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-// TODO: replace notes with structured rows (qty, unit, unit_rate) when ready
-interface BuildingEntry {
-  buildingId: string
-  buildingName: string
-  checked: boolean
-  open: boolean
-  notes: string
-}
-
-interface TradeSection {
-  tradeId: string
-  tradeName: string
-  checked: boolean
-  open: boolean
-  buildings: BuildingEntry[]
-}
-
-interface ScopeSection {
-  scopeId: string
-  scopeName: string
-  scopeNumber: string
-  open: boolean
-  trades: TradeSection[]
-}
+import { usePurchaseOrderForm, usePOEditIdParam, type POFormTradeSection } from '@/lib/hooks/use-purchase-order-form'
+import type { ScopeData } from '@/lib/types'
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 
@@ -62,303 +25,45 @@ export default function POSupplierFormPage() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 function POSupplierFormInner() {
-  const { token, user } = useAuthStore()
-  const router          = useRouter()
-  const editId          = useSearchParams().get('edit')
-  const toast            = useToast()
-  const queryClient     = useQueryClient()
+  const { user } = useAuthStore()
+  const router = useRouter()
+  const editId = usePOEditIdParam()
 
-  const [contractId, setContractId]     = useState('')
-  const [supplierId, setSupplierId]     = useState('')
-  const [supplierName, setSupplierName] = useState('')
-  const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
-  const [deliveryDate, setDeliveryDate] = useState('')
-  const [siteInfo, setSiteInfo]         = useState('')
-  const [scopes, setScopes]             = useState<ScopeSection[]>([])
-  const [attachmentIds, setAttachmentIds] = useState<string[]>([])
-  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
-  const [errors, setErrors]             = useState<Record<string, string>>({})
+  const form = usePurchaseOrderForm({ type: 'supplier', editId })
 
-  // ── Queries ───────────────────────────────────────────────────────────────
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  // Warn before losing in-progress input.
 
-  const { data: contractsData } = useQuery({
-    queryKey: ['contracts-dropdown-scope'],
-    queryFn: () => getDropdownContractScope(token!),
-    enabled: !!token,
-  })
+  const isSaved = form.isSuccess
 
-  const { data: suppliersData } = useQuery({
-    queryKey: ['suppliers-dropdown'],
-    queryFn: () => getSuppliersPaginated(token!, { limit: 100, type: 'Supplier' }),
-    enabled: !!token,
-  })
-
-  const { data: scopeData, isLoading: scopeLoading, isError: scopeError } = useQuery({
-    queryKey: ['scope-by-contract', contractId],
-    queryFn: () => getScopeDetailByContractId(token!, contractId),
-    enabled: !!token && !!contractId,
-  })
-
-  const { data: poDetail, isLoading: poDetailLoading } = useQuery({
-    queryKey: ['po-detail', editId],
-    queryFn: () => getPurchaseOrderDetailsFull(token!, editId!),
-    enabled: !!token && !!editId,
-  })
-
-  const contracts       = contractsData ?? []
-  const contractsWithScope    = contracts.filter((c) => c.has_scope)
-  const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
-  const suppliers       = suppliersData?.data ?? []
-  const selectedContract = contracts.find((c) => c.id === contractId)
-  const siteAddress     = selectedContract?.street_address ?? ''
-
-  // Prefill the form from the existing PO when editing a draft.
   useEffect(() => {
-    if (!editId || !poDetail) return
-    setContractId(poDetail.contract_id)
-    setSupplierId(poDetail.supplier_id)
-    setSupplierName(poDetail.supplier_name)
-    setDeliveryMethod(poDetail.delivery_method === 'Pick Up' ? 'Pick Up' : 'Delivery')
-    setDeliveryDate(poDetail.scheduled_date ? poDetail.scheduled_date.slice(0, 10) : '')
-    setSiteInfo(poDetail.site_information ?? '')
-    setAttachmentIds((poDetail.attachments ?? []).map((a) => a.id))
-  }, [editId, poDetail])
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!form.isDirty || isSaved) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [form.isDirty, isSaved])
 
-  // Auto-populate material order when scope loads, carrying over whichever
-  // trades/buildings + notes were already set on the PO being edited.
-  useEffect(() => {
-    if (!scopeData) {
-      setScopes([])
+  const handleBack = () => {
+    if (form.isDirty && !isSaved &&
+        !window.confirm('You have unsaved changes. Are you sure you want to leave this page?')) {
       return
     }
-
-    // Invert building→trade into trade→building, dedup by trade_name
-    const tradeMap = new Map<string, {
-      tradeId: string
-      tradeName: string
-      buildings: { buildingId: string; buildingName: string }[]
-    }>()
-
-    for (const building of scopeData.scope_details ?? []) {
-      for (const trade of building.trades ?? []) {
-        const key = trade.trade_name.trim().toLowerCase()
-        if (!tradeMap.has(key)) {
-          tradeMap.set(key, { tradeId: trade.trade_id, tradeName: trade.trade_name, buildings: [] })
-        }
-        tradeMap.get(key)!.buildings.push({
-          buildingId:   building.building_id,
-          buildingName: building.building_name,
-        })
-      }
-    }
-
-    const checkedTradeIds = new Set<string>()
-    const checkedPairs = new Set<string>()
-    const notes = editId
-      ? matchOrderDetailsToBuildings(poDetail?.order_details)
-      : { byId: new Map<string, string>(), byName: new Map<string, string>() }
-    if (editId) {
-      for (const building of poDetail?.scope_snapshot ?? []) {
-        for (const trade of building.trades ?? []) {
-          checkedTradeIds.add(trade.trade_id)
-          checkedPairs.add(`${trade.trade_id}::${building.building_id}`)
-        }
-      }
-    }
-
-    const trades: TradeSection[] = Array.from(tradeMap.values()).map((t) => ({
-      tradeId:   t.tradeId,
-      tradeName: t.tradeName,
-      checked:   checkedTradeIds.has(t.tradeId),
-      open:      true,
-      buildings: t.buildings.map((b) => {
-        const checked = checkedPairs.has(`${t.tradeId}::${b.buildingId}`)
-        return {
-          buildingId:   b.buildingId,
-          buildingName: b.buildingName,
-          checked,
-          open:         true,
-          notes:        checked
-            ? notes.byId.get(orderItemId(t.tradeId, b.buildingId))
-              ?? notes.byName.get(`${t.tradeName.toLowerCase()}::${b.buildingName.toLowerCase()}`)
-              ?? ''
-            : '',
-        }
-      }),
-    }))
-
-    setScopes([{
-      scopeId:     scopeData.scope_id,
-      scopeName:   scopeData.scope_name,
-      scopeNumber: scopeData.scope_number,
-      open:        true,
-      trades: trades.length > 0 ? trades : [{
-        tradeId:   'general',
-        tradeName: 'General',
-        checked:   false,
-        open:      true,
-        buildings: [{ buildingId: 'general', buildingName: 'General', checked: false, open: true, notes: '' }],
-      }],
-    }])
-  }, [scopeData, editId, poDetail])
-
-  // ── Submit ────────────────────────────────────────────────────────────────
-
-  const insertMutation = useMutation({
-    mutationFn: (body: InsertPurchaseOrderBody) => insertPurchaseOrder(token!, body),
-    onSuccess: (res, variables) => {
-      if (!variables.send_email) {
-        toast('PO saved as draft.', 'success')
-      } else if (res.email_error) {
-        toast(`PO submitted, but the email failed to send: ${res.email_error}`, 'error')
-      } else {
-        toast('PO submitted and sent successfully.', 'success')
-      }
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
-      router.push('/purchase-orders')
-    },
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: (body: UpdatePurchaseOrderBody) => updatePurchaseOrder(token!, body),
-  })
-
-  // ── Trade handlers ────────────────────────────────────────────────────────
-
-  const toggleTradeChecked = useCallback((scopeId: string, tradeId: string) =>
-    setScopes((prev) => prev.map((s) => s.scopeId !== scopeId ? s : {
-      ...s,
-      trades: s.trades.map((t) => t.tradeId !== tradeId ? t : { ...t, checked: !t.checked }),
-    })), [])
-
-  const toggleTradeOpen = useCallback((scopeId: string, tradeId: string) =>
-    setScopes((prev) => prev.map((s) => s.scopeId !== scopeId ? s : {
-      ...s,
-      trades: s.trades.map((t) => t.tradeId !== tradeId ? t : { ...t, open: !t.open }),
-    })), [])
-
-  // ── Building handlers ─────────────────────────────────────────────────────
-
-  const toggleBuildingChecked = useCallback((scopeId: string, tradeId: string, buildingId: string) =>
-    setScopes((prev) => prev.map((s) => s.scopeId !== scopeId ? s : {
-      ...s,
-      trades: s.trades.map((t) => t.tradeId !== tradeId ? t : {
-        ...t,
-        buildings: t.buildings.map((b) =>
-          b.buildingId !== buildingId ? b : { ...b, checked: !b.checked, open: !b.checked }
-        ),
-      }),
-    })), [])
-
-  const toggleBuildingOpen = useCallback((scopeId: string, tradeId: string, buildingId: string) =>
-    setScopes((prev) => prev.map((s) => s.scopeId !== scopeId ? s : {
-      ...s,
-      trades: s.trades.map((t) => t.tradeId !== tradeId ? t : {
-        ...t,
-        buildings: t.buildings.map((b) =>
-          b.buildingId !== buildingId ? b : { ...b, open: !b.open }
-        ),
-      }),
-    })), [])
-
-  const updateNotes = useCallback((scopeId: string, tradeId: string, buildingId: string, notes: string) =>
-    setScopes((prev) => prev.map((s) => s.scopeId !== scopeId ? s : {
-      ...s,
-      trades: s.trades.map((t) => t.tradeId !== tradeId ? t : {
-        ...t,
-        buildings: t.buildings.map((b) =>
-          b.buildingId !== buildingId ? b : { ...b, notes }
-        ),
-      }),
-    })), [])
-
-  // ── Derived ───────────────────────────────────────────────────────────────
-
-  const checkedCount = scopes.flatMap((s) => s.trades.filter((t) => t.checked)).length
-  const dateLabel = deliveryMethod === 'Delivery' ? 'Delivery Date' : 'Pick Up Date'
-
-  // ── Validate + submit ─────────────────────────────────────────────────────
-
-  const validate = () => {
-    const e: Record<string, string> = {}
-    if (!contractId)   e.contractId   = 'Select a contract'
-    if (!supplierId)   e.supplierId   = 'Select a supplier'
-    if (!deliveryDate) e.deliveryDate = `Select ${dateLabel.toLowerCase()}`
-    if (scopes.length === 0)     e.scopes = 'No scope found for this contract'
-    else if (checkedCount === 0) e.scopes = 'Select at least one trade to order'
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
-  const handleSubmit = (isDraft: boolean) => {
-    if (!validate()) return
-    if (attachmentsUploading) return
-    const allTrades = scopes.flatMap((s) => s.trades)
-    if (editId) {
-      updateMutation.mutate({
-        _id:               editId,
-        _contract_id:      contractId,
-        _supplier_id:      supplierId,
-        _scheduled_date:   deliveryDate,
-        // update-purchase-order only ever saves as Draft — Submit sends the
-        // email below, and a successful send is what promotes the PO to
-        // Sent server-side. This way a failed send just leaves it as Draft
-        // instead of stuck "Submitted" with nothing actually sent.
-        _status:           'PO Draft',
-        _type:             'supplier',
-        _po_amount:        0,
-        _delivery_method:  deliveryMethod,
-        _site_information: siteInfo,
-        _order_details:    buildOrderDetailsItems(allTrades),
-        _scope_snapshot:   buildScopeSnapshot(allTrades),
-      }, {
-        onSuccess: async () => {
-          queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
-          queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
-          if (!isDraft) {
-            try {
-              await autoSendEmailPurchaseOrder(token!, editId, 'supplier')
-              queryClient.invalidateQueries({ queryKey: ['po-detail', editId] })
-              queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
-              toast('PO submitted and sent successfully.', 'success')
-            } catch {
-              toast('Failed to send the email — PO kept as Draft, please try submitting again.', 'error')
-            }
-          } else {
-            toast('PO saved as draft.', 'success')
-          }
-          router.push('/purchase-orders')
-        },
-      })
-    } else {
-      insertMutation.mutate({
-        contract_id:      contractId,
-        supplier_id:      supplierId,
-        delivery_method:  deliveryMethod,
-        scheduled_date:   deliveryDate,
-        site_information: siteInfo,
-        type:             'supplier',
-        service_type:     'supplier',
-        status:           isDraft ? 'PO Draft' : 'PO Submitted',
-        po_amount:        0,
-        order_details:    buildOrderDetailsItems(allTrades),
-        scope_snapshot:   buildScopeSnapshot(allTrades),
-        attachment_ids:   attachmentIds,
-        send_email:       !isDraft,
-      })
-    }
+    router.back()
   }
 
   const fieldCls = (k: string) =>
     cn('w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
-      errors[k] ? 'border-red-300' : 'border-slate-200')
+      form.errors[k] ? 'border-red-300' : 'border-slate-200')
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col min-h-full">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600">
+        <button onClick={handleBack} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-semibold text-slate-800">
@@ -376,38 +81,35 @@ function POSupplierFormInner() {
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   Contract <span className="text-red-400">*</span>
                 </label>
-                <select value={contractId}
-                  onChange={(e) => { setContractId(e.target.value); setScopes([]) }}
+                <select value={form.contractId}
+                  onChange={(e) => form.selectContract(e.target.value)}
                   className={fieldCls('contractId')}>
                   <option value="">Select contract...</option>
-                  {contractsWithScope.length > 0 && (
+                  {form.contractsWithScope.length > 0 && (
                     <optgroup label="Has Scope">
-                      {contractsWithScope.map((c) => <option key={c.id} value={c.id}>{c.dropdown_label}</option>)}
+                      {form.contractsWithScope.map((c) => <option key={c.id} value={c.id}>{c.dropdown_label}</option>)}
                     </optgroup>
                   )}
-                  {contractsWithoutScope.length > 0 && (
+                  {form.contractsWithoutScope.length > 0 && (
                     <optgroup label="No Scope Yet">
-                      {contractsWithoutScope.map((c) => (
+                      {form.contractsWithoutScope.map((c) => (
                         <option key={c.id} value={c.id} disabled>{c.dropdown_label} — no scope</option>
                       ))}
                     </optgroup>
                   )}
                 </select>
-                {errors.contractId && <p className="text-xs text-red-400 mt-1">{errors.contractId}</p>}
+                {form.errors.contractId && <p className="text-xs text-red-400 mt-1">{form.errors.contractId}</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   Supplier <span className="text-red-400">*</span>
                 </label>
-                <select value={supplierId} onChange={(e) => {
-                  setSupplierId(e.target.value)
-                  setSupplierName(suppliers.find((s) => s.id === e.target.value)?.name ?? '')
-                }} className={fieldCls('supplierId')}>
+                <select value={form.vendorId} onChange={(e) => form.selectVendor(e.target.value)} className={fieldCls('vendorId')}>
                   <option value="">Select supplier...</option>
-                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {form.vendors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                {errors.supplierId && <p className="text-xs text-red-400 mt-1">{errors.supplierId}</p>}
+                {form.errors.vendorId && <p className="text-xs text-red-400 mt-1">{form.errors.vendorId}</p>}
               </div>
             </div>
 
@@ -419,8 +121,8 @@ function POSupplierFormInner() {
                     <input
                       type="radio"
                       name="deliveryMethod"
-                      checked={deliveryMethod === method}
-                      onChange={() => setDeliveryMethod(method)}
+                      checked={form.deliveryMethod === method}
+                      onChange={() => form.setDeliveryMethod(method)}
                       className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
                     />
                     {method}
@@ -431,17 +133,17 @@ function POSupplierFormInner() {
 
             <div className="mt-4 sm:w-1/2 sm:pr-2">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                {dateLabel} <span className="text-red-400">*</span>
+                {form.dateLabel} <span className="text-red-400">*</span>
               </label>
-              <input type="date" value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
+              <input type="date" value={form.deliveryDate}
+                onChange={(e) => form.setDeliveryDate(e.target.value)}
                 className={fieldCls('deliveryDate')} />
-              {errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{errors.deliveryDate}</p>}
+              {form.errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{form.errors.deliveryDate}</p>}
             </div>
 
             <div className="mt-4">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
-              <textarea value={siteInfo} onChange={(e) => setSiteInfo(e.target.value)} rows={2}
+              <textarea value={form.siteInfo} onChange={(e) => form.setSiteInfo(e.target.value)} rows={2}
                 placeholder="Enter site information..."
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
             </div>
@@ -454,49 +156,50 @@ function POSupplierFormInner() {
               <p className="text-xs text-slate-400 mt-0.5">Tick the trades and buildings you want to order for</p>
             </div>
 
-            {errors.scopes && <p className="text-xs text-red-400">{errors.scopes}</p>}
+            {form.errors.scopes && <p className="text-xs text-red-400">{form.errors.scopes}</p>}
 
             {/* States */}
-            {!contractId && (
+            {!form.contractId && (
               <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center">
                 <PackagePlus size={28} className="mx-auto text-slate-300 mb-2" />
                 <p className="text-sm text-slate-400">Select a contract above to load scope</p>
               </div>
             )}
 
-            {contractId && scopeLoading && (
+            {form.contractId && form.scopeLoading && (
               <div className="bg-white rounded-xl border border-slate-200 p-8 flex items-center justify-center gap-2 text-slate-400">
                 <Loader2 size={16} className="animate-spin" />
                 <span className="text-sm">Loading scope...</span>
               </div>
             )}
 
-            {contractId && !scopeLoading && scopeError && (
+            {form.contractId && !form.scopeLoading && form.scopeError && (
               <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center">
                 <PackagePlus size={28} className="mx-auto text-slate-300 mb-2" />
                 <p className="text-sm text-slate-400">No scope found for this contract</p>
               </div>
             )}
 
-            {scopes.map((scope) => (
-              <ScopeBlock
-                key={scope.scopeId}
-                scope={scope}
-                onToggleTradeChecked={toggleTradeChecked}
-                onToggleTradeOpen={toggleTradeOpen}
-                onToggleBuildingChecked={toggleBuildingChecked}
-                onToggleBuildingOpen={toggleBuildingOpen}
-                onUpdateNotes={updateNotes}
+            {form.trades.length > 0 && (
+              <TradeList
+                scopeData={form.scopeData}
+                trades={form.trades}
+                checkedCount={form.checkedCount}
+                onToggleTradeChecked={form.toggleTradeChecked}
+                onToggleTradeOpen={form.toggleTradeOpen}
+                onToggleBuildingChecked={form.toggleBuildingChecked}
+                onToggleBuildingOpen={form.toggleBuildingOpen}
+                onUpdateNotes={form.updateNotes}
               />
-            ))}
+            )}
           </div>
 
-          {FEATURE_ATTACHMENTS && (!editId || poDetail) && (
+          {FEATURE_ATTACHMENTS && (!editId || form.poDetail) && (
             <PoAttachmentsSection
-              attachmentIds={attachmentIds}
-              onAttachmentIdsChange={setAttachmentIds}
-              onUploadingChange={setAttachmentsUploading}
-              initialAttachments={poDetail?.attachments}
+              attachmentIds={form.attachmentIds}
+              onAttachmentIdsChange={form.setAttachmentIds}
+              onUploadingChange={form.setAttachmentsUploading}
+              initialAttachments={form.poDetail?.attachments}
             />
           )}
         </div>
@@ -504,32 +207,30 @@ function POSupplierFormInner() {
         {/* ── Right col ── */}
         <div className="space-y-3">
           <EmailPreview
-            supplierName={supplierName}
-            deliveryMethod={deliveryMethod}
-            deliveryDate={deliveryDate}
-            siteInfo={siteInfo}
-            siteAddress={siteAddress}
-            scopeData={scopeData}
-            scopes={scopes}
+            supplierName={form.vendorName}
+            deliveryMethod={form.deliveryMethod}
+            deliveryDate={form.deliveryDate}
+            siteInfo={form.siteInfo}
+            siteAddress={form.siteAddress}
+            scopeData={form.scopeData}
+            trades={form.trades}
             smName={user?.full_name ?? ''}
           />
 
           <div className="space-y-2">
-            <button onClick={() => handleSubmit(false)}
-              disabled={insertMutation.isPending || updateMutation.isPending || attachmentsUploading || (!!editId && poDetailLoading)}
+            <button onClick={() => form.handleSubmit(false)}
+              disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
               className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
-              {attachmentsUploading ? 'Uploading attachments...'
-                : (insertMutation.isPending || updateMutation.isPending) ? 'Submitting...'
-                : 'Submit PO'}
+              {form.attachmentsUploading ? 'Uploading attachments...' : form.isPending ? 'Sending...' : 'Send PO'}
             </button>
-            <button onClick={() => handleSubmit(true)}
-              disabled={insertMutation.isPending || updateMutation.isPending || attachmentsUploading || (!!editId && poDetailLoading)}
+            <button onClick={() => form.handleSubmit(true)}
+              disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               Save as Draft
             </button>
           </div>
 
-          {(insertMutation.isError || updateMutation.isError) && (
+          {form.isError && (
             <p className="text-xs text-red-400 text-center">Failed to save. Please try again.</p>
           )}
         </div>
@@ -538,39 +239,39 @@ function POSupplierFormInner() {
   )
 }
 
-// ─── Scope block ──────────────────────────────────────────────────────────────
+// ─── Trade list ───────────────────────────────────────────────────────────────
 
-function ScopeBlock({
-  scope,
+function TradeList({
+  scopeData, trades, checkedCount,
   onToggleTradeChecked, onToggleTradeOpen,
   onToggleBuildingChecked, onToggleBuildingOpen, onUpdateNotes,
 }: {
-  scope: ScopeSection
-  onToggleTradeChecked: (scopeId: string, tradeId: string) => void
-  onToggleTradeOpen: (scopeId: string, tradeId: string) => void
-  onToggleBuildingChecked: (scopeId: string, tradeId: string, buildingId: string) => void
-  onToggleBuildingOpen: (scopeId: string, tradeId: string, buildingId: string) => void
-  onUpdateNotes: (scopeId: string, tradeId: string, buildingId: string, notes: string) => void
+  scopeData: ScopeData | undefined
+  trades: POFormTradeSection[]
+  checkedCount: number
+  onToggleTradeChecked: (tradeId: string) => void
+  onToggleTradeOpen: (tradeId: string) => void
+  onToggleBuildingChecked: (tradeId: string, buildingId: string) => void
+  onToggleBuildingOpen: (tradeId: string, buildingId: string) => void
+  onUpdateNotes: (tradeId: string, buildingId: string, notes: string) => void
 }) {
-  const checkedCount = scope.trades.filter((t) => t.checked).length
-
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {/* Scope header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50">
-        <span className="text-sm font-semibold text-slate-700 flex-1 truncate">{scope.scopeName}</span>
-        {scope.scopeNumber && (
-          <span className="text-xs text-slate-400 font-mono flex-shrink-0">{scope.scopeNumber}</span>
+        <span className="text-sm font-semibold text-slate-700 flex-1 truncate">{scopeData?.scope_name}</span>
+        {scopeData?.scope_number && (
+          <span className="text-xs text-slate-400 font-mono flex-shrink-0">{scopeData.scope_number}</span>
         )}
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0',
           checkedCount > 0 ? 'bg-[#6692C5]/10 text-[#6692C5]' : 'bg-slate-100 text-slate-400')}>
-          {checkedCount}/{scope.trades.length} trades
+          {checkedCount}/{trades.length} trades
         </span>
       </div>
 
       {/* Trade list */}
       <div>
-        {scope.trades.map((trade) => (
+        {trades.map((trade) => (
           <div key={trade.tradeId} className="border-b border-slate-100 last:border-0">
 
             {/* Trade row */}
@@ -581,7 +282,7 @@ function ScopeBlock({
               <input
                 type="checkbox"
                 checked={trade.checked}
-                onChange={() => onToggleTradeChecked(scope.scopeId, trade.tradeId)}
+                onChange={() => onToggleTradeChecked(trade.tradeId)}
                 className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
               />
               <span className={cn('text-sm font-medium flex-1', trade.checked ? 'text-slate-700' : 'text-slate-500')}>
@@ -591,7 +292,7 @@ function ScopeBlock({
                 {trade.buildings.length} building{trade.buildings.length !== 1 ? 's' : ''}
               </span>
               {trade.checked && (
-                <button type="button" onClick={() => onToggleTradeOpen(scope.scopeId, trade.tradeId)}
+                <button type="button" onClick={() => onToggleTradeOpen(trade.tradeId)}
                   className="p-0.5 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0">
                   <ChevronDown size={14}
                     className={cn('transition-transform', !trade.open && '-rotate-90')} />
@@ -613,7 +314,7 @@ function ScopeBlock({
                       <input
                         type="checkbox"
                         checked={building.checked}
-                        onChange={() => onToggleBuildingChecked(scope.scopeId, trade.tradeId, building.buildingId)}
+                        onChange={() => onToggleBuildingChecked(trade.tradeId, building.buildingId)}
                         className="w-3 h-3 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
                       />
                       <span className={cn('text-xs font-semibold flex-1 uppercase tracking-wide',
@@ -622,7 +323,7 @@ function ScopeBlock({
                       </span>
                       {building.checked && (
                         <button type="button"
-                          onClick={() => onToggleBuildingOpen(scope.scopeId, trade.tradeId, building.buildingId)}
+                          onClick={() => onToggleBuildingOpen(trade.tradeId, building.buildingId)}
                           className="p-0.5 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0">
                           <ChevronDown size={12}
                             className={cn('transition-transform', !building.open && '-rotate-90')} />
@@ -635,7 +336,7 @@ function ScopeBlock({
                       <div className="px-8 pb-4 pt-2">
                         <BulletNotesInput
                           value={building.notes}
-                          onChange={(notes) => onUpdateNotes(scope.scopeId, trade.tradeId, building.buildingId, notes)}
+                          onChange={(notes) => onUpdateNotes(trade.tradeId, building.buildingId, notes)}
                           placeholder="Describe what you need to order for this building…"
                         />
                       </div>
@@ -671,7 +372,7 @@ function EmailPreview({
   siteInfo,
   siteAddress,
   scopeData,
-  scopes,
+  trades,
   smName,
 }: {
   supplierName: string
@@ -679,8 +380,8 @@ function EmailPreview({
   deliveryDate: string
   siteInfo: string
   siteAddress: string
-  scopeData: import('@/lib/types').ScopeData | undefined
-  scopes: ScopeSection[]
+  scopeData: ScopeData | undefined
+  trades: POFormTradeSection[]
   smName: string
 }) {
   const methodVerb = deliveryMethod === 'Delivery' ? 'delivery' : 'pick up'
@@ -690,13 +391,11 @@ function EmailPreview({
       }).format(new Date(deliveryDate + 'T00:00:00'))
     : '—'
 
-  const orderItems = scopes.flatMap((s) =>
-    s.trades.filter((t) => t.checked).flatMap((t) =>
-      t.buildings.filter((b) => b.checked).map((b) => ({
-        title: `${t.tradeName} | ${b.buildingName}`,
-        notes: b.notes,
-      }))
-    )
+  const orderItems = trades.filter((t) => t.checked).flatMap((t) =>
+    t.buildings.filter((b) => b.checked).map((b) => ({
+      title: `${t.tradeName} | ${b.buildingName}`,
+      notes: b.notes,
+    }))
   )
 
   return (
@@ -727,7 +426,7 @@ function EmailPreview({
         {/* Accept CTA */}
         <div>
           <span>Click here → </span>
-          <span className="inline-block px-4 py-1.5 rounded bg-[#5b7db1] text-white text-xs font-medium">
+          <span className="inline-block px-4 py-1.5 rounded bg-slate-300 text-slate-500 text-xs font-medium">
             Accept Order
           </span>
         </div>
@@ -798,9 +497,9 @@ function EmailPreview({
           {deliveryDate && <p className="text-xs text-slate-600 mb-1">Confirm {methodVerb} on {formattedDate}</p>}
           <p className="text-xs text-slate-600 mb-3">Confirm PO Scope above before accepting</p>
           <div className="flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Accept</span>
-            <span className="px-3 py-1 rounded border border-[#5b7db1] text-[#5b7db1] text-xs">Reschedule</span>
-            <span className="px-3 py-1 rounded border border-red-400 text-red-400 text-xs">Reject</span>
+            <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Accept</span>
+            <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reschedule</span>
+            <span className="px-3 py-1 rounded border border-slate-300 text-slate-400 text-xs">Reject</span>
           </div>
         </div>
 

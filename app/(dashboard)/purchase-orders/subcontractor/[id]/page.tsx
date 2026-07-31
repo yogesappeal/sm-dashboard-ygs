@@ -15,6 +15,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { AttachmentList } from '@/components/shared/attachment-list'
 import { useToast } from '@/components/shared/toast'
 import { cn, formatDate, formatDateTime, normalizeOrderItems } from '@/lib/utils'
@@ -87,7 +88,12 @@ export default function POSubsDetailPage() {
   const showRescheduleHistory = !!po?.reviewed_status
 
   return (
-    <div className="flex flex-col min-h-full relative">
+    // -m-4 md:-m-6 bleeds the whole page out of <main>'s own padding (see
+    // app/(dashboard)/layout.tsx) so the top bar sits flush against the
+    // global header at rest, matching contract-preview's page shell —
+    // padding is reintroduced per-section below instead. The top bar scrolls
+    // away with the rest of the page (not sticky).
+    <div className="flex flex-col min-h-full relative -m-4 md:-m-6">
       {responseMessage && (
         <div className="fixed bottom-4 right-4 z-20 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-lg">
           <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
@@ -95,7 +101,8 @@ export default function POSubsDetailPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 sticky top-0 z-30 isolate transform-gpu bg-slate-50 pb-6">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 bg-slate-50 px-4 pt-4 pb-6 md:px-6 md:pt-6">
         <button
           onClick={() => router.back()}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600"
@@ -116,13 +123,15 @@ export default function POSubsDetailPage() {
             <StatusBadge status={po.status} />
             <StatusBadge status={po.type} />
             {po.status === 'PO Draft' && (
-              <Link
-                href={`/purchase-orders/subcontractor/new?edit=${id}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <Edit2 size={14} />
-                Edit
-              </Link>
+              <PermissionGuard action="po:edit">
+                <Link
+                  href={`/purchase-orders/subcontractor/new?edit=${id}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <Edit2 size={14} />
+                  Edit
+                </Link>
+              </PermissionGuard>
             )}
             {po.status === 'PO Submitted' && (
               <>
@@ -153,6 +162,7 @@ export default function POSubsDetailPage() {
         )}
       </div>
 
+      <div className="px-4 pb-4 md:px-6 md:pb-6">
       {isLoading ? (
         <PODetailSkeleton />
       ) : po ? (
@@ -326,6 +336,7 @@ export default function POSubsDetailPage() {
           Purchase order not found
         </div>
       )}
+      </div>
 
       <ConfirmDialog
         open={acceptDialog}

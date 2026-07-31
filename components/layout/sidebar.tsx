@@ -36,7 +36,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
   { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
-  { label: 'Suppliers', href: '/suppliers', icon: Users },
+  { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
   { label: 'Scope', href: '/scope', icon: FileText },
   ...(FEATURE_TASK ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
 ]

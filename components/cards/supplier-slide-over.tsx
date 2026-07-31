@@ -204,27 +204,29 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
               )}
 
               {/* Status toggle */}
-              <div className="pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 mb-3">Supplier Status</p>
-                <button
-                  onClick={handleToggleStatus}
-                  disabled={statusLoading}
-                  className={cn(
-                    'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors',
-                    supplier.status === 'Active Supplier'
-                      ? 'border-red-200 text-red-600 hover:bg-red-50'
-                      : 'border-green-200 text-green-600 hover:bg-green-50',
-                    statusLoading && 'opacity-60 cursor-not-allowed'
-                  )}
-                >
-                  {statusLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Check size={14} />
-                  )}
-                  {supplier.status === 'Active Supplier' ? 'Set as Inactive' : 'Set as Active'}
-                </button>
-              </div>
+              <PermissionGuard action="supplier:status">
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-xs text-slate-500 mb-3">Supplier Status</p>
+                  <button
+                    onClick={handleToggleStatus}
+                    disabled={statusLoading}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors',
+                      supplier.status === 'Active Supplier'
+                        ? 'border-red-200 text-red-600 hover:bg-red-50'
+                        : 'border-green-200 text-green-600 hover:bg-green-50',
+                      statusLoading && 'opacity-60 cursor-not-allowed'
+                    )}
+                  >
+                    {statusLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    {supplier.status === 'Active Supplier' ? 'Set as Inactive' : 'Set as Active'}
+                  </button>
+                </div>
+              </PermissionGuard>
             </div>
           )}
         </div>

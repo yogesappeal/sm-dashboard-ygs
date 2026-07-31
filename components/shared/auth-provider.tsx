@@ -7,15 +7,16 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/lib/store'
 import type { UserRole } from '@/lib/store'
 import { getUserDetails } from '@/lib/api'
+import type { BackendUserRole } from '@/lib/types'
 
-// Only these job titles may use the app at all — everyone else (Site Lead,
-// Tradesmen, anything unrecognized) is blocked at the AuthProvider gate below.
-// Per-menu permissions within these three roles are a separate, later step.
-function mapJobTitleToRole(jobTitle: string | undefined): UserRole {
-  switch (jobTitle) {
-    case 'Site Manager': return 'Site Manager'
-    case 'Ops': return 'Operations'
-    case 'Admin': return 'Admin'
+// Access is driven by the backend's `role` enum (admin/site_manager/ops),
+// NOT job_title — job_title is display-only. Anything outside this enum
+// (including a missing/unrecognized value) is blocked at the gate below.
+function mapBackendRoleToRole(role: BackendUserRole | undefined): UserRole {
+  switch (role) {
+    case 'site_manager': return 'Site Manager'
+    case 'ops': return 'Operations'
+    case 'admin': return 'Admin'
     default: return null
   }
 }
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await getUserDetails(accessToken)
         if (res?.data) {
           setUser(res.data)
-          const role = mapJobTitleToRole(res.data.job_title)
+          const role = mapBackendRoleToRole(res.data.role)
           setRole(role)
           setAccessDenied(role === null)
         }

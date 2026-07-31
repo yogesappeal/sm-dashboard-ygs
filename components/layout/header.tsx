@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuthStore, useAppStore } from '@/lib/store'
-import { Bell, Menu, LayoutGrid } from 'lucide-react'
+import { Bell, Menu, LayoutGrid, Search, X } from 'lucide-react'
 import Image from 'next/image'
 import { GlobalSearch } from './global-search'
 import { NotificationPanel } from './notification-panel'
@@ -17,6 +17,7 @@ export function Header() {
   const { setMobileSidebarOpen } = useAppStore()
   const [notifOpen, setNotifOpen] = useState(false)
   const [toolboxOpen, setToolboxOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const { data: unreadCount = 0 } = useNotificationsUnreadCount()
 
   const initials = user?.first_name?.[0]?.toUpperCase() ?? '?'
@@ -25,6 +26,23 @@ export function Header() {
       ? user.image_url
       : `${STORAGE_BASE}/${user.image_url.replace(/^\/+/, '')}`
     : null
+
+  if (mobileSearchOpen) {
+    return (
+      <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-2 px-4 sticky top-0 z-10 md:hidden">
+        <div className="flex-1">
+          <GlobalSearch />
+        </div>
+        <button
+          onClick={() => setMobileSearchOpen(false)}
+          className="p-2 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors shrink-0"
+          aria-label="Close search"
+        >
+          <X size={20} />
+        </button>
+      </header>
+    )
+  }
 
   return (
     <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-4 px-4 md:px-6 sticky top-0 z-10">
@@ -49,6 +67,15 @@ export function Header() {
       {/* Right cluster */}
       <div className="flex items-center gap-3 shrink-0">
 
+        {/* Mobile search trigger */}
+        <button
+          onClick={() => setMobileSearchOpen(true)}
+          className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors md:hidden"
+          aria-label="Search"
+        >
+          <Search size={18} />
+        </button>
+
         {/* SM Toolbox */}
         <PermissionGuard action="toolbox:view">
           <div className="relative">
@@ -72,7 +99,7 @@ export function Header() {
           >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#6692C5]" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-orange-600" />
             )}
           </button>
           <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />

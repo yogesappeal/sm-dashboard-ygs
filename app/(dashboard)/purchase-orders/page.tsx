@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ShoppingCart, ChevronDown, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
-import { getPurchaseOrdersPaginated, getPurchaseOrderStatusSummary } from '@/lib/api'
+import { getPurchaseOrdersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { PORow, POTableHeader } from '@/components/cards/po-row'
@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { TableRowSkeleton, Skeleton } from '@/components/ui/skeleton'
 import { PaginationBar } from '@/components/ui/pagination-bar'
 import { cn } from '@/lib/utils'
+import type { PoStatusMetrics } from '@/lib/types'
 
 const TYPE_FILTERS = [
   { value: '', label: 'All' },
@@ -35,11 +36,13 @@ const PO_STATUSES = [
   'PO Cancelled',
 ]
 
-const SUMMARY_STATUSES = [
-  'PO Confirmed',
-  'PO Rescheduled',
-  'PO Completed',
-  'PO Rejected',
+// Maps each summary tile's status label to its key in the `metrics` object
+// get-po-paginated returns alongside `data`/`pagination`.
+const SUMMARY_STATUSES: { status: string; metricKey: keyof PoStatusMetrics; description: string }[] = [
+  { status: 'PO Confirmed', metricKey: 'confirmed', description: 'Accepted by the supplier/subcontractor' },
+  { status: 'PO Rescheduled', metricKey: 'rescheduled', description: 'Supplier/subcontractor requested a new date' },
+  { status: 'PO Completed', metricKey: 'completed', description: 'Order has been fulfilled' },
+  { status: 'PO Rejected', metricKey: 'rejected', description: 'Declined by the supplier/subcontractor' },
 ]
 
 const STATUS_FILTERS = [
@@ -74,12 +77,6 @@ export default function PurchaseOrdersPage() {
     staleTime: 0,
   })
 
-  const { data: statusSummary, isLoading: isSummaryLoading } = useQuery({
-    queryKey: ['purchase-orders-status-summary'],
-    queryFn: () => getPurchaseOrderStatusSummary(token!),
-    enabled: !!token,
-  })
-
   const pos = data?.data ?? []
   const pagination = data?.pagination
 
@@ -112,7 +109,7 @@ export default function PurchaseOrdersPage() {
                 onClick={() => setNewPOOpen((v) => !v)}
                 className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
               >
-                + New PO
+                + Create PO
                 <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
               </button>
               {newPOOpen && (
@@ -141,16 +138,17 @@ export default function PurchaseOrdersPage() {
 
       {/* Status summary */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {isSummaryLoading ? (
+        {isTableLoading && !data ? (
           Array.from({ length: SUMMARY_STATUSES.length }).map((_, i) => (
-            <Skeleton key={i} className="h-[68px] w-28 rounded-xl flex-shrink-0" />
+            <Skeleton key={i} className="h-[124px] w-48 rounded-xl flex-shrink-0" />
           ))
         ) : (
-          SUMMARY_STATUSES.map((status) => (
+          SUMMARY_STATUSES.map(({ status, metricKey, description }) => (
             <PoStatusTile
               key={status}
               status={status}
-              count={statusSummary?.[status] ?? 0}
+              count={data?.metrics?.[metricKey] ?? 0}
+              description={description}
               isActive={statusFilter === status}
               onClick={() => handleFilterChange(typeFilter, statusFilter === status ? '' : status)}
             />
@@ -240,9 +238,10 @@ export default function PurchaseOrdersPage() {
   )
 }
 
-function PoStatusTile({ status, count, isActive, onClick }: {
+function PoStatusTile({ status, count, description, isActive, onClick }: {
   status: string
   count: number
+  description: string
   isActive: boolean
   onClick: () => void
 }) {
@@ -250,12 +249,13 @@ function PoStatusTile({ status, count, isActive, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        'flex-shrink-0 flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-colors',
+        'flex-shrink-0 w-48 h-[124px] flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-colors',
         isActive ? 'bg-[#6692C5]/10 border-[#6692C5]/40' : 'bg-white border-slate-200 hover:border-slate-300'
       )}
     >
       <StatusBadge status={status} />
       <p className="text-xl font-bold text-slate-800 leading-none">{count}</p>
+      <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">{description}</p>
     </button>
   )
 }

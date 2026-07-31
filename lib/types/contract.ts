@@ -138,6 +138,7 @@ export interface ContractDetailsPO {
   po_number: string
   supplier_name: string
   scheduled_date: string
+  last_modified: string
 }
 
 export interface ContractDetailsPOGroup {

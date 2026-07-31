@@ -1,7 +1,7 @@
 import Image from 'next/image'
 
 const FULL_LOGO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/company-logos/logo_ah.png`
-const BG_IMAGE = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=80'
+const BG_IMAGE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/background/image-cover.jpg` //'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=80'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

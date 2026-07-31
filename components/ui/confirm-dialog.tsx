@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +50,11 @@ export function ConfirmDialog({
     default: 'bg-[#6692C5] hover:bg-[#4F7CB3] text-white',
   }[variant]
 
-  return (
+  // Portal to <body> — a fixed-position modal nested inside an ancestor that
+  // establishes its own stacking context (e.g. an `isolate` wrapper elsewhere
+  // in the tree) gets its whole z-index trapped inside that context, so it
+  // can render below sibling UI like the app header instead of on top of it.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -108,6 +113,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

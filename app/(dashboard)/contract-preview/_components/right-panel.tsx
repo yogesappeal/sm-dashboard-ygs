@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, CheckSquare, X, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, X, AlertTriangle } from 'lucide-react'
 import { cn, formatDate, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PermissionGuard } from '@/components/shared/permission-guard'
@@ -15,9 +15,12 @@ import { useContractId } from './contract-id-context'
 
 // ─── Scope Navigator ──────────────────────────────────────────────────────────
 
-function tradeDot(status: string) {
-  if (status === 'Urgent') return 'bg-red-400'
-  if (status === 'Completed') return 'bg-green-400'
+// No planned PO date → no dot at all. Overdue → red. Otherwise yellow/green
+// is still TBD (placeholder yellow for now, pending final rule).
+function tradeDot(plannedPoDate: string | null | undefined) {
+  if (!plannedPoDate) return null
+  const overdue = new Date(toDateOnly(plannedPoDate) + 'T00:00:00').getTime() < new Date().setHours(0, 0, 0, 0)
+  if (overdue) return 'bg-red-400'
   return 'bg-yellow-400'
 }
 
@@ -377,24 +380,12 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
             {/* Quick-create buttons */}
             <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-t border-b border-slate-100">
               <PermissionGuard action="po:create">
-                <div className="flex gap-2">
-                  {allowedPoTypes.includes('supplier') && (
-                    <button
-                      onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
-                    >
-                      <Plus size={11} /> Supplier
-                    </button>
-                  )}
-                  {allowedPoTypes.includes('subcontractor') && (
-                    <button
-                      onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'subcontractor' })}
-                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
-                    >
-                      <Plus size={11} /> Subs
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: inlinePoType })}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
+                >
+                  <Plus size={11} /> Create PO
+                </button>
               </PermissionGuard>
               <button
                 onClick={toggleEditMode}
@@ -405,7 +396,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                     : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                 )}
               >
-                <CheckSquare size={11} /> {editMode ? 'Cancel' : 'Edit PO dates'}
+                <Calendar size={11} /> {editMode ? 'Cancel' : 'PO Plan Date'}
               </button>
             </div>
 
@@ -439,7 +430,9 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                           className="flex items-center justify-between py-2 pr-2 group border-b border-slate-50 last:border-0"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className={cn('w-2 h-2 rounded-full flex-shrink-0', tradeDot(building.status))} />
+                            {tradeDot(trade.planned_po_date) && (
+                              <span className={cn('w-2 h-2 rounded-full flex-shrink-0', tradeDot(trade.planned_po_date))} />
+                            )}
                             <span className={cn(
                               'text-xs font-medium truncate',
                               building.status === 'Urgent' ? 'text-red-500' : 'text-slate-600'
@@ -479,19 +472,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                                     {formatDate(trade.planned_po_date)}
                                   </span>
                                 )}
-                                <PermissionGuard action="po:create">
-                                  <button
-                                    onClick={() => onCanvas({
-                                      type: 'SHOW_CREATE_PO',
-                                      poType: inlinePoType,
-                                      buildingName: building.building_name,
-                                      tradeName: trade.trade_name,
-                                    })}
-                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-[#6692C5] hover:text-[#4F7CB3] font-medium whitespace-nowrap"
-                                  >
-                                    <Plus size={10} /> Create PO
-                                  </button>
-                                </PermissionGuard>
+                                {/* Per-trade Create PO temporarily hidden — creation now goes through the single scope-level button above */}
                               </>
                             )}
                           </div>
@@ -544,7 +525,7 @@ function POTracker({ pos, onCanvas }: {
   pos: PurchaseOrder[]
   onCanvas: (a: CanvasAction) => void
 }) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [statusFilter, setStatusFilter] = useState('')
 
   if (pos.length === 0) {
     return (
@@ -566,57 +547,60 @@ function POTracker({ pos, onCanvas }: {
     )
   }
 
-  const grouped = PO_STATUS_ORDER.reduce<Record<string, PurchaseOrder[]>>((acc, status) => {
-    const items = pos.filter(p => p.status === status)
-    if (items.length > 0) acc[status] = items
-    return acc
-  }, {})
+  const availableStatuses = PO_STATUS_ORDER.filter(status => pos.some(p => p.status === status))
+  const filteredPos = (statusFilter ? pos.filter(p => p.status === statusFilter) : pos)
+    .slice()
+    .sort((a, b) => new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime())
 
   return (
-    <div className="p-3 flex flex-col gap-5">
-      {Object.entries(grouped).map(([status, items]) => {
-        const isOpen = !collapsed[status]
-        return (
-          <div key={status}>
-            <button
-              onClick={() => setCollapsed(p => ({ ...p, [status]: !p[status] }))}
-              className="w-full flex items-center justify-between mb-2 px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
-            >
-              <span>{status} <span className="font-normal">({items.length})</span></span>
-              {isOpen
-                ? <ChevronDown size={13} className="text-slate-400" />
-                : <ChevronRight size={13} className="text-slate-400" />
-              }
-            </button>
-            {isOpen && (
-              <div className="flex flex-col gap-2.5">
-                {items.map(po => (
-                  <button
-                    key={po.id}
-                    onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left hover:border-slate-300 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-slate-800 truncate">{po.po_number}</p>
-                      <StatusBadge status={po.status} className="flex-shrink-0" />
-                    </div>
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* Fixed filter header — stays put while the list below scrolls */}
+      <div className="p-3 pb-0 flex-shrink-0">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">Status</p>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+        >
+          <option value="">All Status ({pos.length})</option>
+          {availableStatuses.map(status => (
+            <option key={status} value={status}>
+              {status} ({pos.filter(p => p.status === status).length})
+            </option>
+          ))}
+        </select>
+      </div>
 
-                    <div className="flex items-end justify-between gap-2 mt-2.5">
-                      <div className="min-w-0">
-                        <p className="text-[10px] text-slate-400">
-                          {po.type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
-                        </p>
-                        <p className="text-sm font-semibold text-slate-700 truncate mt-0.5">{po.supplier_name}</p>
-                      </div>
-                      <StatusBadge status={po.type} className="flex-shrink-0" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+      <div className="flex-1 overflow-y-auto p-3">
+        {filteredPos.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-6">No purchase orders with this status</p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {filteredPos.map(po => (
+              <button
+                key={po.id}
+                onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left hover:border-slate-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-slate-800 truncate">{po.po_number}</p>
+                  <StatusBadge status={po.status} className="flex-shrink-0" />
+                </div>
+
+                <div className="flex items-end justify-between gap-2 mt-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400">
+                      {po.type === 'supplier' ? 'Supplier Name' : 'Subcontractor Name'}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700 truncate mt-0.5">{po.supplier_name}</p>
+                  </div>
+                  <StatusBadge status={po.type} className="flex-shrink-0" />
+                </div>
+              </button>
+            ))}
           </div>
-        )
-      })}
+        )}
+      </div>
     </div>
   )
 }
@@ -671,7 +655,7 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
               onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
             >
-              <Plus size={12} /> New PO
+              <Plus size={12} /> Create PO
             </button>
           </PermissionGuard>
         </div>
@@ -706,9 +690,9 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {tab === 'scope' && (
-          <>
+          <div className="flex-1 overflow-y-auto">
             {isLoading && (
               <div className="flex items-center justify-center gap-2 p-8 text-slate-400">
                 <Loader2 size={14} className="animate-spin" />
@@ -733,7 +717,7 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
             {scopeData && (
               <ScopeNavigator scopeData={scopeData} onCanvas={onCanvas} contractId={contractId} plannedStart={plannedStart} />
             )}
-          </>
+          </div>
         )}
         {tab === 'po' && <POTracker pos={pos} onCanvas={onCanvas} />}
       </div>

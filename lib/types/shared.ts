@@ -8,7 +8,7 @@ export interface DashboardMetrics {
 }
 
 export interface DashboardResponseItem {
-  users: {
+  users?: {
     reference_id: string
     first_name: string
     last_name: string
@@ -21,8 +21,11 @@ export interface DashboardResponseItem {
   metrics: Metrics[]
 }
 
+// dashboard-metrics wraps `response` in an array; ops-metrics returns it as a
+// single object (confirmed via a real ops-metrics response) — normalizeMetrics
+// in lib/api/dashboard.ts handles both.
 export interface DashboardResponse {
-  response: DashboardResponseItem[]
+  response: DashboardResponseItem | DashboardResponseItem[]
 }
 
 export interface Pagination {

@@ -9,9 +9,19 @@ export interface POData {
   total_count?: number
 }
 
+// Status counts returned alongside the paginated list itself by
+// get-po-paginated — no separate summary endpoint.
+export interface PoStatusMetrics {
+  confirmed: number
+  rescheduled: number
+  completed: number
+  rejected: number
+}
+
 export interface PurchaseOrderList {
   data: POData[]
   pagination: Pagination
+  metrics?: PoStatusMetrics
 }
 
 export interface POSummary {
