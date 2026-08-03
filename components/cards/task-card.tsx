@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Star, CalendarDays, Loader2, ArrowUpRight, User, ChevronRight } from 'lucide-react'
+import { Flag, CalendarDays, Loader2, ArrowUpRight, ChevronRight } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateTaskStatus, updateTaskPriority, updateExistingTask } from '@/lib/api'
 import { TaskQuickAdd } from '@/components/cards/task-quick-add'
@@ -143,18 +143,12 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
         )}
       </div>
 
-      {/* Meta: due date + assignee (display only) */}
+      {/* Meta: due date (display only) */}
       <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
         {task.due_date && (
           <span className="flex items-center gap-1 text-xs text-slate-400">
             <CalendarDays size={10} />
             {formatDate(task.due_date)}
-          </span>
-        )}
-        {task.assignee && (
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <User size={10} />
-            {task.assignee}
           </span>
         )}
       </div>
@@ -254,7 +248,7 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
     <>
       {/* ── Main task row ──────────────────────────────────────── */}
       <div className={cn(
-        'flex items-start gap-3 px-4 py-3 bg-white border-b border-slate-100 last:border-0 hover:bg-slate-50/40 transition-colors group',
+        'flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-100 last:border-0 hover:bg-slate-50/40 transition-colors group',
         isCompleted && 'opacity-60',
         isExpanded && 'border-b-0',
       )}>
@@ -264,7 +258,7 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
           onClick={() => statusMutation.mutate(STATUS_CYCLE[optimisticStatus] ?? 'pending')}
           disabled={statusMutation.isPending}
           className={cn(
-            'mt-0.5 w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors',
+            'w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors',
             isCompleted              ? 'bg-[#6692C5] border-[#6692C5]'
             : optimisticStatus === 'in_progress' ? 'border-blue-400 bg-blue-50'
             : 'border-slate-300 hover:border-[#6692C5]',
@@ -281,8 +275,8 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
           ) : null}
         </button>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Content — title + metadata all on a single line, title gets the bulk of the width */}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
           {/* Title */}
           {editingField === 'title' ? (
             <input
@@ -291,14 +285,14 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
               onChange={(e) => setEditValues((v) => ({ ...v, title: e.target.value }))}
               onBlur={() => saveField('title')}
               onKeyDown={(e) => handleKey(e, 'title')}
-              className="w-full text-sm font-medium text-slate-800 bg-white border border-[#6692C5] rounded-md px-2 py-0.5 outline-none ring-2 ring-[#6692C5]/20"
+              className="min-w-0 flex-shrink text-sm font-medium text-slate-800 bg-white border border-[#6692C5] rounded-md px-2 py-0.5 outline-none ring-2 ring-[#6692C5]/20"
             />
           ) : (
             <p
               onClick={() => setEditingField('title')}
               title="Click to rename"
               className={cn(
-                'text-sm text-slate-800 font-medium truncate cursor-text hover:text-[#6692C5] transition-colors w-fit max-w-full',
+                'min-w-0 flex-shrink text-sm text-slate-800 font-medium truncate cursor-text hover:text-[#6692C5] transition-colors',
                 isCompleted && 'line-through text-slate-400',
                 patchMutation.isPending && 'opacity-60',
               )}
@@ -307,10 +301,10 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
             </p>
           )}
 
-          {/* Metadata chips */}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          {/* Metadata chips — compact, fixed-width, stay on the same line as the title */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             {task.project_name && (
-              <span className="text-xs text-slate-400 truncate max-w-[100px]">{task.project_name}</span>
+              <span className="hidden md:inline text-xs text-slate-400 truncate max-w-[100px]">{task.project_name}</span>
             )}
 
             {/* Category */}
@@ -325,11 +319,11 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
                 className="text-xs px-2 py-0.5 border border-[#6692C5] rounded-full outline-none w-24 text-[#6692C5] ring-1 ring-[#6692C5]/20"
               />
             ) : editValues.category ? (
-              <button onClick={() => setEditingField('category')} className="text-xs px-2 py-0.5 rounded-full bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20 hover:border-[#6692C5] transition-colors">
+              <button onClick={() => setEditingField('category')} className="text-xs px-2 py-0.5 rounded-full bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20 hover:border-[#6692C5] transition-colors whitespace-nowrap">
                 {editValues.category}
               </button>
             ) : (
-              <button onClick={() => setEditingField('category')} className="text-xs text-slate-300 hover:text-[#6692C5] transition-colors opacity-0 group-hover:opacity-100">
+              <button onClick={() => setEditingField('category')} className="text-xs text-slate-300 hover:text-[#6692C5] transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap">
                 + Category
               </button>
             )}
@@ -346,37 +340,14 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
                 className="text-xs border border-[#6692C5] rounded-md px-1.5 py-0.5 outline-none text-slate-700 ring-1 ring-[#6692C5]/20"
               />
             ) : editValues.due_date ? (
-              <button onClick={() => setEditingField('due_date')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#6692C5] transition-colors">
+              <button onClick={() => setEditingField('due_date')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#6692C5] transition-colors whitespace-nowrap">
                 <CalendarDays size={11} />
                 {formatDate(editValues.due_date)}
               </button>
             ) : (
-              <button onClick={() => setEditingField('due_date')} className="flex items-center gap-1 text-xs text-slate-300 hover:text-[#6692C5] transition-colors opacity-0 group-hover:opacity-100">
+              <button onClick={() => setEditingField('due_date')} className="hidden sm:flex items-center gap-1 text-xs text-slate-300 hover:text-[#6692C5] transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap">
                 <CalendarDays size={11} />
                 Due date
-              </button>
-            )}
-
-            {/* Assignee */}
-            {editingField === 'assignee' ? (
-              <input
-                ref={fieldInputRef}
-                value={editValues.assignee}
-                onChange={(e) => setEditValues((v) => ({ ...v, assignee: e.target.value }))}
-                onBlur={() => saveField('assignee')}
-                onKeyDown={(e) => handleKey(e, 'assignee')}
-                placeholder="Assignee…"
-                className="text-xs border border-[#6692C5] rounded-md px-1.5 py-0.5 outline-none text-slate-700 ring-1 ring-[#6692C5]/20 w-28"
-              />
-            ) : editValues.assignee ? (
-              <button onClick={() => setEditingField('assignee')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#6692C5] transition-colors">
-                <User size={11} />
-                {editValues.assignee}
-              </button>
-            ) : (
-              <button onClick={() => setEditingField('assignee')} className="flex items-center gap-1 text-xs text-slate-300 hover:text-[#6692C5] transition-colors opacity-0 group-hover:opacity-100">
-                <User size={11} />
-                Assignee
               </button>
             )}
 
@@ -384,7 +355,7 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
             {hasSubtasks && !isExpanded && (
               <button
                 onClick={() => setIsExpanded(true)}
-                className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#6692C5] transition-colors"
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#6692C5] transition-colors whitespace-nowrap"
               >
                 <span className="w-3.5 h-3.5 rounded-sm bg-slate-100 flex items-center justify-center text-[10px] font-semibold">
                   {subtasks.length}
@@ -396,15 +367,15 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
-          {/* Priority star */}
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {/* Priority flag */}
           <button
             onClick={() => priorityMutation.mutate(!optimisticPriority)}
             disabled={priorityMutation.isPending}
             title={optimisticPriority ? 'Remove priority' : 'Mark as priority'}
             className={cn('p-1 rounded hover:bg-slate-100 transition-colors', !optimisticPriority && 'opacity-0 group-hover:opacity-100')}
           >
-            <Star size={14} className={cn(optimisticPriority ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300')} />
+            <Flag size={14} className={cn(optimisticPriority ? 'fill-red-500 text-red-500' : 'text-slate-300')} />
           </button>
 
           {/* Expand subtasks */}

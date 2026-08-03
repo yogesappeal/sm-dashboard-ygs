@@ -54,9 +54,11 @@ export const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   dueDate: z.string().min(1, 'Due date is required'),
-  assignee: z.string().min(1, 'Assignee is required'),
+  assignee: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
   status: z.string().min(1, 'Status is required'),
+  priority: z.boolean().optional(),
+  projectId: z.string().optional(),
 })
 
 export function validatePOSupplierForm(data: Record<string, unknown>): {

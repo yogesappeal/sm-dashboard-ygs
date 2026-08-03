@@ -4,13 +4,13 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2, Star, CalendarDays, User, Tag, Briefcase } from 'lucide-react'
-import { insertNewTask, updateExistingTask, searchContract } from '@/lib/api'
+import { X, Loader2, Flag, CalendarDays, Tag, Briefcase } from 'lucide-react'
+import { insertNewTask, updateExistingTask, getDropdownContractScope } from '@/lib/api'
 import { taskSchema } from '@/lib/utils/validation'
 import { buildTaskRequestBody } from '@/lib/utils/tasks'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import type { TaskModel } from '@/lib/types'
 import type { z } from 'zod'
 
@@ -43,6 +43,8 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
       assignee: task?.assignee ?? '',
       category: task?.category ?? '',
       status: task?.status ?? 'pending',
+      priority: task?.priority ?? false,
+      projectId: task?.project_id ?? '',
     },
   })
 
@@ -55,27 +57,33 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
         assignee: task.assignee ?? '',
         category: task.category ?? '',
         status: task.status ?? 'pending',
+        priority: task.priority ?? false,
+        projectId: task.project_id ?? '',
       })
     }
   }, [task, reset])
 
   const currentStatus = watch('status')
-  const currentPriority = watch('priority' as keyof TaskForm)
+  const currentPriority = watch('priority')
 
-  const { data: contractsData } = useQuery({
-    queryKey: ['contracts-search', ''],
-    queryFn: () => searchContract(token, ''),
+  // Dropdown for the Project field — same source used for the PO/scope
+  // contract pickers. searchContract is a text-search endpoint (needs a
+  // typed query) and returns nothing for an empty string, which is why this
+  // dropdown used to never render any options.
+  const { data: contracts = [] } = useQuery({
+    queryKey: ['contracts-dropdown-scope'],
+    queryFn: () => getDropdownContractScope(token),
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   })
-  const contracts = contractsData?.data ?? []
 
   const mutation = useMutation({
     mutationFn: (data: TaskForm) => {
       const body = buildTaskRequestBody({
         ...data,
         id: task?.id,
-        project_id: task?.project_id,
+        due_date: data.dueDate,
+        project_id: data.projectId || undefined,
       })
       return isEditing
         ? updateExistingTask(token, { task_id: task!.id, ...body })
@@ -119,15 +127,19 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
           onSubmit={handleSubmit((d) => mutation.mutateAsync(d))}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
         >
-          {/* Title — prominent */}
+          {/* Hidden — assignee no longer editable from this form, but its
+              existing value must still round-trip on save so editing a task
+              doesn't silently wipe out who it's assigned to. */}
+          <input type="hidden" {...register('assignee')} />
+
+          {/* Title */}
           <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              Title <span className="text-red-500">*</span>
+            </label>
             <input
               {...register('title')}
-              className={cn(
-                'w-full text-base font-medium text-slate-800 placeholder:text-slate-300',
-                'border-0 border-b-2 rounded-none px-0 py-2 outline-none bg-transparent transition-colors',
-                errors.title ? 'border-red-300' : 'border-slate-100 focus:border-[#6692C5]'
-              )}
+              className={fieldCls(!!errors.title)}
               placeholder="Task title…"
               autoFocus={!isEditing}
             />
@@ -136,55 +148,46 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
 
           {/* Description */}
           <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Description</label>
             <textarea
               {...register('description')}
               rows={3}
-              className="w-full text-sm text-slate-600 placeholder:text-slate-300 border-0 resize-none outline-none bg-transparent"
+              className={cn(fieldCls(false), 'resize-none')}
               placeholder="Add description…"
             />
           </div>
 
           <div className="border-t border-slate-100 pt-4 space-y-3">
             {/* Status */}
-            <FieldRow icon={<span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', {
-              'bg-slate-400': currentStatus === 'pending',
-              'bg-blue-400': currentStatus === 'in_progress',
-              'bg-green-400': currentStatus === 'completed',
-            })} />} label="Status">
-              <select
-                {...register('status')}
-                className="text-sm text-slate-700 border-0 outline-none bg-transparent cursor-pointer"
-              >
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Status</label>
+              <div className="flex flex-wrap gap-1.5">
                 {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setValue('status', o.value)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors',
+                      currentStatus === o.value
+                        ? cn(o.color, 'border-transparent')
+                        : 'border-slate-200 text-slate-400 hover:border-slate-300'
+                    )}
+                  >
+                    {o.label}
+                  </button>
                 ))}
-              </select>
-            </FieldRow>
+              </div>
+            </div>
 
             {/* Due Date */}
             <FieldRow icon={<CalendarDays size={15} className="text-slate-400 flex-shrink-0" />} label="Due Date">
               <input
                 {...register('dueDate')}
                 type="date"
-                className={cn(
-                  'text-sm text-slate-700 border-0 outline-none bg-transparent cursor-pointer',
-                  errors.dueDate && 'text-red-500'
-                )}
+                className={cn(fieldCls(!!errors.dueDate), 'w-auto cursor-pointer')}
               />
               {errors.dueDate && <p className="text-xs text-red-500">{errors.dueDate.message}</p>}
-            </FieldRow>
-
-            {/* Assignee */}
-            <FieldRow icon={<User size={15} className="text-slate-400 flex-shrink-0" />} label="Assignee">
-              <input
-                {...register('assignee')}
-                className={cn(
-                  'flex-1 text-sm text-slate-700 border-0 outline-none bg-transparent placeholder:text-slate-300',
-                  errors.assignee && 'placeholder:text-red-300'
-                )}
-                placeholder="Name or email"
-              />
-              {errors.assignee && <p className="text-xs text-red-500">{errors.assignee.message}</p>}
             </FieldRow>
 
             {/* Category */}
@@ -200,21 +203,17 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
               {errors.category && <p className="text-xs text-red-500">{errors.category.message}</p>}
             </FieldRow>
 
-            {/* Priority toggle */}
-            <FieldRow icon={<Star size={15} className="text-slate-400 flex-shrink-0" />} label="Priority">
+            {/* Priority flag */}
+            <FieldRow icon={<Flag size={15} className={currentPriority ? 'text-red-500 fill-red-500' : 'text-slate-400 flex-shrink-0'} />} label="Priority">
               <button
                 type="button"
-                onClick={() => setValue('priority' as keyof TaskForm, !currentPriority as never)}
+                onClick={() => setValue('priority', !currentPriority)}
                 className={cn(
                   'flex items-center gap-1.5 text-sm transition-colors',
-                  currentPriority ? 'text-yellow-500' : 'text-slate-400'
+                  currentPriority ? 'text-red-500 font-medium' : 'text-slate-400'
                 )}
               >
-                <Star
-                  size={14}
-                  className={currentPriority ? 'fill-yellow-400 text-yellow-400' : ''}
-                />
-                {currentPriority ? 'High priority' : 'No priority'}
+                {currentPriority ? 'Flagged as priority' : 'Flag as priority'}
               </button>
             </FieldRow>
 
@@ -222,17 +221,28 @@ export function TaskSlideOver({ token, task, onClose, queryKey }: TaskSlideOverP
             {contracts.length > 0 && (
               <FieldRow icon={<Briefcase size={15} className="text-slate-400 flex-shrink-0" />} label="Project">
                 <select
-                  defaultValue={task?.project_id ?? ''}
+                  {...register('projectId')}
                   className="flex-1 text-sm text-slate-700 border-0 outline-none bg-transparent cursor-pointer"
                 >
                   <option value="">No project</option>
                   {contracts.map((c) => (
-                    <option key={c.id} value={c.id}>{c.project_name}</option>
+                    <option key={c.id} value={c.id}>{c.dropdown_label}</option>
                   ))}
                 </select>
               </FieldRow>
             )}
           </div>
+
+          {/* Task meta — created/updated/due info, only meaningful once the task exists */}
+          {isEditing && task && (
+            <div className="border-t border-slate-100 pt-3 text-xs text-slate-400">
+              {[
+                task.due_date && `Due ${formatDate(task.due_date)}`,
+                `Created ${formatDate(task.created_at)}`,
+                task.updated_at && task.updated_at !== task.created_at && `Updated ${formatDate(task.updated_at)}`,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          )}
 
           {mutation.isError && (
             <p className="text-xs text-red-500 text-center">
@@ -280,5 +290,13 @@ function FieldRow({
       </div>
       <div className="flex-1 flex items-center flex-wrap gap-1">{children}</div>
     </div>
+  )
+}
+
+function fieldCls(hasError: boolean) {
+  return cn(
+    'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
+    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

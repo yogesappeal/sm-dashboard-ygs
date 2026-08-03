@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CheckSquare, Star } from 'lucide-react'
+import { CheckSquare, Flag } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getAllTasks } from '@/lib/api'
 import { groupTasksByStatus, buildSubtaskMap } from '@/lib/utils/tasks'
@@ -105,11 +105,11 @@ export default function TasksPage() {
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
             priorityOnly
-              ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
+              ? 'bg-red-50 border-red-200 text-red-700'
               : 'border-slate-200 text-slate-500 hover:border-slate-300'
           )}
         >
-          <Star size={12} className={priorityOnly ? 'fill-yellow-400 text-yellow-400' : ''} />
+          <Flag size={12} className={priorityOnly ? 'fill-red-500 text-red-500' : ''} />
           Priority only
         </button>
       </div>
