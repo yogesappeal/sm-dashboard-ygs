@@ -22,6 +22,8 @@ function mapContract(raw: ContractDetailsRaw['contract'], project: ContractDetai
     state: raw.state,
     builder: raw.builder,
     contractValue: raw.total_contract_value,
+    remainingBalance: raw.remaining_balance,
+    adsBalance: raw.ads_balance,
     status: raw.project_status,
     pif: raw.pif,
     notes: '',

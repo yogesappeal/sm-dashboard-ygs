@@ -31,7 +31,8 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
   // TEMP: testing a trade-first input flow — see scope-items-builder.tsx.
   const [buildings, setBuildings] = useState<string[]>([])
   const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
-  const [itemsError, setItemsError] = useState<string | null>(null)
+  const [buildingsError, setBuildingsError] = useState<string | null>(null)
+  const [tradesError, setTradesError] = useState<string | null>(null)
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
     defaultValues: { type: 'supplier', notes: '', contractId: '' },
@@ -66,20 +67,22 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
   })
 
   function validateItems() {
+    let valid = true
+    setBuildingsError(null)
+    setTradesError(null)
+
     if (buildings.length === 0) {
-      setItemsError('At least one building is required')
-      return false
+      setBuildingsError('At least one building is required')
+      valid = false
     }
     if (trades.length === 0) {
-      setItemsError('At least one trade is required')
-      return false
+      setTradesError('At least one trade is required')
+      valid = false
+    } else if (trades.some((t) => t.buildingNames.length === 0)) {
+      setTradesError('Every trade must have at least one building assigned')
+      valid = false
     }
-    if (trades.some((t) => t.buildingNames.length === 0)) {
-      setItemsError('Every trade must have at least one building assigned')
-      return false
-    }
-    setItemsError(null)
-    return true
+    return valid
   }
 
   const onSubmit = (data: ScopeForm) => {
@@ -110,7 +113,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
         >
-          <Field label="Scope Name *" error={errors.scopeName?.message}>
+          <Field label="Scope Name" required error={errors.scopeName?.message}>
             <input
               {...register('scopeName', { required: 'Scope name is required' })}
               className={inputCls(!!errors.scopeName)}
@@ -119,7 +122,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             />
           </Field>
 
-          <Field label="Contract *" error={errors.contractId?.message}>
+          <Field label="Contract" required error={errors.contractId?.message}>
             <ContractSearchSelect
               value={contractId}
               onChange={(id) => setValue('contractId', id, { shouldValidate: true })}
@@ -129,7 +132,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             />
           </Field>
 
-          <Field label="Type *" error={errors.type?.message}>
+          <Field label="Type" required error={errors.type?.message}>
             <select
               {...register('type', { required: 'Type is required' })}
               className={inputCls(!!errors.type)}
@@ -141,14 +144,17 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           </Field>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 block mb-2">Scope Items *</label>
+            <label className="text-xs font-medium text-slate-600 block mb-2">
+              Scope Items <span className="text-red-500">*</span>
+            </label>
             <ScopeItemsBuilder
               buildings={buildings}
               trades={trades}
-              onBuildingsChange={(b) => { setBuildings(b); setItemsError(null) }}
-              onTradesChange={(t) => { setTrades(t); setItemsError(null) }}
+              onBuildingsChange={(b) => { setBuildings(b); setBuildingsError(null) }}
+              onTradesChange={(t) => { setTrades(t); setTradesError(null) }}
+              buildingsError={buildingsError ?? undefined}
+              tradesError={tradesError ?? undefined}
             />
-            {itemsError && <p className="text-xs text-red-500 mt-1.5">{itemsError}</p>}
           </div>
 
           <Field label="Notes" error={undefined}>
@@ -295,10 +301,12 @@ function ContractOptionGroup({ label, contracts, value, onSelect }: {
   )
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-slate-600 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       {children}
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>

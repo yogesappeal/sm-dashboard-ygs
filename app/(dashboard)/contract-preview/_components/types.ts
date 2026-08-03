@@ -8,6 +8,8 @@ export interface Contract {
   state: string
   builder: string
   contractValue: number
+  remainingBalance: number
+  adsBalance: number
   status: string
   pif: string
   notes: string

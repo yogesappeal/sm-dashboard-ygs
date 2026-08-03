@@ -123,6 +123,8 @@ export interface ContractDetailsContract {
   airtable_record_id: string
   client_email_address: string
   total_contract_value: number
+  remaining_balance: number
+  ads_balance: number
   client_contact_mobile: string
   date_deposit_received: string
   primary_contact_record_id: string

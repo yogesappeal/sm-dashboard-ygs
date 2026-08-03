@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Bell, Moon, Globe, Shield, ChevronRight } from 'lucide-react'
+import { Bell, Shield, ChevronRight } from 'lucide-react'
+import { ChangePasswordModal } from '@/components/forms/change-password-modal'
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -48,7 +49,7 @@ function SettingRow({
 export default function SettingsPage() {
   const [notifications, setNotifications] = useState(true)
   const [emailAlerts, setEmailAlerts] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -77,29 +78,6 @@ export default function SettingsPage() {
         />
       </div>
 
-      {/* Appearance */}
-      <div className="bg-white rounded-2xl border border-slate-100 px-6">
-        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide pt-5 pb-2">
-          Appearance
-        </h3>
-        <SettingRow
-          icon={Moon}
-          label="Dark Mode"
-          description="Switch to dark theme (coming soon)"
-          action={<Toggle enabled={darkMode} onChange={setDarkMode} />}
-        />
-        <SettingRow
-          icon={Globe}
-          label="Language"
-          description="English (Australia)"
-          action={
-            <button className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition-colors">
-              Change <ChevronRight size={14} />
-            </button>
-          }
-        />
-      </div>
-
       {/* Security */}
       <div className="bg-white rounded-2xl border border-slate-100 px-6">
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide pt-5 pb-2">
@@ -110,12 +88,19 @@ export default function SettingsPage() {
           label="Change Password"
           description="Update your account password"
           action={
-            <button className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition-colors">
+            <button
+              onClick={() => setShowChangePassword(true)}
+              className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+            >
               Update <ChevronRight size={14} />
             </button>
           }
         />
       </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </div>
   )
 }

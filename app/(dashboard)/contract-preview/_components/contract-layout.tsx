@@ -224,16 +224,12 @@ function ProjectSwitcher({ contract, projects, currentProjectId }: {
   )
 }
 
-function TopBar({ contract, pos, projects, currentProjectId, projectId }: {
+function TopBar({ contract, projects, currentProjectId, projectId }: {
   contract: Contract
-  pos: PurchaseOrder[]
   projects: Project[]
   currentProjectId?: string
   projectId?: string
 }) {
-  const totalAmount = pos.reduce((sum, p) => sum + (p.amount ?? 0), 0)
-  const remaining = contract.contractValue - totalAmount
-
   const plannedStart = contract.plannedStart ?? ''
   const daysOpen = plannedStart ? daysSince(plannedStart) : null
 
@@ -264,10 +260,10 @@ function TopBar({ contract, pos, projects, currentProjectId, projectId }: {
 
       <div className="hidden xl:flex items-center gap-2 flex-shrink-0 ml-2 pl-3 border-l border-slate-200">
         <span className="px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 text-xs font-medium whitespace-nowrap">
-          Remaining SUM: <span className="font-bold">${remaining.toLocaleString()}</span>
+          Remaining SUM: <span className="font-bold">${contract.remainingBalance.toLocaleString()}</span>
         </span>
         <span className="px-3 py-1.5 rounded-full bg-blue-50 text-[#6692C5] text-xs font-medium whitespace-nowrap">
-          In ADS: <span className="font-bold">${contract.contractValue.toLocaleString()}</span>
+          In ADS: <span className="font-bold">${contract.adsBalance.toLocaleString()}</span>
         </span>
       </div>
     </div>
@@ -289,7 +285,7 @@ export function ContractLayout({ contract, crew, pod, scopes, pos, projects, cur
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Top contract bar */}
-      <TopBar contract={contract} pos={pos} projects={projects} currentProjectId={currentProjectId} projectId={projectId ?? undefined} />
+      <TopBar contract={contract} projects={projects} currentProjectId={currentProjectId} projectId={projectId ?? undefined} />
 
       {/* 3-panel row */}
       {/* isolate: keeps the z-10 collapse handles below from bleeding past

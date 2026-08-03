@@ -16,9 +16,11 @@ interface ScopeItemsBuilderProps {
   trades: ScopeTradeDraft[]
   onBuildingsChange: (buildings: string[]) => void
   onTradesChange: (trades: ScopeTradeDraft[]) => void
+  buildingsError?: string
+  tradesError?: string
 }
 
-export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTradesChange }: ScopeItemsBuilderProps) {
+export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTradesChange, buildingsError, tradesError }: ScopeItemsBuilderProps) {
   function addBuilding(name: string) {
     const trimmed = name.trim()
     if (!trimmed) return
@@ -69,6 +71,7 @@ export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTrad
             ))}
           </div>
         )}
+        {buildingsError && <p className="text-xs text-red-500 mt-1.5">{buildingsError}</p>}
       </div>
 
       <div>
@@ -88,6 +91,7 @@ export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTrad
             ))}
           </div>
         )}
+        {tradesError && <p className="text-xs text-red-500 mt-1.5">{tradesError}</p>}
       </div>
     </div>
   )
