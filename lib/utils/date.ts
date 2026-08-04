@@ -11,6 +11,14 @@ export function formatDateTime(dateString: string): string {
   return formatDate(dateString, 'dd MMM yyyy, HH:mm')
 }
 
+/** Convert an ISO timestamp to the yyyy-MM-dd shape <input type="date"> requires. */
+export function toDateInputValue(dateString?: string | null): string {
+  if (!dateString) return ''
+  const date = parseISO(dateString)
+  if (!isValid(date)) return ''
+  return format(date, 'yyyy-MM-dd')
+}
+
 export function relativeTime(dateString: string): string {
   if (!dateString) return ''
   const date = parseISO(dateString)

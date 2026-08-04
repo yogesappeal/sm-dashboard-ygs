@@ -24,9 +24,9 @@ interface TaskCreateEditModalProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
+  { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'done', label: 'Done' },
 ]
 
 export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCreateEditModalProps) {
@@ -42,7 +42,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
       dueDate: task?.due_date ?? '',
       assignee: task?.assignee ?? '',
       category: task?.category ?? '',
-      status: task?.status ?? 'pending',
+      status: task?.status ?? 'open',
     },
   })
 
@@ -54,7 +54,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
         dueDate: task.due_date ?? '',
         assignee: task.assignee ?? '',
         category: task.category ?? '',
-        status: task.status ?? 'pending',
+        status: task.status ?? 'open',
       })
     }
   }, [task, reset])

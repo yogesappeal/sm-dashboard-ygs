@@ -111,82 +111,86 @@ export default function SuppliersPage() {
   const isTableLoading = isLoading || isFetching
 
   return (
-    <div className="flex flex-col min-h-full">
-      <PageHeader
-        title="Suppliers"
-        description="Manage suppliers and subcontractors"
-        action={
-          <PermissionGuard action="supplier:create">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              + Add Supplier
-            </button>
-          </PermissionGuard>
-        }
-      />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Suppliers"
+          description="Manage suppliers and subcontractors"
+          action={
+            <PermissionGuard action="supplier:create">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                + Add Supplier
+              </button>
+            </PermissionGuard>
+          }
+        />
 
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search name, code, company…"
-            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
-          />
-          {searchInput && (
-            <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-              <X size={14} />
-            </button>
-          )}
-        </div>
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search name, code, company…"
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
+            />
+            {searchInput && (
+              <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-        {/* Type filter */}
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => handleTypeChange(f.value)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                typeFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+          {/* Type filter */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => handleTypeChange(f.value)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  typeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Active/Inactive filter */}
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {ACTIVE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => handleActiveChange(f.value)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                activeFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+          {/* Active/Inactive filter */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            {ACTIVE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => handleActiveChange(f.value)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  activeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
-        <SupplierTableHeader sortDir={sortDir} onSort={handleSort} />
+      {/* Table — header and pagination stay put, only the row list scrolls */}
+      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-0', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
+        <div className="flex-shrink-0">
+          <SupplierTableHeader sortDir={sortDir} onSort={handleSort} />
+        </div>
 
-        <div className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           {isTableLoading ? (
             Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
           ) : suppliers.length === 0 ? (
@@ -204,12 +208,14 @@ export default function SuppliersPage() {
 
         {/* Pagination */}
         {pagination && (
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
-            onPageChange={setCurrentPage}
-            onRefresh={handleRefresh}
-          />
+          <div className="flex-shrink-0">
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+              onPageChange={setCurrentPage}
+              onRefresh={handleRefresh}
+            />
+          </div>
         )}
       </div>
 

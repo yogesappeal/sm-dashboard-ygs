@@ -7,7 +7,9 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import { useAppStore, useAuthStore } from '@/lib/store'
+import type { UserRole } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
+import { hasPermission } from '@/lib/permissions'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -33,15 +35,18 @@ interface NavItem {
   icon: React.ElementType
 }
 
-const navItems: NavItem[] = [
-  { label: 'Home', href: '/', icon: LayoutDashboard },
-  { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
-  { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
-  { label: 'Scope', href: '/scope', icon: FileText },
-  ...(FEATURE_TASK ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
-]
+function getNavItems(role: UserRole): NavItem[] {
+  return [
+    { label: 'Home', href: '/', icon: LayoutDashboard },
+    { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
+    { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
+    { label: 'Scope', href: '/scope', icon: FileText },
+    ...(FEATURE_TASK && hasPermission(role, 'task:view') ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
+  ]
+}
 
-function NavLinks({ pathname, collapsed, onLinkClick }: { pathname: string; collapsed?: boolean; onLinkClick?: () => void }) {
+function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string; role: UserRole; collapsed?: boolean; onLinkClick?: () => void }) {
+  const navItems = getNavItems(role)
   return (
     <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
       {navItems.map((item) => {
@@ -220,7 +225,7 @@ export function Sidebar() {
             <X size={18} />
           </button>
         </div>
-        <NavLinks pathname={pathname} onLinkClick={closeMobile} />
+        <NavLinks pathname={pathname} role={role} onLinkClick={closeMobile} />
         <UserFooter user={user} role={role} />
       </aside>
 
@@ -254,7 +259,7 @@ export function Sidebar() {
           </button>
         )}
 
-        <NavLinks pathname={pathname} collapsed={!sidebarOpen} />
+        <NavLinks pathname={pathname} role={role} collapsed={!sidebarOpen} />
         <UserFooter user={user} role={role} collapsed={!sidebarOpen} />
       </aside>
     </>

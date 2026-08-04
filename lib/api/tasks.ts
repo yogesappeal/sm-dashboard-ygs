@@ -1,11 +1,12 @@
 import { api } from './fetcher'
-import type { TaskModel, TasksResponse } from '../types'
+import type { TaskModel, TasksResponse, TaskDetailResponse, TaskHistoryEntry, TaskHistoryResponse } from '../types'
 
 interface GetTasksParams {
   assignee?: string
   status?: string
   category?: string
   projectId?: string
+  onlyParent?: boolean
 }
 
 export async function getAllTasks(token: string, params: GetTasksParams = {}) {
@@ -13,7 +14,8 @@ export async function getAllTasks(token: string, params: GetTasksParams = {}) {
     ...(params.assignee ? { assignee: params.assignee } : {}),
     ...(params.status ? { status: params.status } : {}),
     ...(params.category ? { category: params.category } : {}),
-    ...(params.projectId ? { project_id: params.projectId } : {}),
+    ...(params.projectId ? { project: params.projectId } : {}),
+    ...(params.onlyParent !== undefined ? { only_parent: String(params.onlyParent) } : {}),
   })
   const qs = q.toString()
   const res = await api.get<TasksResponse>(
@@ -52,4 +54,14 @@ export async function updateTaskStatus(
     task_id: taskId,
     status,
   })
+}
+
+export async function getTaskById(token: string, taskId: string): Promise<TaskModel> {
+  const res = await api.get<TaskDetailResponse>(`/functions/v1/tasks/${taskId}`, token)
+  return res.data
+}
+
+export async function getTaskHistory(token: string, taskId: string): Promise<TaskHistoryEntry[]> {
+  const res = await api.get<TaskHistoryResponse>(`/functions/v1/tasks/${taskId}/history`, token)
+  return res.data ?? []
 }

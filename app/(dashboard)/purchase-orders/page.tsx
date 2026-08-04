@@ -98,118 +98,120 @@ export default function PurchaseOrdersPage() {
   const isTableLoading = isLoading || isFetching
 
   return (
-    <div className="flex flex-col min-h-full">
-      <PageHeader
-        title="Purchase Order"
-        description="View and manage all purchase orders"
-        action={
-          <PermissionGuard action="po:create">
-            <div className="relative">
-              <button
-                onClick={() => setNewPOOpen((v) => !v)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                + Create PO
-                <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
-              </button>
-              {newPOOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setNewPOOpen(false)} />
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                    <button
-                      onClick={() => { router.push('/purchase-orders/supplier/new'); setNewPOOpen(false) }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      Supplier PO
-                    </button>
-                    <button
-                      onClick={() => { router.push('/purchase-orders/subcontractor/new'); setNewPOOpen(false) }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      Subcontractor PO
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </PermissionGuard>
-        }
-      />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Purchase Order"
+          description="View and manage all purchase orders"
+          action={
+            <PermissionGuard action="po:create">
+              <div className="relative">
+                <button
+                  onClick={() => setNewPOOpen((v) => !v)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  + Create PO
+                  <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
+                </button>
+                {newPOOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setNewPOOpen(false)} />
+                    <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                      <button
+                        onClick={() => { router.push('/purchase-orders/supplier/new'); setNewPOOpen(false) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Supplier PO
+                      </button>
+                      <button
+                        onClick={() => { router.push('/purchase-orders/subcontractor/new'); setNewPOOpen(false) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Subcontractor PO
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </PermissionGuard>
+          }
+        />
 
-      {/* Status summary */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {isTableLoading && !data ? (
-          Array.from({ length: SUMMARY_STATUSES.length }).map((_, i) => (
-            <Skeleton key={i} className="h-[124px] w-48 rounded-xl flex-shrink-0" />
-          ))
-        ) : (
-          SUMMARY_STATUSES.map(({ status, metricKey, description }) => (
-            <PoStatusTile
-              key={status}
-              status={status}
-              count={data?.metrics?.[metricKey] ?? 0}
-              description={description}
-              isActive={statusFilter === status}
-              onClick={() => handleFilterChange(typeFilter, statusFilter === status ? '' : status)}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Filters + Search */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        {/* Type filter */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => handleFilterChange(f.value, statusFilter)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                typeFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Status filter */}
-        <select
-          value={statusFilter}
-          onChange={(e) => handleFilterChange(typeFilter, e.target.value)}
-          className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
-        >
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
-
-        {/* Search */}
-        <div className="relative w-60 ml-auto">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search PO..."
-            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
-          />
-          {search && (
-            <button
-              onClick={() => handleSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X size={14} />
-            </button>
+        {/* Status summary */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+          {isTableLoading && !data ? (
+            Array.from({ length: SUMMARY_STATUSES.length }).map((_, i) => (
+              <Skeleton key={i} className="h-[124px] w-48 rounded-xl flex-shrink-0" />
+            ))
+          ) : (
+            SUMMARY_STATUSES.map(({ status, metricKey, description }) => (
+              <PoStatusTile
+                key={status}
+                status={status}
+                count={data?.metrics?.[metricKey] ?? 0}
+                description={description}
+                isActive={statusFilter === status}
+                onClick={() => handleFilterChange(typeFilter, statusFilter === status ? '' : status)}
+              />
+            ))
           )}
         </div>
+
+        {/* Filters + Search */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          {/* Type filter */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => handleFilterChange(f.value, statusFilter)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  typeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Status filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => handleFilterChange(typeFilter, e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+          >
+            {STATUS_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+
+          {/* Search */}
+          <div className="relative w-60 ml-auto">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search PO..."
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
+            />
+            {search && (
+              <button
+                onClick={() => handleSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 flex flex-col flex-1 overflow-hidden">
+      {/* Table — header and pagination stay put, only the row list scrolls */}
+      <div className="bg-white rounded-xl border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
         <POTableHeader />
         <div className="flex-1 overflow-y-auto">
           {isTableLoading ? (

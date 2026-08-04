@@ -91,9 +91,9 @@ export default function POSupplierDetailPage() {
     // -m-4 md:-m-6 bleeds the whole page out of <main>'s own padding (see
     // app/(dashboard)/layout.tsx) so the top bar sits flush against the
     // global header at rest, matching contract-preview's page shell —
-    // padding is reintroduced per-section below instead. The top bar scrolls
-    // away with the rest of the page (not sticky).
-    <div className="flex flex-col min-h-full relative -m-4 md:-m-6">
+    // padding is reintroduced per-section below instead. The top bar is
+    // fixed in place; only the body below it scrolls.
+    <div className="flex flex-col h-full overflow-hidden relative -m-4 md:-m-6">
       {responseMessage && (
         <div className="fixed bottom-4 right-4 z-20 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-lg">
           <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
@@ -101,8 +101,8 @@ export default function POSupplierDetailPage() {
         </div>
       )}
 
-      {/* Top bar */}
-      <div className="flex items-center gap-3 bg-slate-50 px-4 pt-4 pb-6 md:px-6 md:pt-6">
+      {/* Top bar — fixed, doesn't scroll */}
+      <div className="flex-shrink-0 flex items-center gap-3 bg-slate-50 px-4 pt-4 pb-6 md:px-6 md:pt-6">
         <button
           onClick={() => router.back()}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600"
@@ -167,7 +167,8 @@ export default function POSupplierDetailPage() {
         )}
       </div>
 
-      <div className="px-4 pb-4 md:px-6 md:pb-6">
+      {/* Body — the only part of this page that scrolls */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 md:px-6 md:pb-6">
       {isLoading ? (
         <PODetailSkeleton />
       ) : po ? (

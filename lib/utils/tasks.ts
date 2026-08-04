@@ -1,5 +1,7 @@
 import type { TaskModel } from '../types'
 
+export const TASK_CATEGORIES = ['General', 'Contract', 'PO', 'Scope', 'Supplier'] as const
+
 export function buildTaskRequestBody(task: Partial<TaskModel>): Record<string, unknown> {
   return {
     title: task.title,
@@ -8,7 +10,7 @@ export function buildTaskRequestBody(task: Partial<TaskModel>): Record<string, u
     priority: task.priority ?? false,
     assignee: task.assignee,
     category: task.category,
-    status: task.status ?? 'pending',
+    status: task.status ?? 'open',
     project_id: task.project_id,
     parent_task_id: task.parent_task_id ?? null,
   }

@@ -23,6 +23,34 @@ export interface TasksResponse {
   meta: { total: number }
 }
 
+export interface TaskDetailResponse {
+  success: boolean
+  message: string
+  data: TaskModel
+  meta: Record<string, unknown>
+}
+
+export interface TaskHistoryEntry {
+  id: string
+  task_id: string
+  action: string
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  actor_id: string | null
+  actor_type: string
+  note: string | null
+  created_at: string
+  actor_name: string | null
+}
+
+export interface TaskHistoryResponse {
+  success: boolean
+  message: string
+  data: TaskHistoryEntry[]
+  meta: { total: number }
+}
+
 export interface TaskCategory {
   id: string
   name: string

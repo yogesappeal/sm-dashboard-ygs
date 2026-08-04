@@ -11,10 +11,12 @@ interface TaskQuickAddProps {
   status: string
   queryKey: unknown[]
   parentTaskId?: string
+  category?: string
+  projectId?: string | null
   placeholder?: string
 }
 
-export function TaskQuickAdd({ token, status, queryKey, parentTaskId, placeholder = 'Task title…' }: TaskQuickAddProps) {
+export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, projectId, placeholder = 'Task title…' }: TaskQuickAddProps) {
   const queryClient = useQueryClient()
   const [isAdding, setIsAdding] = useState(false)
   const [title, setTitle] = useState('')
@@ -32,9 +34,9 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, placeholde
         description: '',
         due_date: null,
         assignee: '',
-        category: '',
+        category: category || 'General',
         priority: false,
-        project_id: null,
+        project_id: projectId || null,
         parent_task_id: parentTaskId ?? null,
       }),
     onSuccess: () => {

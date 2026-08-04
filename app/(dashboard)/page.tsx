@@ -130,25 +130,24 @@ export default function DashboardPage() {
   const isContractsLoading = contractsLoading || isFetching || isPageChanging
 
   return (
-    <div className="flex flex-col min-h-full">
-      {/* Metrics row */}
-      <div className="mb-6">
-        {metricsLoading ? (
-          <MetricsSkeleton />
-        ) : isOps ? (
-          <OpsMetricsRow metrics={metrics} firstName={firstName} />
-        ) : (
-          <SMMetricsRow
-            metrics={metrics}
-            firstName={firstName}
-            activeFilter={activeFilter}
-            onFilterClick={handleFilterClick}
-          />
-        )}
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Fixed header — metrics, title, search, table column header. Doesn't scroll. */}
+      <div className="flex-shrink-0">
+        <div className="mb-6">
+          {metricsLoading ? (
+            <MetricsSkeleton />
+          ) : isOps ? (
+            <OpsMetricsRow metrics={metrics} firstName={firstName} />
+          ) : (
+            <SMMetricsRow
+              metrics={metrics}
+              firstName={firstName}
+              activeFilter={activeFilter}
+              onFilterClick={handleFilterClick}
+            />
+          )}
+        </div>
 
-      {/* Contract table */}
-      <div className="flex flex-col flex-1">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-slate-800">Contract</h2>
           <div className="relative w-64">
@@ -170,36 +169,37 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 flex flex-col flex-1 overflow-hidden">
-          <ContractTableHeader sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+      {/* Contract table — header and pagination stay put, only the row list scrolls */}
+      <div className="bg-white rounded-xl border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
+        <ContractTableHeader sortField={sortField} sortDir={sortDir} onSort={handleSort} />
 
-          <div className="flex-1 overflow-y-auto">
-            {isContractsLoading ? (
-              <TableRowSkeleton rows={8} />
-            ) : contracts.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title="Welcome to the SM Page"
-                description="View, track, and manage all contracts in one place to keep everything organized and easy to access"
-              />
-            ) : (
-              contracts.map((contract) => (
-                <ContractRow key={contract.id} contract={contract} />
-              ))
-            )}
-          </div>
-
-          {pagination && (pagination.totalPages ?? pagination.total_pages ?? 0) > 0 && (
-            <PaginationBar
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
-              onPageChange={handlePageChange}
-              isRefreshing={isContractsLoading}
-              onRefresh={handleRefresh}
+        <div className="flex-1 overflow-y-auto">
+          {isContractsLoading ? (
+            <TableRowSkeleton rows={8} />
+          ) : contracts.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="Welcome to the SM Page"
+              description="View, track, and manage all contracts in one place to keep everything organized and easy to access"
             />
+          ) : (
+            contracts.map((contract) => (
+              <ContractRow key={contract.id} contract={contract} />
+            ))
           )}
         </div>
+
+        {pagination && (pagination.totalPages ?? pagination.total_pages ?? 0) > 0 && (
+          <PaginationBar
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+            onPageChange={handlePageChange}
+            isRefreshing={isContractsLoading}
+            onRefresh={handleRefresh}
+          />
+        )}
       </div>
     </div>
   )

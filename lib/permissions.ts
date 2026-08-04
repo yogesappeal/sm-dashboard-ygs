@@ -9,6 +9,7 @@ export type PermissionAction =
   | 'po:create'
   | 'po:edit'
   | 'toolbox:view'
+  | 'task:view'
 
 // Flip any boolean to change what a role can do — this table is the only
 // place permission rules live. Admin is spelled out in full (not "always
@@ -25,6 +26,7 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     // SM Toolbox is Site Manager-specific tooling, not a general permission —
     // deliberately not "all access" here even for Admin.
     'toolbox:view':    false,
+    'task:view':       true,
   },
   'Site Manager': {
     'supplier:create': false,
@@ -35,6 +37,7 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'po:create':       true,
     'po:edit':         true,
     'toolbox:view':    true,
+    'task:view':       true,
   },
   Operations: {
     'supplier:create': true,
@@ -45,6 +48,8 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'po:create':       false,
     'po:edit':         false,
     'toolbox:view':    false,
+    // Ops doesn't get the Tasks menu at all.
+    'task:view':       false,
   },
 }
 
