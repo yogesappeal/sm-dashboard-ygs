@@ -7,6 +7,8 @@ interface GetTasksParams {
   category?: string
   projectId?: string
   onlyParent?: boolean
+  isActive?: boolean
+  priority?: boolean
 }
 
 export async function getAllTasks(token: string, params: GetTasksParams = {}) {
@@ -16,6 +18,8 @@ export async function getAllTasks(token: string, params: GetTasksParams = {}) {
     ...(params.category ? { category: params.category } : {}),
     ...(params.projectId ? { project: params.projectId } : {}),
     ...(params.onlyParent !== undefined ? { only_parent: String(params.onlyParent) } : {}),
+    ...(params.isActive !== undefined ? { is_active: String(params.isActive) } : {}),
+    ...(params.priority !== undefined ? { priority: String(params.priority) } : {}),
   })
   const qs = q.toString()
   const res = await api.get<TasksResponse>(

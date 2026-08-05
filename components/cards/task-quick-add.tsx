@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { insertNewTask } from '@/lib/api'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 
 interface TaskQuickAddProps {
@@ -13,11 +15,13 @@ interface TaskQuickAddProps {
   parentTaskId?: string
   category?: string
   projectId?: string | null
+  projectName?: string | null
   placeholder?: string
 }
 
-export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, projectId, placeholder = 'Task title…' }: TaskQuickAddProps) {
+export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, projectId, projectName, placeholder = 'Task title…' }: TaskQuickAddProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [isAdding, setIsAdding] = useState(false)
   const [title, setTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -37,6 +41,7 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
         category: category || 'General',
         priority: false,
         project_id: projectId || null,
+        project_name: projectName || null,
         parent_task_id: parentTaskId ?? null,
       }),
     onSuccess: () => {
@@ -44,6 +49,11 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
       setTitle('')
       // tetap buka supaya user bisa langsung tambah task berikutnya
       inputRef.current?.focus()
+    },
+    onError: () => {
+      // Keep the typed title and the field open so the user can retry
+      // without having to type it again.
+      toast(messages.task.createError, 'error')
     },
   })
 
@@ -61,7 +71,9 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
   const handleBlur = () => {
     // sedikit delay supaya mutation.mutate punya waktu jalan sebelum blur collapse
     setTimeout(() => {
-      if (!mutation.isPending) { setTitle(''); setIsAdding(false) }
+      // Jangan tutup/hapus teks kalau masih pending atau baru saja gagal —
+      // biar user bisa retry tanpa ngetik ulang.
+      if (!mutation.isPending && !mutation.isError) { setTitle(''); setIsAdding(false) }
     }, 150)
   }
 
@@ -95,9 +107,15 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
           placeholder={placeholder}
           className="w-full text-sm font-medium text-slate-800 placeholder:text-slate-300 bg-transparent outline-none"
         />
-        <p className="text-xs text-slate-300 mt-0.5">
-          ↵ to save · Esc to cancel
-        </p>
+        {mutation.isError ? (
+          <p className="text-xs text-red-500 mt-0.5">
+            Failed to save — press ↵ to retry · Esc to cancel
+          </p>
+        ) : (
+          <p className="text-xs text-slate-300 mt-0.5">
+            ↵ to save · Esc to cancel
+          </p>
+        )}
       </div>
 
       {/* Loading / save indicator */}

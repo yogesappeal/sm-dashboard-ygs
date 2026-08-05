@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CheckSquare, Flag } from 'lucide-react'
+import { CheckSquare, Flag, ChevronDown, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { getAllTasks } from '@/lib/api'
-import { groupTasksByStatus, buildSubtaskMap } from '@/lib/utils/tasks'
+import { groupTasksByStatus, buildSubtaskMap, isTaskOverdue } from '@/lib/utils/tasks'
 import { PageHeader } from '@/components/shared/page-header'
 import { TaskCard, TaskTableHeader } from '@/components/cards/task-card'
 import { TaskSlideOver } from '@/components/cards/task-slide-over'
@@ -23,6 +23,7 @@ const STATUS_FILTERS = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'done', label: 'Done' },
+  { value: 'overdue', label: 'Overdue' },
 ]
 
 const STATUS_LABELS: Record<string, string> = {
@@ -37,6 +38,17 @@ export default function TasksPage() {
 
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityOnly, setPriorityOnly] = useState(false)
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [collapsedStatuses, setCollapsedStatuses] = useState<Set<string>>(new Set())
+
+  const toggleStatusCollapsed = (status: string) => {
+    setCollapsedStatuses((prev) => {
+      const next = new Set(prev)
+      if (next.has(status)) next.delete(status)
+      else next.add(status)
+      return next
+    })
+  }
   // Stack of tasks drilled into from the detail slide-over — last item is
   // the one currently shown, earlier items are what "Back" returns to.
   const [taskDetailStack, setTaskDetailStack] = useState<TaskModel[]>([])
@@ -50,20 +62,44 @@ export default function TasksPage() {
   const popTaskDetail = () => setTaskDetailStack((s) => s.slice(0, -1))
   const closeTaskDetail = () => setTaskDetailStack([])
 
-  const queryKey = ['tasks', statusFilter]
+  // "Overdue" isn't a real backend status — it's derived client-side from
+  // due_date, so it must not be sent as the status query param.
+  const apiStatus = statusFilter === 'overdue' ? '' : statusFilter
+  const tasksQueryKey = ['tasks', apiStatus, showDeleted]
+  // Passed down to TaskCard/TaskQuickAdd/TaskSlideOver for invalidateQueries.
+  // Deliberately broader than tasksQueryKey (no apiStatus/showDeleted) so a
+  // mutation made from any tab/toggle invalidates every tab/toggle's cache —
+  // otherwise e.g. restoring a task while on "Deleted tasks" only refreshes
+  // that one cache entry, leaving "All" showing stale data until it expires.
+  const queryKey = ['tasks']
 
   const { data, isLoading } = useQuery({
-    queryKey,
-    queryFn: () => getAllTasks(token!, { status: statusFilter || undefined, onlyParent: false }),
+    queryKey: tasksQueryKey,
+    queryFn: () => getAllTasks(token!, { status: apiStatus || undefined, onlyParent: false, isActive: showDeleted ? false : undefined }),
     enabled: !!token && FEATURE_TASK && canViewTasks,
     staleTime: 60 * 1000,
   })
+
+  // Overdue count needs the full unfiltered task list to stay correct
+  // regardless of which status tab is active — shares cache with the
+  // "All"/"Overdue" tabs (same queryKey), so this doesn't add an extra
+  // request when one of those is already selected.
+  const { data: allStatusData } = useQuery({
+    queryKey: ['tasks', ''],
+    queryFn: () => getAllTasks(token!, { onlyParent: false }),
+    enabled: !!token && FEATURE_TASK && canViewTasks,
+    staleTime: 60 * 1000,
+  })
+  const overdueCount = (Array.isArray(allStatusData) ? allStatusData : [])
+    .filter((t) => !t.parent_task_id)
+    .filter(isTaskOverdue).length
 
   const allTasks = Array.isArray(data) ? data : []
   const subtaskMap = buildSubtaskMap(allTasks)
   // Only show root tasks in the list — subtasks are rendered inside their parent
   const rootTasks = allTasks.filter((t) => !t.parent_task_id)
-  const tasks = priorityOnly ? rootTasks.filter((t) => t.priority) : rootTasks
+  const priorityFiltered = priorityOnly ? rootTasks.filter((t) => t.priority) : rootTasks
+  const tasks = statusFilter === 'overdue' ? priorityFiltered.filter(isTaskOverdue) : priorityFiltered
   const grouped = statusFilter ? null : groupTasksByStatus(tasks)
 
   if (!FEATURE_TASK) {
@@ -122,6 +158,9 @@ export default function TasksPage() {
                 )}
               >
                 {f.label}
+                {f.value === 'overdue' && overdueCount > 0 && (
+                  <span className="text-red-500"> ({overdueCount})</span>
+                )}
               </button>
             ))}
           </div>
@@ -138,6 +177,19 @@ export default function TasksPage() {
             <Flag size={12} className={priorityOnly ? 'fill-red-500 text-red-500' : ''} />
             Priority only
           </button>
+
+          <button
+            onClick={() => setShowDeleted((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ml-auto',
+              showDeleted
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+            )}
+          >
+            <Trash2 size={12} />
+            Deleted tasks
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden mb-4">
@@ -153,9 +205,13 @@ export default function TasksPage() {
           </div>
         ) : tasks.length === 0 ? (
           <EmptyState
-            icon={CheckSquare}
-            title="No tasks found"
-            description={priorityOnly ? 'No priority tasks' : 'Create your first task to get started'}
+            icon={showDeleted ? Trash2 : CheckSquare}
+            title={showDeleted ? 'No deleted tasks' : 'No tasks found'}
+            description={
+              showDeleted ? 'Tasks you delete will show up here'
+              : priorityOnly ? 'No priority tasks'
+              : 'Create your first task to get started'
+            }
           />
         ) : statusFilter ? (
           // Flat list when filtered by status
@@ -170,7 +226,7 @@ export default function TasksPage() {
                 subtasks={subtaskMap[task.id] ?? []}
               />
             ))}
-            {statusFilter === 'open' && (
+            {!showDeleted && statusFilter === 'open' && (
               <TaskQuickAdd token={token!} status={statusFilter} queryKey={queryKey} />
             )}
           </div>
@@ -179,31 +235,43 @@ export default function TasksPage() {
           <div className="space-y-4">
             {Object.entries(grouped ?? {})
               .filter(([, statusTasks]) => statusTasks.length > 0)
-              .map(([status, statusTasks]) => (
-                <div key={status}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      {STATUS_LABELS[status] ?? status}
-                    </h3>
-                    <span className="text-xs text-slate-400">({statusTasks.length})</span>
-                  </div>
-                  <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-                    {statusTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        token={token!}
-                        queryKey={queryKey}
-                        onEdit={openTaskDetail}
-                        subtasks={subtaskMap[task.id] ?? []}
+              .map(([status, statusTasks]) => {
+                const isCollapsed = collapsedStatuses.has(status)
+                return (
+                  <div key={status}>
+                    <button
+                      onClick={() => toggleStatusCollapsed(status)}
+                      className="flex items-center gap-2 mb-2 group"
+                    >
+                      <ChevronDown
+                        size={14}
+                        className={cn('text-slate-400 transition-transform', isCollapsed && '-rotate-90')}
                       />
-                    ))}
-                    {status === 'open' && (
-                      <TaskQuickAdd token={token!} status={status} queryKey={queryKey} />
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide group-hover:text-slate-700 transition-colors">
+                        {STATUS_LABELS[status] ?? status}
+                      </h3>
+                      <span className="text-xs text-slate-400">({statusTasks.length})</span>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                        {statusTasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            token={token!}
+                            queryKey={queryKey}
+                            onEdit={openTaskDetail}
+                            subtasks={subtaskMap[task.id] ?? []}
+                          />
+                        ))}
+                        {!showDeleted && status === 'open' && (
+                          <TaskQuickAdd token={token!} status={status} queryKey={queryKey} />
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
           </div>
         )}
       </div>

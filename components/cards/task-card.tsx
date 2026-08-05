@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Flag, CalendarDays, Loader2, ArrowUpRight, ChevronRight, ChevronDown } from 'lucide-react'
+import { Flag, CalendarDays, ArrowUpRight, ChevronRight } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateTaskStatus, updateTaskPriority, updateExistingTask } from '@/lib/api'
 import { TaskQuickAdd } from '@/components/cards/task-quick-add'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { formatDate, toDateInputValue } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { TASK_CATEGORIES } from '@/lib/utils/tasks'
@@ -31,6 +33,7 @@ type EditingField = 'title' | 'due_date' | 'assignee' | 'category' | null
 // ─────────────────────────────────────────────────────────────────────────────
 function usePatchMutation(token: string, task: TaskModel, queryKey: unknown[]) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   return useMutation({
     mutationFn: (patch: Partial<{ title: string; due_date: string; assignee: string; category: string }>) =>
       updateExistingTask(token, {
@@ -44,6 +47,7 @@ function usePatchMutation(token: string, task: TaskModel, queryKey: unknown[]) {
         priority:    task.priority,
         project_id:  task.project_id,
       }),
+    onError: () => toast(messages.task.updateError, 'error'),
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 }
@@ -53,7 +57,9 @@ function usePatchMutation(token: string, task: TaskModel, queryKey: unknown[]) {
 // ─────────────────────────────────────────────────────────────────────────────
 function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subtasks'>) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [optimisticStatus, setOptimisticStatus] = useState(task.status)
+  const [optimisticPriority, setOptimisticPriority] = useState(task.priority)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -70,10 +76,27 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
     setOptimisticStatus(task.status)
   }, [task.status])
 
+  useEffect(() => {
+    setOptimisticPriority(task.priority)
+  }, [task.priority])
+
   const statusMutation = useMutation({
     mutationFn: (s: string) => updateTaskStatus(token, task.id, s),
     onMutate: (s) => setOptimisticStatus(s),
-    onError: () => setOptimisticStatus(task.status),
+    onError: () => {
+      setOptimisticStatus(task.status)
+      toast(messages.task.updateError, 'error')
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  })
+
+  const priorityMutation = useMutation({
+    mutationFn: (p: boolean) => updateTaskPriority(token, task.id, p),
+    onMutate: (p) => setOptimisticPriority(p),
+    onError: () => {
+      setOptimisticPriority(task.priority)
+      toast(messages.task.updateError, 'error')
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 
@@ -90,32 +113,30 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
 
   return (
     <div className={cn(
-      'flex items-center gap-2.5 px-4 py-2 border-b border-slate-100/80 last:border-0',
+      'flex items-center gap-3 px-4 py-2 border-b border-slate-100/80 last:border-0',
       'hover:bg-white/60 transition-colors group/sub',
       isCompleted && 'opacity-50',
     )}>
-      {/* Subtask indent line */}
-      <div className="w-4 flex-shrink-0 flex items-center justify-end">
+      {/* Connector line — same slot width as the parent row's expand-icon, so columns line up */}
+      <div className="w-5 flex-shrink-0 flex items-center justify-center">
         <div className="w-px h-4 bg-slate-200 rounded-full" />
       </div>
 
-      {/* Checkbox */}
+      {/* Checkbox — same size/slot as the parent row's checkbox */}
       <button
         onClick={() => statusMutation.mutate(STATUS_CYCLE[optimisticStatus] ?? 'open')}
         disabled={statusMutation.isPending}
         role="checkbox"
         aria-checked={isCompleted}
         className={cn(
-          'w-4 h-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors',
+          'w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors',
           isCompleted           ? 'bg-[#6692C5] border-[#6692C5]'
           : optimisticStatus === 'in_progress' ? 'border-blue-400 bg-blue-50'
           : 'border-slate-200 hover:border-[#6692C5]',
         )}
       >
-        {statusMutation.isPending ? (
-          <Loader2 size={8} className="animate-spin text-white" />
-        ) : isCompleted ? (
-          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        {isCompleted ? (
+          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         ) : optimisticStatus === 'in_progress' ? (
@@ -150,14 +171,24 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
         )}
       </div>
 
-      {/* Project Name — subtasks share the parent's project, left blank for column alignment */}
-      <div className="flex-[2] hidden md:block" />
+      {/* Project Name / RA Number */}
+      <div className="flex-[2] hidden md:block min-w-0">
+        {task.project_name && (
+          <span className="text-xs text-slate-400 truncate block">{task.project_name}</span>
+        )}
+      </div>
 
-      {/* Category — subtasks have no category of their own */}
-      <div className="flex-[2] hidden sm:block" />
+      {/* Category */}
+      <div className="flex-[2] min-w-0">
+        {task.category && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20 whitespace-nowrap w-fit inline-block">
+            {task.category}
+          </span>
+        )}
+      </div>
 
       {/* Due date */}
-      <div className="flex-[2] hidden sm:flex items-center">
+      <div className="flex-[2] min-w-0 flex items-center">
         {task.due_date && (
           <span className="flex items-center gap-1 text-xs text-slate-400">
             <CalendarDays size={10} />
@@ -166,8 +197,17 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
         )}
       </div>
 
-      {/* Priority — subtasks don't carry their own priority flag */}
-      <div className="flex-[1] hidden sm:block" />
+      {/* Priority */}
+      <div className="flex-[1] flex justify-start">
+        <button
+          onClick={() => priorityMutation.mutate(!optimisticPriority)}
+          disabled={priorityMutation.isPending}
+          title={optimisticPriority ? 'Remove priority' : 'Mark as priority'}
+          className="p-1 rounded hover:bg-slate-100 transition-colors"
+        >
+          <Flag size={14} className={cn(optimisticPriority ? 'fill-red-500 text-red-500' : 'text-slate-200')} />
+        </button>
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity flex-shrink-0 w-12 justify-end">
@@ -188,6 +228,7 @@ function SubtaskRow({ task, token, queryKey, onEdit }: Omit<TaskCardProps, 'subt
 // ─────────────────────────────────────────────────────────────────────────────
 export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskCardProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [optimisticStatus, setOptimisticStatus] = useState(task.status)
   const [optimisticPriority, setOptimisticPriority] = useState(task.priority)
   const [editingField, setEditingField] = useState<EditingField>(null)
@@ -228,14 +269,20 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
   const statusMutation = useMutation({
     mutationFn: (s: string) => updateTaskStatus(token, task.id, s),
     onMutate: (s) => setOptimisticStatus(s),
-    onError: () => setOptimisticStatus(task.status),
+    onError: () => {
+      setOptimisticStatus(task.status)
+      toast(messages.task.updateError, 'error')
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 
   const priorityMutation = useMutation({
     mutationFn: (p: boolean) => updateTaskPriority(token, task.id, p),
     onMutate: (p) => setOptimisticPriority(p),
-    onError: () => setOptimisticPriority(task.priority),
+    onError: () => {
+      setOptimisticPriority(task.priority)
+      toast(messages.task.updateError, 'error')
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 
@@ -283,6 +330,22 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
         isExpanded && 'border-b-0',
       )}>
 
+        {/* Expand subtasks */}
+        <div className="w-5 flex-shrink-0 flex items-center justify-center">
+          {hasSubtasks && (
+            <button
+              onClick={() => setIsExpanded((v) => !v)}
+              title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
+            >
+              <ChevronRight
+                size={14}
+                className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
+              />
+            </button>
+          )}
+        </div>
+
         {/* Status checkbox */}
         <button
           onClick={() => statusMutation.mutate(STATUS_CYCLE[optimisticStatus] ?? 'open')}
@@ -296,9 +359,7 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
             : 'border-slate-300 hover:border-[#6692C5]',
           )}
         >
-          {statusMutation.isPending ? (
-            <Loader2 size={10} className="animate-spin text-white" />
-          ) : isCompleted ? (
+          {isCompleted ? (
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
@@ -325,7 +386,6 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
               className={cn(
                 'min-w-0 flex-shrink text-sm text-slate-800 font-medium truncate cursor-text hover:text-[#6692C5] transition-colors',
                 isCompleted && 'line-through text-slate-400',
-                patchMutation.isPending && 'opacity-60',
               )}
             >
               {editValues.title}
@@ -418,18 +478,6 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
 
         {/* Right actions */}
         <div className="flex items-center gap-0.5 flex-shrink-0 w-12 justify-end">
-          {/* Expand subtasks */}
-          <button
-            onClick={() => setIsExpanded((v) => !v)}
-            title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
-            className="p-1 rounded hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100"
-          >
-            <ChevronRight
-              size={14}
-              className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
-            />
-          </button>
-
           {/* Open slide-over */}
           <button
             onClick={() => onEdit(task)}
@@ -460,6 +508,7 @@ export function TaskCard({ task, token, queryKey, onEdit, subtasks = [] }: TaskC
             parentTaskId={task.id}
             category={task.category}
             projectId={task.project_id}
+            projectName={task.project_name}
             placeholder="Subtask title…"
           />
         </div>
@@ -478,9 +527,9 @@ export function TaskTableHeader() {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 border-b-2 border-slate-200 bg-slate-50/50">
       <div className="w-5" />
-      <span className="flex-[10] flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+      <div className="w-5" />
+      <span className="flex-[10] text-xs font-semibold text-slate-500 uppercase tracking-wide">
         Task List
-        <ChevronDown size={12} className="text-slate-400" />
       </span>
       {label('RA Number', 'flex-[2]', 'hidden md:block')}
       {label('Category', 'flex-[2]')}

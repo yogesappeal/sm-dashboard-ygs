@@ -1,6 +1,16 @@
+import { isBefore, startOfDay, parseISO, isValid } from 'date-fns'
 import type { TaskModel } from '../types'
 
 export const TASK_CATEGORIES = ['General', 'Contract', 'PO', 'Scope', 'Supplier'] as const
+
+// Overdue is derived client-side, not a real backend status — a task is
+// overdue if its due date is before today and it isn't already done.
+export function isTaskOverdue(task: Pick<TaskModel, 'due_date' | 'status'>): boolean {
+  if (!task.due_date || task.status === 'done') return false
+  const due = parseISO(task.due_date)
+  if (!isValid(due)) return false
+  return isBefore(startOfDay(due), startOfDay(new Date()))
+}
 
 export function buildTaskRequestBody(task: Partial<TaskModel>): Record<string, unknown> {
   return {
@@ -12,6 +22,9 @@ export function buildTaskRequestBody(task: Partial<TaskModel>): Record<string, u
     category: task.category,
     status: task.status ?? 'open',
     project_id: task.project_id,
+    // Mirrors the contract's client_ra_number — the tasks list (GET /tasks)
+    // returns it as project_name, so writes need to keep it in sync.
+    project_name: task.project_name,
     parent_task_id: task.parent_task_id ?? null,
   }
 }

@@ -17,8 +17,12 @@ export const messages = {
   task: {
     createSuccess: 'Task created successfully',
     updateSuccess: 'Task updated successfully',
+    deleteSuccess: 'Task deleted successfully',
+    restoreSuccess: 'Task restored successfully',
     createError: 'Failed to create task. Please try again.',
     updateError: 'Failed to update task. Please try again.',
+    deleteError: 'Failed to delete task. Please try again.',
+    restoreError: 'Failed to restore task. Please try again.',
   },
   purchaseOrder: {
     saveError: 'Failed to save. Please try again.',

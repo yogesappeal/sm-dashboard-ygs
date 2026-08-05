@@ -63,7 +63,7 @@ export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTrad
     <div className="space-y-4">
       <div>
         <label className="text-xs font-medium text-slate-600 block mb-2">Buildings</label>
-        <ChipInput placeholder="Type a building, press Enter or ," onCommit={addBuilding} />
+        <ChipInput placeholder="Type a building (e.g., Main House or Garage) ," onCommit={addBuilding} />
         {buildings.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {buildings.map((b) => (
@@ -76,7 +76,7 @@ export function ScopeItemsBuilder({ buildings, trades, onBuildingsChange, onTrad
 
       <div>
         <label className="text-xs font-medium text-slate-600 block mb-2">Trades</label>
-        <ChipInput placeholder="Type a trade, press Enter or ," onCommit={addTrade} />
+        <ChipInput placeholder="Type a trade (e.g., Roofing or Plumbing) ," onCommit={addTrade} />
         {trades.length > 0 && (
           <div className="space-y-2 mt-2">
             {trades.map((trade) => (

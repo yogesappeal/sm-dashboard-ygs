@@ -5,13 +5,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Loader2 } from 'lucide-react'
 import { createSupplierData } from '@/lib/api'
-import { supplierSchema } from '@/lib/utils/validation'
+import { supplierCreateSchema } from '@/lib/utils/validation'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { z } from 'zod'
 
-type SupplierForm = z.infer<typeof supplierSchema>
+type SupplierForm = z.infer<typeof supplierCreateSchema>
 
 interface SupplierCreateModalProps {
   token: string
@@ -28,7 +28,7 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SupplierForm>({
-    resolver: zodResolver(supplierSchema),
+    resolver: zodResolver(supplierCreateSchema),
     defaultValues: { type: 'supplier', email: '', phone: '', address: '', notes: '' },
   })
 
@@ -64,7 +64,7 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
           onSubmit={handleSubmit((d) => createMutation.mutateAsync(d))}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
         >
-          <Field label="Name *" error={errors.name?.message}>
+          <Field label="Name" required error={errors.name?.message}>
             <input
               {...register('name')}
               className={inputCls(!!errors.name)}
@@ -73,7 +73,7 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
             />
           </Field>
 
-          <Field label="Type *" error={errors.type?.message}>
+          <Field label="Type" required error={errors.type?.message}>
             <select {...register('type')} className={inputCls(!!errors.type)}>
               <option value="supplier">Supplier</option>
               <option value="subcontractor">Subcontractor</option>
@@ -88,11 +88,11 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
             />
           </Field>
 
-          <Field label="Email" error={errors.email?.message}>
+          <Field label="Email" required error={errors.email?.message}>
             <input
               {...register('email')}
               className={inputCls(!!errors.email)}
-              placeholder="Email address (optional)"
+              placeholder="Email address"
             />
           </Field>
 
@@ -147,16 +147,21 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
 
 function Field({
   label,
+  required,
   error,
   children,
 }: {
   label: string
+  required?: boolean
   error?: string
   children: React.ReactNode
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-slate-600 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
       {children}
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>

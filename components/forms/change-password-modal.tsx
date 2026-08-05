@@ -152,7 +152,6 @@ function PasswordInput({
         type={visible ? 'text' : 'password'}
         autoComplete={autoComplete}
         className={cn(inputCls(hasError), 'pr-10')}
-        placeholder="••••••••"
         autoFocus={autoFocus}
       />
       <button
@@ -161,7 +160,7 @@ function PasswordInput({
         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
         tabIndex={-1}
       >
-        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+        {visible ? <Eye size={15} /> : <EyeOff size={15} />}
       </button>
     </div>
   )

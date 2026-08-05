@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2, Flag, CalendarDays, Tag, Briefcase, Paperclip, History as HistoryIcon, ArrowLeft, ChevronRight } from 'lucide-react'
+import { X, Loader2, Flag, CalendarDays, Tag, Briefcase, Paperclip, History as HistoryIcon, ArrowLeft, ChevronRight, Trash2, RotateCcw } from 'lucide-react'
 import { insertNewTask, updateExistingTask, updateTaskStatus, getDropdownContractScope, getTaskById, getTaskHistory } from '@/lib/api'
 import { taskSchema } from '@/lib/utils/validation'
 import { buildTaskRequestBody, TASK_CATEGORIES } from '@/lib/utils/tasks'
 import { TaskQuickAdd } from '@/components/cards/task-quick-add'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn, formatDate, relativeTime, toDateInputValue } from '@/lib/utils'
@@ -73,6 +74,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
   const isEditing = !!task
   const [activeTab, setActiveTab] = useState<DetailTab>('subtask')
   const [historyLimit, setHistoryLimit] = useState(HISTORY_PAGE_SIZE)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     setHistoryLimit(HISTORY_PAGE_SIZE)
@@ -91,6 +93,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
 
   const activeTask = taskDetail ?? task
   const isSubtask = !!activeTask?.parent_task_id
+  const isDeleted = activeTask?.is_active === false
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<TaskForm>({
     resolver: zodResolver(taskSchema),
@@ -145,11 +148,13 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
 
   const mutation = useMutation({
     mutationFn: (data: TaskForm) => {
+      const selectedContract = contracts.find((c) => c.id === data.projectId)
       const body = buildTaskRequestBody({
         ...data,
         id: task?.id,
         due_date: data.dueDate,
         project_id: data.projectId || undefined,
+        project_name: selectedContract?.client_ra_number,
       })
       return isEditing
         ? updateExistingTask(token, { task_id: task!.id, ...body })
@@ -161,6 +166,43 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
       if (onBack) onBack()
       else onClose()
       queryClient.invalidateQueries({ queryKey })
+    },
+  })
+
+  // Soft delete — keeps the row but flips is_active off, same request shape
+  // as a normal edit save so no other field gets clobbered.
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      const current = activeTask ?? task!
+      const body = buildTaskRequestBody(current)
+      return updateExistingTask(token, { task_id: current.id, ...body, is_active: false })
+    },
+    onSuccess: () => {
+      toast(messages.task.deleteSuccess, 'success')
+      setShowDeleteDialog(false)
+      if (onBack) onBack()
+      else onClose()
+      queryClient.invalidateQueries({ queryKey })
+    },
+    onError: () => {
+      toast(messages.task.deleteError, 'error')
+    },
+  })
+
+  // Restore — flips is_active back on. No confirmation needed since it's non-destructive.
+  const restoreMutation = useMutation({
+    mutationFn: () => {
+      const current = activeTask ?? task!
+      const body = buildTaskRequestBody(current)
+      return updateExistingTask(token, { task_id: current.id, ...body, is_active: true })
+    },
+    onSuccess: () => {
+      toast(messages.task.restoreSuccess, 'success')
+      queryClient.invalidateQueries({ queryKey })
+      queryClient.invalidateQueries({ queryKey: ['task', task?.id] })
+    },
+    onError: () => {
+      toast(messages.task.restoreError, 'error')
     },
   })
 
@@ -199,6 +241,28 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
           <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', statusOption.color)}>
             {statusOption.label}
           </span>
+          {isEditing && (
+            isDeleted ? (
+              <button
+                type="button"
+                onClick={() => restoreMutation.mutate()}
+                disabled={restoreMutation.isPending}
+                title="Restore task"
+                className="text-slate-400 hover:text-green-600 transition-colors disabled:opacity-50"
+              >
+                {restoreMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteDialog(true)}
+                title="Delete task"
+                className="text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={18} />
+              </button>
+            )
+          )}
         </div>
 
         {/* Form */}
@@ -368,6 +432,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
                       parentTaskId={task.id}
                       category={activeTask?.category}
                       projectId={activeTask?.project_id}
+                      projectName={activeTask?.project_name}
                       placeholder="Subtask title…"
                     />
                   </div>
@@ -434,12 +499,24 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
         </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title="Delete this task?"
+        description="This will remove the task from your list. This action can't be undone from here."
+        confirmLabel="Delete"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
     </>
   )
 }
 
 function SubtaskListItem({ task, token, queryKey, onOpen }: { task: TaskModel; token: string; queryKey: unknown[]; onOpen?: (task: TaskModel) => void }) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [optimisticStatus, setOptimisticStatus] = useState(task.status)
 
   useEffect(() => {
@@ -449,7 +526,10 @@ function SubtaskListItem({ task, token, queryKey, onOpen }: { task: TaskModel; t
   const statusMutation = useMutation({
     mutationFn: (s: string) => updateTaskStatus(token, task.id, s),
     onMutate: (s) => setOptimisticStatus(s),
-    onError: () => setOptimisticStatus(task.status),
+    onError: () => {
+      setOptimisticStatus(task.status)
+      toast(messages.task.updateError, 'error')
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 
@@ -469,9 +549,7 @@ function SubtaskListItem({ task, token, queryKey, onOpen }: { task: TaskModel; t
           : 'border-slate-300 hover:border-[#6692C5]',
         )}
       >
-        {statusMutation.isPending ? (
-          <Loader2 size={8} className="animate-spin text-white" />
-        ) : isCompleted ? (
+        {isCompleted ? (
           <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>

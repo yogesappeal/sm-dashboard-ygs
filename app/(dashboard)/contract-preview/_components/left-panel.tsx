@@ -4,12 +4,14 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ChevronLeft, DollarSign, FileText, Users, UserPlus, AlertCircle, Image as ImageIcon, X, Plus, ZoomIn, Info, Handshake, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuthStore } from '@/lib/store'
-import { getCrewPaginated, updateProjectCrew, getContractImages, uploadContractImages } from '@/lib/api'
+import { getCrewPaginated, updateProjectCrew, getContractImages, uploadContractImages, getAllTasks, updateTaskPriority } from '@/lib/api'
 import { useContractId } from './contract-id-context'
 import type { Contract, Crew, Pod, Scope, PurchaseOrder } from './types'
+import type { TaskModel } from '@/lib/types'
 
 function PhotoCarousel() {
   const contractId = useContractId()
@@ -409,26 +411,81 @@ function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; curr
   )
 }
 
-function derivePriorities(scopes: Scope[], pos: PurchaseOrder[]) {
-  const items: { label: string; sub: string; level: 'high' | 'medium' }[] = []
+// Priorities section — tasks flagged priority=true for this contract. Removing
+// priority here just flips priority back to false (task itself isn't deleted).
+// Uses the contract's own id (not the linked-project id from ?project=,
+// which is a different, often-empty concept) as the `project` filter value.
+function PriorityTasksSection() {
+  const contractId = useContractId()
+  const { token } = useAuthStore()
+  const queryClient = useQueryClient()
+  const [taskToRemove, setTaskToRemove] = useState<TaskModel | null>(null)
 
-  pos.filter(p => p.status === 'PO Rejected').forEach(p => {
-    items.push({ label: 'Rejected PO — action required', sub: `${p.po_number} · ${p.supplier_name}`, level: 'high' })
+  const queryKey = ['tasks-priority', contractId]
+
+  const { data, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => getAllTasks(token!, { priority: true, projectId: contractId, onlyParent: false }),
+    enabled: !!token,
   })
 
-  scopes.forEach(scope => {
-    scope.scope_details.forEach(b => {
-      b.trades.filter(t => t.status === 'Urgent').forEach(t => {
-        items.push({ label: `${t.trade_name} — urgent action needed`, sub: `${b.building_name}`, level: 'high' })
-      })
-    })
+  const tasks = Array.isArray(data) ? data : []
+
+  const removeMutation = useMutation({
+    mutationFn: (taskId: string) => updateTaskPriority(token!, taskId, false),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey })
+      setTaskToRemove(null)
+    },
   })
 
-  pos.filter(p => p.status === 'PO Draft').forEach(p => {
-    items.push({ label: 'Draft PO awaiting review', sub: `${p.po_number} · ${p.supplier_name}`, level: 'medium' })
-  })
+  return (
+    <>
+      {isLoading ? (
+        <div className="flex items-center gap-2 py-2 text-slate-400">
+          <Loader2 size={13} className="animate-spin" />
+          <span className="text-xs">Loading priorities...</span>
+        </div>
+      ) : tasks.length === 0 ? (
+        <p className="text-xs text-slate-400 py-1">No active priorities — all good!</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {tasks.map(task => (
+            <div
+              key={task.id}
+              className="flex items-start gap-2.5 p-3 rounded-lg border bg-red-50 border-red-100"
+            >
+              <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium leading-snug text-red-700">{task.title}</p>
+                {task.due_date && (
+                  <p className="text-[10px] text-slate-500 mt-0.5">Due {formatDate(task.due_date)}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setTaskToRemove(task)}
+                title="Remove from priorities"
+                className="flex-shrink-0 text-red-300 hover:text-red-600 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
-  return items
+      <ConfirmDialog
+        open={!!taskToRemove}
+        title="Remove from priorities?"
+        description={taskToRemove ? `"${taskToRemove.title}" will no longer be marked as priority.` : undefined}
+        confirmLabel="Remove"
+        variant="danger"
+        isLoading={removeMutation.isPending}
+        onConfirm={() => taskToRemove && removeMutation.mutate(taskToRemove.id)}
+        onCancel={() => setTaskToRemove(null)}
+      />
+    </>
+  )
 }
 
 interface LeftPanelProps {
@@ -440,9 +497,19 @@ interface LeftPanelProps {
   projectId?: string
 }
 
-export function LeftPanel({ contract, crew, pod, scopes, pos, projectId }: LeftPanelProps) {
+export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
   const [tab, setTab] = useState<'details' | 'documents'>('details')
-  const priorities = derivePriorities(scopes, pos)
+
+  // Shares its cache (same queryKey) with PriorityTasksSection's own fetch
+  // below — this just reads the count, no extra request.
+  const contractId = useContractId()
+  const { token } = useAuthStore()
+  const { data: priorityTasksData } = useQuery({
+    queryKey: ['tasks-priority', contractId],
+    queryFn: () => getAllTasks(token!, { priority: true, projectId: contractId, onlyParent: false }),
+    enabled: !!token,
+  })
+  const priorityCount = Array.isArray(priorityTasksData) ? priorityTasksData.length : 0
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
@@ -572,35 +639,8 @@ export function LeftPanel({ contract, crew, pod, scopes, pos, projectId }: LeftP
             </AccordionSection>
 
             {/* Priorities section */}
-            <AccordionSection title={`Priorities${priorities.length > 0 ? ` (${priorities.length})` : ''}`}>
-              {priorities.length === 0 ? (
-                <p className="text-xs text-slate-400 py-1">No active priorities — all good!</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {priorities.map((p, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'flex items-start gap-2.5 p-3 rounded-lg border',
-                        p.level === 'high'
-                          ? 'bg-red-50 border-red-100'
-                          : 'bg-amber-50 border-amber-100'
-                      )}
-                    >
-                      <AlertCircle
-                        size={14}
-                        className={cn('mt-0.5 flex-shrink-0', p.level === 'high' ? 'text-red-400' : 'text-amber-400')}
-                      />
-                      <div className="min-w-0">
-                        <p className={cn('text-xs font-medium leading-snug', p.level === 'high' ? 'text-red-700' : 'text-amber-700')}>
-                          {p.label}
-                        </p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">{p.sub}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <AccordionSection title={`Priorities${priorityCount > 0 ? ` (${priorityCount})` : ''}`}>
+              <PriorityTasksSection />
             </AccordionSection>
           </>
         )}

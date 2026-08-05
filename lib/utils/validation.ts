@@ -50,6 +50,13 @@ export const supplierSchema = z.object({
   notes: z.string().optional(),
 })
 
+// Stricter than supplierSchema (email required) — used only when creating a
+// new supplier. Kept separate so editing existing suppliers that predate
+// this rule doesn't get blocked by a missing email.
+export const supplierCreateSchema = supplierSchema.extend({
+  email: z.string().min(1, 'Email is required').email('Invalid email'),
+})
+
 export const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
