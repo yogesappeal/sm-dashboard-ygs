@@ -21,6 +21,10 @@ function getStatusConfig(status: string): StatusConfig {
       return { bg: 'bg-orange-50', text: 'text-orange-600', dot: 'bg-orange-400', label: status }
     case 'Completed':
       return { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500', label: 'Completed' }
+    case 'In Progress':
+      return { bg: 'bg-yellow-50', text: 'text-yellow-600', dot: 'bg-yellow-400', label: 'In Progress' }
+    case 'Not Started':
+      return { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'Not Started' }
     case 'Lost':
       return { bg: 'bg-red-50', text: 'text-red-600', dot: 'bg-red-400', label: 'Lost' }
     case 'Active Supplier':

@@ -4,6 +4,9 @@ export interface ScopeTrade {
   trade_id: string
   trade_name: string
   planned_po_date?: string | null
+  // 'Not Started' | 'In Progress' | 'Completed' | 'Urgent' (no PO created yet
+  // and past planned_po_date).
+  po_status?: string | null
 }
 
 export interface ScopeDetail {

@@ -589,6 +589,7 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
             {/* Crew section */}
             <AccordionSection
               title="Crew"
+              defaultOpen={false}
               headerAction={<CrewAssignPicker projectId={projectId} currentCrew={crew} />}
             >
               {crew.length === 0 ? (
@@ -617,7 +618,7 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
             </AccordionSection>
 
             {/* POD section */}
-            <AccordionSection title="POD">
+            <AccordionSection title="POD" defaultOpen={false}>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: 'SM', name: pod.sm },

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { ArrowLeft, ChevronDown, PackagePlus, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DateInput } from '@/components/ui/date-input'
 import { PoAttachmentsSection, FEATURE_ATTACHMENTS } from '@/components/forms/po-attachments-section'
 import { BulletNotesInput } from '@/components/forms/bullet-notes-input'
 import { AccessRestrictedNotice } from '@/components/shared/access-restricted-notice'
@@ -135,9 +136,9 @@ function POSupplierFormInner() {
               <label className="block text-xs font-medium text-slate-600 mb-1.5">
                 {form.dateLabel} <span className="text-red-400">*</span>
               </label>
-              <input type="date" value={form.deliveryDate}
-                onChange={(e) => form.setDeliveryDate(e.target.value)}
-                className={fieldCls('deliveryDate')} />
+              <DateInput value={form.deliveryDate} min={form.minDeliveryDate}
+                onChange={form.setDeliveryDate}
+                className={fieldCls('deliveryDate')} hasError={!!form.errors.deliveryDate} />
               {form.errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{form.errors.deliveryDate}</p>}
             </div>
 

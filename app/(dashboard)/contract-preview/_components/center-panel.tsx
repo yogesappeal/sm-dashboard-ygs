@@ -6,6 +6,7 @@ import { X, Send, Check, XCircle, Edit2, ChevronDown, Clock, Package, Activity, 
 import { cn, normalizeOrderItems, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { DateInput } from '@/components/ui/date-input'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { useAuthStore } from '@/lib/store'
 import { getPurchaseOrderDetailsFull, respondNewDateRequest, autoSendEmailPurchaseOrder } from '@/lib/api'
@@ -594,8 +595,8 @@ function CreatePOCanvas({
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   {form.dateLabel} <span className="text-red-400">*</span>
                 </label>
-                <input type="date" value={form.deliveryDate} onChange={(e) => form.setDeliveryDate(e.target.value)}
-                  className={fieldCls('deliveryDate')} />
+                <DateInput value={form.deliveryDate} min={form.minDeliveryDate} onChange={form.setDeliveryDate}
+                  className={fieldCls('deliveryDate')} hasError={!!form.errors.deliveryDate} />
                 {form.errors.deliveryDate && <p className="text-xs text-red-400 mt-1">{form.errors.deliveryDate}</p>}
               </div>
 

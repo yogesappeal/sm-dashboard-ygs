@@ -10,6 +10,8 @@ import { taskSchema } from '@/lib/utils/validation'
 import { buildTaskRequestBody, TASK_CATEGORIES } from '@/lib/utils/tasks'
 import { TaskQuickAdd } from '@/components/cards/task-quick-add'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Switch } from '@/components/ui/switch'
+import { DateInput } from '@/components/ui/date-input'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
 import { cn, formatDate, relativeTime, toDateInputValue } from '@/lib/utils'
@@ -145,6 +147,27 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   })
+
+  // Keep the Project <select> in sync with the loaded task. This is more than
+  // a simple re-apply: activeTask.project_id sometimes doesn't match any id in
+  // `contracts` (e.g. the task was linked before the contract was re-created,
+  // or via a flow that stored a different id) — in that case the <select>
+  // silently falls back to its first option ("No project") even though the
+  // task really does have a project, visible via its project_name. When the
+  // id doesn't match, fall back to matching contracts by client_ra_number,
+  // which is what project_name mirrors (see buildTaskRequestBody).
+  useEffect(() => {
+    if (!activeTask || contracts.length === 0) return
+    const matchesById = contracts.some((c) => c.id === activeTask.project_id)
+    if (matchesById) {
+      setValue('projectId', activeTask.project_id ?? '')
+      return
+    }
+    const byName = activeTask.project_name
+      ? contracts.find((c) => c.client_ra_number === activeTask.project_name)
+      : undefined
+    if (byName) setValue('projectId', byName.id)
+  }, [contracts, activeTask, setValue])
 
   const mutation = useMutation({
     mutationFn: (data: TaskForm) => {
@@ -326,10 +349,11 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
 
             {/* Due Date */}
             <FieldRow icon={<CalendarDays size={15} className="text-slate-400 flex-shrink-0" />} label="Due Date">
-              <input
-                {...register('dueDate')}
-                type="date"
+              <DateInput
+                value={watch('dueDate') ?? ''}
+                onChange={(v) => setValue('dueDate', v, { shouldDirty: true })}
                 className={cn(fieldCls(!!errors.dueDate), 'w-auto cursor-pointer')}
+                hasError={!!errors.dueDate}
               />
               {errors.dueDate && <p className="text-xs text-red-500">{errors.dueDate.message}</p>}
             </FieldRow>
@@ -355,16 +379,17 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
 
             {/* Priority flag */}
             <FieldRow icon={<Flag size={15} className={currentPriority ? 'text-red-500 fill-red-500' : 'text-slate-400 flex-shrink-0'} />} label="Priority">
-              <button
-                type="button"
-                onClick={() => setValue('priority', !currentPriority)}
-                className={cn(
-                  'flex items-center gap-1.5 text-sm transition-colors',
-                  currentPriority ? 'text-red-500 font-medium' : 'text-slate-400'
-                )}
-              >
-                {currentPriority ? 'Flagged as priority' : 'Flag as priority'}
-              </button>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={!!currentPriority}
+                  onChange={(checked) => setValue('priority', checked)}
+                  activeColor="bg-red-500"
+                  label="Priority"
+                />
+                <span className={cn('text-sm transition-colors', currentPriority ? 'text-red-500 font-medium' : 'text-slate-400')}>
+                  {currentPriority ? 'Flagged as priority' : 'Flag as priority'}
+                </span>
+              </div>
             </FieldRow>
 
             {/* Project — subtasks inherit this from their parent, so it's not editable here */}

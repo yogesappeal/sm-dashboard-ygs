@@ -15,13 +15,27 @@ import { useContractId } from './contract-id-context'
 
 // ─── Scope Navigator ──────────────────────────────────────────────────────────
 
-// No planned PO date → no dot at all. Overdue → red. Otherwise yellow/green
-// is still TBD (placeholder yellow for now, pending final rule).
-function tradeDot(plannedPoDate: string | null | undefined) {
-  if (!plannedPoDate) return null
-  const overdue = new Date(toDateOnly(plannedPoDate) + 'T00:00:00').getTime() < new Date().setHours(0, 0, 0, 0)
-  if (overdue) return 'bg-red-400'
-  return 'bg-yellow-400'
+// Maps a trade's po_status to the Status Legend colors. 'Not Started' (or
+// unknown) gets no dot — matches the legend, which only has 3 entries.
+function tradeDot(poStatus: string | null | undefined) {
+  switch (poStatus) {
+    case 'Urgent': return 'bg-red-400'
+    case 'In Progress': return 'bg-yellow-400'
+    case 'Completed': return 'bg-green-400'
+    default: return null
+  }
+}
+
+// Scope-level rollup from its trades' po_status: all Completed → Completed;
+// any In Progress or Urgent → In Progress; otherwise (all Not Started) →
+// Not Started. Urgent counts toward In Progress since it means there's
+// already work needing attention, not that nothing has happened yet.
+function computeScopeStatus(scopeData: ScopeData): string {
+  const statuses = scopeData.scope_details.flatMap(b => b.trades.map(t => t.po_status))
+  if (statuses.length === 0) return 'Not Started'
+  if (statuses.every(s => s === 'Completed')) return 'Completed'
+  if (statuses.some(s => s === 'In Progress' || s === 'Urgent')) return 'In Progress'
+  return 'Not Started'
 }
 
 // The backend may return a full ISO timestamp for planned_po_date instead of
@@ -93,7 +107,7 @@ function PlannedPoDateControl({
         title="Set planned PO date"
       >
         <Calendar size={10} />
-        {value ? formatDate(value) : 'Set PO date'}
+        {value ? formatDate(value) : 'Choose date'}
       </button>
 
       {open && (
@@ -372,7 +386,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
             <p className="text-xs font-semibold text-slate-700 truncate">{scopeData.scope_number}</p>
             <p className="text-[10px] text-slate-400 truncate">{scopeData.scope_name}</p>
           </div>
-          <StatusBadge status={scopeData.order_status} className="flex-shrink-0" />
+          <StatusBadge status={computeScopeStatus(scopeData)} className="flex-shrink-0" />
         </button>
 
         {scopeOpen && (
@@ -430,8 +444,8 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                           className="flex items-center justify-between py-2 pr-2 group border-b border-slate-50 last:border-0"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            {tradeDot(trade.planned_po_date) && (
-                              <span className={cn('w-2 h-2 rounded-full flex-shrink-0', tradeDot(trade.planned_po_date))} />
+                            {tradeDot(trade.po_status) && (
+                              <span className={cn('w-2 h-2 rounded-full flex-shrink-0', tradeDot(trade.po_status))} />
                             )}
                             <span className={cn(
                               'text-xs font-medium truncate',
@@ -443,20 +457,38 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {editMode ? (
-                              <input
-                                type="date"
-                                value={draftValue}
-                                min={minDate}
-                                onChange={(e) => setDraft(trade.trade_id, trade.trade_name, e.target.value, trade.planned_po_date ? toDateOnly(trade.planned_po_date) : null)}
-                                className={cn(
-                                  'text-[10px] border rounded-md px-1.5 py-1 w-[112px] focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
-                                  draftInvalid
-                                    ? 'border-red-400 bg-red-50 text-red-600 font-medium'
-                                    : drafts.has(trade.trade_id)
-                                      ? 'border-[#6692C5] bg-[#6692C5]/5 text-[#6692C5] font-medium'
-                                      : 'border-slate-200 text-slate-500'
+                              <div className={cn('relative w-[112px] rounded-md', !draftValue && 'focus-within:ring-2 focus-within:ring-[#6692C5]/30')}>
+                                {!draftValue && (
+                                  <div
+                                    className={cn(
+                                      'absolute inset-0 flex items-center justify-between rounded-md border px-1.5 py-1 pointer-events-none',
+                                      draftInvalid ? 'border-red-400 bg-red-50' : 'border-slate-200'
+                                    )}
+                                  >
+                                    <span className="text-[10px] text-slate-400">Choose date</span>
+                                    <Calendar size={10} className="text-slate-400 flex-shrink-0" />
+                                  </div>
                                 )}
-                              />
+                                <input
+                                  type="date"
+                                  value={draftValue}
+                                  min={minDate}
+                                  onChange={(e) => setDraft(trade.trade_id, trade.trade_name, e.target.value, trade.planned_po_date ? toDateOnly(trade.planned_po_date) : null)}
+                                  className={cn(
+                                    'w-full text-[10px] border rounded-md px-1.5 py-1 focus:outline-none',
+                                    !draftValue
+                                      ? 'opacity-0'
+                                      : cn(
+                                          'focus:ring-2 focus:ring-[#6692C5]/30',
+                                          draftInvalid
+                                            ? 'border-red-400 bg-red-50 text-red-600 font-medium'
+                                            : drafts.has(trade.trade_id)
+                                              ? 'border-[#6692C5] bg-[#6692C5]/5 text-[#6692C5] font-medium'
+                                              : 'border-slate-200 text-slate-500'
+                                        )
+                                  )}
+                                />
+                              </div>
                             ) : (
                               <>
                                 {trade.planned_po_date && (

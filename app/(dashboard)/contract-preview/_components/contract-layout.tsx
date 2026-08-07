@@ -5,12 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Calendar, ChevronDown, Clock, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import { cn, todayDateOnly } from '@/lib/utils'
 import { canvasReducer, initialCanvas } from './canvas-state'
 import { LeftPanel } from './left-panel'
 import { CenterPanel } from './center-panel'
 import { RightPanel } from './right-panel'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { DateInput } from '@/components/ui/date-input'
 import { useAuthStore } from '@/lib/store'
 import { updateProjectStartDate } from '@/lib/api'
 import type { Contract, Crew, Pod, Scope, PurchaseOrder, Project } from './types'
@@ -70,6 +71,7 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
   const mutation = useMutation({
     mutationFn: async () => {
       if (!projectId) throw new Error('No project selected')
+      if (pending && pending < todayDateOnly()) throw new Error('Planned start can\'t be a past date.')
       await updateProjectStartDate(token!, { project_id: projectId, start_date: pending || null })
     },
     onSuccess: () => {
@@ -94,6 +96,12 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
     ? (mutation.error instanceof Error ? mutation.error.message : 'Failed to save planned start date.')
     : null
 
+  const today = todayDateOnly()
+  // Only flag past dates the user is actively picking — the existing saved
+  // value is naturally in the past once its date has come and gone, and
+  // that's not an error worth surfacing just for opening the picker.
+  const isPastDate = !!pending && pending !== value && pending < today
+
   return (
     <div ref={wrapperRef} className="relative hidden lg:flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
       <Calendar size={13} className="text-slate-400" />
@@ -111,13 +119,15 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
       {open && (
         <div className="absolute top-full mt-2 right-0 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg p-3">
           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1.5">Planned start date</p>
-          <input
-            type="date"
+          <DateInput
             value={pending}
-            onChange={e => setPending(e.target.value)}
+            min={today}
+            onChange={setPending}
             className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
           />
-          {pending && pending !== value && (
+          {isPastDate ? (
+            <p className="text-xs text-red-500 mt-2">Planned start can&apos;t be a past date.</p>
+          ) : pending && pending !== value && (
             <p className="text-xs text-slate-500 mt-2">
               Set planned start to <span className="font-semibold text-slate-700">{formatPlannedDate(pending)}</span>?
             </p>
@@ -134,7 +144,7 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
             </button>
             <button
               onClick={() => mutation.mutate()}
-              disabled={!pending || pending === value || !projectId || mutation.isPending}
+              disabled={!pending || pending === value || !projectId || mutation.isPending || isPastDate}
               className="px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#5a82b3] text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? 'Saving...' : 'Confirm'}

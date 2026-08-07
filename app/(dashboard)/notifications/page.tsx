@@ -157,7 +157,7 @@ export default function NotificationsPage() {
                     <div
                       key={n.id}
                       onClick={() => handleNotificationClick(n)}
-                      className={`flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-slate-50 ${!n.is_read ? 'bg-[#6692C5]/5' : ''}`}
+                      className="flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-slate-50"
                     >
                       <div className={`mt-0.5 p-2.5 rounded-xl shrink-0 ${bg}`}>
                         <Icon size={16} className={color} />

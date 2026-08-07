@@ -20,6 +20,7 @@ import {
   matchOrderDetailsToBuildings,
   orderItemId,
   normalizeOrderItems,
+  todayDateOnly,
 } from '@/lib/utils'
 import type { InsertPurchaseOrderBody, UpdatePurchaseOrderBody } from '@/lib/types'
 
@@ -73,6 +74,10 @@ export function usePurchaseOrderForm({ type, editId, contractId: fixedContractId
   const [vendorName, setVendorName] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'Delivery' | 'Pick Up'>('Delivery')
   const [deliveryDate, setDeliveryDate] = useState('')
+  // Captured once when an existing PO's date is prefilled — lets validate()
+  // tell "unchanged historical date" apart from "user actively picked a past
+  // date", so editing an old PO without touching the date doesn't error out.
+  const [initialDeliveryDate, setInitialDeliveryDate] = useState<string | null>(null)
   const [siteInfo, setSiteInfo] = useState('')
   const [jobDetails, setJobDetails] = useState('')
   const [totalPrice, setTotalPrice] = useState('')
@@ -122,7 +127,9 @@ export function usePurchaseOrderForm({ type, editId, contractId: fixedContractId
     setContractIdRaw(poDetail.contract_id)
     setVendorId(poDetail.supplier_id)
     setVendorName(poDetail.supplier_name)
-    setDeliveryDate(poDetail.scheduled_date ? poDetail.scheduled_date.slice(0, 10) : '')
+    const prefilledDate = poDetail.scheduled_date ? poDetail.scheduled_date.slice(0, 10) : ''
+    setDeliveryDate(prefilledDate)
+    setInitialDeliveryDate(prefilledDate)
     setSiteInfo(poDetail.site_information ?? '')
     setAttachmentIds((poDetail.attachments ?? []).map((a) => a.id))
     if (type === 'supplier') {
@@ -251,6 +258,11 @@ export function usePurchaseOrderForm({ type, editId, contractId: fixedContractId
     if (!contractId) e.contractId = 'Select a contract'
     if (!vendorId) e.vendorId = type === 'supplier' ? 'Select a supplier' : 'Select a subcontractor'
     if (!deliveryDate) e.deliveryDate = type === 'supplier' ? `Select ${dateLabel.toLowerCase()}` : 'Select delivery date'
+    // Only reject a date the user is actively choosing — leave an unchanged
+    // historical date alone (editing an old PO shouldn't force a date bump).
+    else if (deliveryDate !== initialDeliveryDate && deliveryDate < todayDateOnly()) {
+      e.deliveryDate = `${dateLabel} can't be in the past`
+    }
     if (type === 'subcontractor' && (!totalPrice || parseFloat(totalPrice) <= 0)) e.totalPrice = 'Enter total price'
     if (type === 'supplier') {
       if (trades.length === 0) e.scopes = 'No scope found for this contract'
@@ -260,7 +272,7 @@ export function usePurchaseOrderForm({ type, editId, contractId: fixedContractId
     }
     setErrors(e)
     return Object.keys(e).length === 0
-  }, [contractId, vendorId, deliveryDate, type, dateLabel, totalPrice, trades.length, checkedCount])
+  }, [contractId, vendorId, deliveryDate, initialDeliveryDate, type, dateLabel, totalPrice, trades.length, checkedCount])
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
@@ -366,6 +378,7 @@ export function usePurchaseOrderForm({ type, editId, contractId: fixedContractId
     vendorId, vendorName, selectVendor,
     deliveryMethod, setDeliveryMethod,
     deliveryDate, setDeliveryDate,
+    minDeliveryDate: todayDateOnly(),
     siteInfo, setSiteInfo,
     jobDetails, setJobDetails,
     totalPrice, setTotalPrice,

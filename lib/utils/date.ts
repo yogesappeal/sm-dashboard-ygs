@@ -26,6 +26,11 @@ export function relativeTime(dateString: string): string {
   return formatDistanceToNow(date, { addSuffix: true })
 }
 
+/** Local (not UTC) yyyy-MM-dd for today — matches what <input type="date"> reads/writes. */
+export function todayDateOnly(): string {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
 export function getGreeting(): string {
   const hour = new Date().getHours()
   if (hour < 12) return 'Good Morning'
