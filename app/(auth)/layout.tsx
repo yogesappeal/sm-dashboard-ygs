@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <h2 className="font-extrabold text-white leading-none mb-4" style={{ fontSize: '4.5rem', letterSpacing: '-0.02em' }}>
             SM Dashboard
           </h2>
-          <p className="text-slate-300 text-lg max-w-sm">
+          <p className="text-slate-300 text-lg whitespace-nowrap">
             Your workspace for managing projects and staying organized
           </p>
         </div>

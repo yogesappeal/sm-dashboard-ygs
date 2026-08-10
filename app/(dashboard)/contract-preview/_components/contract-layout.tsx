@@ -13,6 +13,7 @@ import { RightPanel } from './right-panel'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DateInput } from '@/components/ui/date-input'
 import { useAuthStore } from '@/lib/store'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { updateProjectStartDate } from '@/lib/api'
 import type { Contract, Crew, Pod, Scope, PurchaseOrder, Project } from './types'
 
@@ -47,6 +48,7 @@ function daysSince(iso: string) {
 
 function PlannedStartField({ projectId, value }: { projectId?: string; value: string }) {
   const { token } = useAuthStore()
+  const canEdit = usePermission('contract:edit-planned-start')
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(value)
@@ -106,17 +108,23 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
     <div ref={wrapperRef} className="relative hidden lg:flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
       <Calendar size={13} className="text-slate-400" />
       <span>Planned Start:</span>
-      <button
-        onClick={handleOpen}
-        className={cn(
-          'font-medium hover:underline underline-offset-2 transition-colors',
-          value ? 'text-slate-700' : 'text-slate-400 italic'
-        )}
-      >
-        {value ? formatPlannedDate(value) : 'Not set'}
-      </button>
+      {canEdit ? (
+        <button
+          onClick={handleOpen}
+          className={cn(
+            'font-medium hover:underline underline-offset-2 transition-colors',
+            value ? 'text-slate-700' : 'text-slate-400 italic'
+          )}
+        >
+          {value ? formatPlannedDate(value) : 'Not set'}
+        </button>
+      ) : (
+        <span className={cn('font-medium', value ? 'text-slate-700' : 'text-slate-400 italic')}>
+          {value ? formatPlannedDate(value) : 'Not set'}
+        </span>
+      )}
 
-      {open && (
+      {canEdit && open && (
         <div className="absolute top-full mt-2 right-0 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg p-3">
           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1.5">Planned start date</p>
           <DateInput
