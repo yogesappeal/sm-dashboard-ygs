@@ -33,13 +33,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex-1 lg:w-[35%] flex items-center justify-center bg-white p-8">
         <div className="w-full max-w-sm">
           {/* Logo above Welcome back */}
-          <div className="mb-6 flex justify-center">
+          <div className="relative w-[180px] h-[66px] mb-6 mx-auto">
             <Image
               src={FULL_LOGO}
               alt="AusHail"
-              width={180}
-              height={66}
-              className="object-contain w-[180px] h-auto"
+              fill
+              sizes="180px"
+              className="object-contain"
               priority
             />
           </div>

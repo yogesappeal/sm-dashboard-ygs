@@ -30,6 +30,7 @@ export function WelcomeCard({ firstName, variant = 'sm' }: WelcomeCardProps) {
         src={avatarUrl}
         alt={firstName}
         fill
+        sizes="80px"
         className="rounded-2xl object-cover ring-4 ring-white/30"
       />
     </div>

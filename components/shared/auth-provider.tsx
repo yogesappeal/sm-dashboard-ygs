@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store'
 import type { UserRole } from '@/lib/store'
 import { getUserDetails } from '@/lib/api'
 import type { BackendUserRole } from '@/lib/types'
+import { WelcomeModal } from '@/components/shared/welcome-modal'
 
 // Access is driven by the backend's `role` enum (admin/site_manager/ops),
 // NOT job_title — job_title is display-only. Anything outside this enum
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setRole, setToken, setLoading, setAccessDenied, isLoading, accessDenied, clear } = useAuthStore()
   const supabase = createClient()
   const router = useRouter()
+  const [showWelcome, setShowWelcome] = useState(false)
 
   useEffect(() => {
     async function loadProfile(accessToken: string) {
@@ -48,16 +50,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
         await loadProfile(session.access_token)
+        setShowWelcome(!session.user.user_metadata?.has_seen_welcome)
       }
       setLoading(false)
     }
 
     init()
 
+    // Only the initial SIGNED_IN carries the first-login check — later
+    // refreshes/token rotations fire this same event and would otherwise
+    // re-show the modal after it's already been dismissed this session.
+    let sawInitialSignIn = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         if (session?.access_token) {
           await loadProfile(session.access_token)
+          if (event === 'SIGNED_IN' && !sawInitialSignIn) {
+            sawInitialSignIn = true
+            setShowWelcome(!session.user.user_metadata?.has_seen_welcome)
+          }
         } else {
           setToken(null)
         }
@@ -72,6 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clear()
     router.push('/login')
     router.refresh()
+  }
+
+  async function handleFinishWelcome() {
+    setShowWelcome(false)
+    await supabase.auth.updateUser({ data: { has_seen_welcome: true } })
   }
 
   if (isLoading) {
@@ -101,5 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      <WelcomeModal open={showWelcome} onFinish={handleFinishWelcome} />
+    </>
+  )
 }

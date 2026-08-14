@@ -179,7 +179,7 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
       >
         {avatarUrl ? (
           <div className="relative w-8 h-8 flex-shrink-0">
-            <Image src={avatarUrl} alt={displayName} fill className="rounded-full object-cover ring-2 ring-[#6692C5]/30" />
+            <Image src={avatarUrl} alt={displayName} fill sizes="32px" className="rounded-full object-cover ring-2 ring-[#6692C5]/30" />
           </div>
         ) : (
           <div className="w-8 h-8 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center flex-shrink-0">

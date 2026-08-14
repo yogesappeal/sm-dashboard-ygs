@@ -93,6 +93,7 @@ export default function ProfilePage() {
                 src={avatarUrl}
                 alt={displayName}
                 fill
+                sizes="80px"
                 className="rounded-2xl object-cover ring-4 ring-[#6692C5]/10 transition-all duration-200 group-hover:ring-[#6692C5]/30 group-hover:brightness-90"
               />
               {/* Zoom hint overlay */}

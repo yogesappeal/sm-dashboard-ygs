@@ -5,13 +5,13 @@ const FULL_LOGO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/pub
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-      <div className="mb-6">
+      <div className="relative w-[160px] h-[58px] mb-6">
         <Image
           src={FULL_LOGO}
           alt="AusHail"
-          width={160}
-          height={58}
-          className="object-contain w-[160px] h-auto"
+          fill
+          sizes="160px"
+          className="object-contain"
           priority
         />
       </div>

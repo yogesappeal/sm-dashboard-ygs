@@ -122,6 +122,7 @@ export function Header() {
                 src={avatarUrl}
                 alt={user?.full_name ?? 'avatar'}
                 fill
+                sizes="36px"
                 className="rounded-full object-cover ring-2 ring-[#6692C5]/20"
               />
             </div>
