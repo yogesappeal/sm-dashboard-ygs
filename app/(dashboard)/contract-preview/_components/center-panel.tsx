@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Send, Check, XCircle, Edit2, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Calendar, Paperclip } from 'lucide-react'
+import { X, Send, Check, XCircle, Edit2, ChevronDown, Clock, Package, Activity, CheckCircle2, AlertCircle, FileText, Loader2, Calendar, Paperclip, PenLine, ShieldCheck } from 'lucide-react'
 import { cn, normalizeOrderItems, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -17,9 +17,95 @@ import { useToast } from '@/components/shared/toast'
 import { usePurchaseOrderForm, type POFormTradeSection as TradeSection } from '@/lib/hooks/use-purchase-order-form'
 import type { ScopeData } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
+import type { PurchaseOrder } from './types'
 import { useContractId } from './contract-id-context'
 
 // ─── Activity Canvas ──────────────────────────────────────────────────────────
+
+// Same grouping POTracker's status filter uses in the right panel — kept in
+// sync manually since there's no shared status taxonomy module yet.
+const PO_STAT_GROUPS: { label: string; title: string; statuses: string[]; Icon: typeof Package; color: string }[] = [
+  { label: 'Draft', title: 'Draft POs', statuses: ['PO Draft'], Icon: PenLine, color: 'amber' },
+  { label: 'Sent', title: 'Sent POs', statuses: ['PO Submitted', 'PO Sent'], Icon: Send, color: 'cyan' },
+  { label: 'Confirmed', title: 'Confirmed POs', statuses: ['PO Confirmed'], Icon: ShieldCheck, color: 'blue' },
+  { label: 'Completed', title: 'Completed POs', statuses: ['PO Completed'], Icon: CheckCircle2, color: 'teal' },
+  { label: 'Rejected', title: 'Rejected / Cancelled POs', statuses: ['PO Rejected', 'PO Cancelled'], Icon: XCircle, color: 'red' },
+]
+
+const STAT_COLOR_CLS: Record<string, { iconBg: string; iconText: string; ring: string }> = {
+  amber: { iconBg: 'bg-amber-50', iconText: 'text-amber-500', ring: 'ring-amber-200' },
+  cyan: { iconBg: 'bg-cyan-50', iconText: 'text-cyan-500', ring: 'ring-cyan-200' },
+  blue: { iconBg: 'bg-blue-50', iconText: 'text-blue-500', ring: 'ring-blue-200' },
+  teal: { iconBg: 'bg-teal-50', iconText: 'text-teal-500', ring: 'ring-teal-200' },
+  red: { iconBg: 'bg-red-50', iconText: 'text-red-500', ring: 'ring-red-200' },
+}
+
+function POStatsRow({ pos, onCanvas }: { pos: PurchaseOrder[]; onCanvas: (a: CanvasAction) => void }) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  if (pos.length === 0) return null
+
+  const expandedGroup = PO_STAT_GROUPS.find((g) => g.label === expanded)
+  const expandedPos = expandedGroup
+    ? pos.filter((po) => expandedGroup.statuses.includes(po.status))
+        .slice()
+        .sort((a, b) => new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime())
+    : []
+
+  return (
+    <div className="mb-6">
+      <div className="grid grid-cols-5 gap-2">
+        {PO_STAT_GROUPS.map((group) => {
+          const count = pos.filter((po) => group.statuses.includes(po.status)).length
+          const isOpen = expanded === group.label
+          const c = STAT_COLOR_CLS[group.color]
+          return (
+            <button
+              key={group.label}
+              onClick={() => count > 0 && setExpanded((p) => (p === group.label ? null : group.label))}
+              disabled={count === 0}
+              className={cn(
+                'flex flex-col items-center gap-1.5 bg-white rounded-xl border px-3 py-3 transition-all',
+                count === 0 ? 'border-slate-100 opacity-50 cursor-default' : 'border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer',
+                isOpen && cn('ring-2', c.ring, 'border-transparent')
+              )}
+            >
+              <div className={cn('w-8 h-8 rounded-full flex items-center justify-center', c.iconBg, c.iconText)}>
+                <group.Icon size={14} />
+              </div>
+              <p className="text-lg font-bold text-slate-700 leading-none">{count}</p>
+              <p className="text-[10px] text-slate-400 leading-tight text-center">{group.label}</p>
+            </button>
+          )
+        })}
+      </div>
+
+      {expandedGroup && (
+        <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/50 overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{expandedGroup.title}</p>
+            <span className="text-[11px] text-slate-400">{expandedPos.length}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto p-2">
+            {expandedPos.map((po) => (
+              <button
+                key={po.id}
+                onClick={() => onCanvas({ type: 'SHOW_PO_DETAIL', poId: po.id })}
+                className="flex flex-col items-start gap-1.5 bg-white rounded-xl border border-slate-100 px-3.5 py-3 text-left hover:border-slate-200 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{po.po_number}</p>
+                  <StatusBadge status={po.status} className="flex-shrink-0" />
+                </div>
+                <p className="text-[11px] text-slate-400 truncate">{po.supplier_name}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const ACTIVITIES = [
   { id: 1, Icon: Package, color: 'bg-blue-100 text-blue-500', label: 'PO-2026-003 created', sub: 'Plumbing Mate · Subcontractor PO · $3,200', date: '12 Feb 2026, 2:00 PM' },
@@ -30,7 +116,7 @@ const ACTIVITIES = [
   { id: 6, Icon: FileText, color: 'bg-slate-100 text-slate-500', label: 'Contract created', sub: "SC-2026-00001-3E3 — Lisa D'Hondt", date: '10 Jan 2026, 9:00 AM' },
 ]
 
-function ActivityCanvas() {
+function ActivityCanvas({ pos, onCanvas }: { pos: PurchaseOrder[]; onCanvas: (a: CanvasAction) => void }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-6">
@@ -38,6 +124,13 @@ function ActivityCanvas() {
           <Activity size={16} className="text-slate-400" />
           <h2 className="text-sm font-semibold text-slate-700">Activity</h2>
         </div>
+
+        {pos.length > 0 && (
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Purchase Orders</p>
+        )}
+        <POStatsRow pos={pos} onCanvas={onCanvas} />
+
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Activity Log</p>
 
         {/* isolate: contains the timeline icons' z-10 (flex items respect
             z-index even at position:static) so it can't bleed past this
@@ -1131,13 +1224,14 @@ function PODetailCanvas({
 
 // ─── Center Panel ─────────────────────────────────────────────────────────────
 
-export function CenterPanel({ canvas, onCanvas }: {
+export function CenterPanel({ canvas, onCanvas, pos }: {
   canvas: CanvasContext
   onCanvas: (action: CanvasAction) => void
+  pos: PurchaseOrder[]
 }) {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
-      {canvas.view === 'activity' && <ActivityCanvas />}
+      {canvas.view === 'activity' && <ActivityCanvas pos={pos} onCanvas={onCanvas} />}
       {canvas.view === 'create-po' && <CreatePOCanvas canvas={canvas} onCanvas={onCanvas} />}
       {canvas.view === 'po-detail' && <PODetailCanvas canvas={canvas} onCanvas={onCanvas} />}
     </div>

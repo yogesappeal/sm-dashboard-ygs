@@ -341,7 +341,7 @@ export function ContractLayout({ contract, crew, pod, scopes, pos, projects, cur
 
         {/* Center canvas */}
         <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-          <CenterPanel canvas={canvas} onCanvas={dispatch} />
+          <CenterPanel canvas={canvas} onCanvas={dispatch} pos={pos} />
         </div>
 
         {/* Right panel */}

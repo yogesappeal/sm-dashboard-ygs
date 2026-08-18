@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Plus, Loader2, FileText, Calendar, X, AlertT
 import { cn, formatDate, scopeAllowedPoTypes } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PermissionGuard } from '@/components/shared/permission-guard'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { useAuthStore } from '@/lib/store'
 import { getScopeDetailByContractId, updateScopeItems, ApiError } from '@/lib/api'
 import type { ScopeData } from '@/lib/types'
@@ -309,14 +310,16 @@ function PlannedStartConflictBanner({
               <p className="text-xs font-medium text-slate-700 truncate">{c.tradeName}</p>
               <p className="text-[10px] text-red-500">Due {formatDate(c.plannedPoDate)}</p>
             </div>
-            <PlannedPoDateControl
-              scopeId={scopeId}
-              tradeId={c.tradeId}
-              tradeName={c.tradeName}
-              value={c.plannedPoDate}
-              contractId={contractId}
-              plannedStart={plannedStart}
-            />
+            <PermissionGuard action="po:edit">
+              <PlannedPoDateControl
+                scopeId={scopeId}
+                tradeId={c.tradeId}
+                tradeName={c.tradeName}
+                value={c.plannedPoDate}
+                contractId={contractId}
+                plannedStart={plannedStart}
+              />
+            </PermissionGuard>
           </div>
         ))}
       </div>
@@ -334,6 +337,8 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
   const [openBuildings, setOpenBuildings] = useState<Record<string, boolean>>({})
   const [editMode, setEditMode] = useState(false)
   const [drafts, setDrafts] = useState<Map<string, PoDateDraft>>(new Map())
+  const canCreatePo = usePermission('po:create')
+  const canEditPoDate = usePermission('po:edit')
 
   function toggleEditMode() {
     setEditMode(p => !p)
@@ -391,28 +396,33 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
 
         {scopeOpen && (
           <>
-            {/* Quick-create buttons */}
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-t border-b border-slate-100">
-              <PermissionGuard action="po:create">
-                <button
-                  onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: inlinePoType })}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
-                >
-                  <Plus size={11} /> Create PO
-                </button>
-              </PermissionGuard>
-              <button
-                onClick={toggleEditMode}
-                className={cn(
-                  'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors',
-                  editMode
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+            {/* Quick-create buttons — row itself only renders when at least
+                one action is allowed, otherwise it's an empty strip of padding */}
+            {(canCreatePo || canEditPoDate) && (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-t border-b border-slate-100">
+                {canCreatePo && (
+                  <button
+                    onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: inlinePoType })}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
+                  >
+                    <Plus size={11} /> Create PO
+                  </button>
                 )}
-              >
-                <Calendar size={11} /> {editMode ? 'Cancel' : 'PO Plan Date'}
-              </button>
-            </div>
+                {canEditPoDate && (
+                  <button
+                    onClick={toggleEditMode}
+                    className={cn(
+                      'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors',
+                      editMode
+                        ? 'bg-slate-800 text-white border-slate-800'
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    )}
+                  >
+                    <Calendar size={11} /> {editMode ? 'Cancel' : 'PO Plan Date'}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Buildings → Trades tree */}
             {scopeData.scope_details.map(building => {
