@@ -18,16 +18,12 @@ export interface TaskModel {
 
 export interface TasksResponse {
   success: boolean
-  message: string
   data: TaskModel[]
-  meta: { total: number }
 }
 
 export interface TaskDetailResponse {
   success: boolean
-  message: string
   data: TaskModel
-  meta: Record<string, unknown>
 }
 
 export interface TaskHistoryEntry {
@@ -46,9 +42,7 @@ export interface TaskHistoryEntry {
 
 export interface TaskHistoryResponse {
   success: boolean
-  message: string
   data: TaskHistoryEntry[]
-  meta: { total: number }
 }
 
 export interface TaskCategory {

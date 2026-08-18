@@ -31,11 +31,12 @@ export async function getAllTasks(token: string, params: GetTasksParams = {}) {
 }
 
 export async function insertNewTask(token: string, body: unknown) {
-  return api.post('/functions/v1/insert-task', token, body)
+  return api.post('/functions/v1/tasks', token, body)
 }
 
-export async function updateExistingTask(token: string, body: unknown) {
-  return api.post('/functions/v1/update-task', token, body)
+export async function updateExistingTask(token: string, body: { task_id: string; [key: string]: unknown }) {
+  const { task_id, ...rest } = body
+  return api.patch(`/functions/v1/tasks/${task_id}`, token, rest)
 }
 
 export async function updateTaskPriority(
@@ -43,10 +44,7 @@ export async function updateTaskPriority(
   taskId: string,
   priority: boolean
 ) {
-  return api.post('/functions/v1/task-priority', token, {
-    task_id: taskId,
-    priority,
-  })
+  return api.patch(`/functions/v1/tasks/${taskId}/priority`, token, { priority })
 }
 
 export async function updateTaskStatus(
@@ -54,10 +52,7 @@ export async function updateTaskStatus(
   taskId: string,
   status: string
 ) {
-  return api.post('/functions/v1/task-status', token, {
-    task_id: taskId,
-    status,
-  })
+  return api.patch(`/functions/v1/tasks/${taskId}/status`, token, { status })
 }
 
 export async function getTaskById(token: string, taskId: string): Promise<TaskModel> {
