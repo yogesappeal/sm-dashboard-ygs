@@ -6,8 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Building2, Mail, Phone, MapPin, FileText, Edit2, Check, Loader2 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { updateSupplierStatus, updateSupplierData } from '@/lib/api'
 import { supplierSchema } from '@/lib/utils/validation'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { SupplierData } from '@/lib/types'
 import type { z } from 'zod'
@@ -25,6 +28,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
   const [isEditing, setIsEditing] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const {
     register,
@@ -41,17 +45,17 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
           address: supplier.address,
           type: supplier.type,
           notes: supplier.notes || '',
-          company: supplier.company || '',
         }
       : undefined,
   })
 
   const updateMutation = useMutation({
     mutationFn: (data: SupplierForm) =>
-      updateSupplierData(token, { supplier_id: supplier!.id, ...data }),
+      updateSupplierData(token, { supplier: supplier!.id, ...data, company: supplier!.company || 'AusHail' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.supplier.updateSuccess, 'success')
       setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -94,16 +98,18 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-slate-500">Supplier Code</p>
-            <p className="font-medium text-slate-800 truncate">{supplier.supplierCode || '-'}</p>
+            <p className="font-medium text-slate-800 truncate">{supplier.supplier_code || '-'}</p>
           </div>
           {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#C66EEB] border border-[#C66EEB] rounded-lg hover:bg-purple-50 transition-colors"
-            >
-              <Edit2 size={14} />
-              Edit
-            </button>
+            <PermissionGuard action="supplier:edit">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
+              >
+                <Edit2 size={14} />
+                Edit
+              </button>
+            </PermissionGuard>
           )}
         </div>
 
@@ -116,13 +122,6 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
                   {...register('name')}
                   className={inputCls(!!errors.name)}
                   placeholder="Supplier name"
-                />
-              </Field>
-              <Field label="Company" error={errors.company?.message}>
-                <input
-                  {...register('company')}
-                  className={inputCls(false)}
-                  placeholder="Company name (optional)"
                 />
               </Field>
               <Field label="Phone" error={errors.phone?.message}>
@@ -166,7 +165,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
                 <button
                   type="submit"
                   disabled={isSubmitting || updateMutation.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {(isSubmitting || updateMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
                   Save Changes
@@ -181,7 +180,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
               </div>
 
               {updateMutation.isError && (
-                <p className="text-xs text-red-500 text-center">Failed to save changes. Please try again.</p>
+                <p className="text-xs text-red-500 text-center">{messages.supplier.updateError}</p>
               )}
             </form>
           ) : (
@@ -205,27 +204,29 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
               )}
 
               {/* Status toggle */}
-              <div className="pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 mb-3">Supplier Status</p>
-                <button
-                  onClick={handleToggleStatus}
-                  disabled={statusLoading}
-                  className={cn(
-                    'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors',
-                    supplier.status === 'Active Supplier'
-                      ? 'border-red-200 text-red-600 hover:bg-red-50'
-                      : 'border-green-200 text-green-600 hover:bg-green-50',
-                    statusLoading && 'opacity-60 cursor-not-allowed'
-                  )}
-                >
-                  {statusLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Check size={14} />
-                  )}
-                  {supplier.status === 'Active Supplier' ? 'Set as Inactive' : 'Set as Active'}
-                </button>
-              </div>
+              <PermissionGuard action="supplier:status">
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-xs text-slate-500 mb-3">Supplier Status</p>
+                  <button
+                    onClick={handleToggleStatus}
+                    disabled={statusLoading}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors',
+                      supplier.status === 'Active Supplier'
+                        ? 'border-red-200 text-red-600 hover:bg-red-50'
+                        : 'border-green-200 text-green-600 hover:bg-green-50',
+                      statusLoading && 'opacity-60 cursor-not-allowed'
+                    )}
+                  >
+                    {statusLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    {supplier.status === 'Active Supplier' ? 'Set as Inactive' : 'Set as Active'}
+                  </button>
+                </div>
+              </PermissionGuard>
             </div>
           )}
         </div>
@@ -277,7 +278,7 @@ function Field({
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]',
+    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

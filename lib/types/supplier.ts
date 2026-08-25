@@ -9,8 +9,9 @@ export interface SupplierData {
   type: string
   notes: string
   company: string
-  supplierCode: string
-  totalCount: number
+  supplier_code: string
+  created_at: string
+  total_count?: number
   status: string
 }
 

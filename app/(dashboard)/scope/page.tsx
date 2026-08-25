@@ -6,6 +6,7 @@ import { ClipboardList } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getScopingPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { ScopeRow, ScopeTableHeader } from '@/components/cards/scope-row'
 import { ScopeSlideOver } from '@/components/cards/scope-slide-over'
 import { ScopeCreateModal } from '@/components/forms/scope-create-modal'
@@ -44,9 +45,7 @@ export default function ScopePage() {
     staleTime: 2 * 60 * 1000,
   })
 
-  const scopes = (data?.data ?? []).filter(
-    (s) => !typeFilter || s.type === typeFilter
-  )
+  const scopes = data?.data ?? []
   const pagination = data?.pagination
 
   const handleRefresh = useCallback(() => {
@@ -60,77 +59,89 @@ export default function ScopePage() {
   const isTableLoading = isLoading || isFetching
 
   return (
-    <div className="flex flex-col min-h-full">
-      <PageHeader
-        title="Scope of Work"
-        description="View and manage project scopes"
-        action={
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            + New Scope
-          </button>
-        }
-      />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Scope of Work"
+          description="View and manage project scopes"
+          action={
+            <PermissionGuard action="scope:create">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                + New Scope
+              </button>
+            </PermissionGuard>
+          }
+        />
 
-      {/* Type filter */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => {
-                setTypeFilter(f.value)
-                setCurrentPage(1)
-              }}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                typeFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Type filter */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => {
+                  setTypeFilter(f.value)
+                  setCurrentPage(1)
+                }}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  typeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
-        <ScopeTableHeader />
+      {/* Table — header and pagination stay put, only the row list scrolls */}
+      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-0', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
+        <div className="flex-shrink-0">
+          <ScopeTableHeader />
+        </div>
 
-        {isTableLoading ? (
-          Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
-        ) : scopes.length === 0 ? (
-          <EmptyState
-            icon={ClipboardList}
-            title="No scopes found"
-            description="Create your first scope of work to get started"
-          />
-        ) : (
-          scopes.map((s) => (
-            <ScopeRow key={s.scopeId} scope={s} onClick={handleRowClick} />
-          ))
+        <div className="flex-1 overflow-y-auto">
+          {isTableLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
+          ) : scopes.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No scopes found"
+              description="Create your first scope of work to get started"
+            />
+          ) : (
+            scopes.map((s) => (
+              <ScopeRow key={s.scope_id} scope={s} onClick={handleRowClick} />
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination && (
+          <div className="flex-shrink-0">
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+              onPageChange={setCurrentPage}
+              onRefresh={handleRefresh}
+            />
+          </div>
         )}
       </div>
-
-      {/* Pagination */}
-      {pagination && (
-        <PaginationBar
-          currentPage={currentPage}
-          totalPages={pagination.totalPages}
-          onPageChange={setCurrentPage}
-          onRefresh={handleRefresh}
-        />
-      )}
 
       {/* Slide-over */}
       {selectedScope && (
         <ScopeSlideOver
           scope={selectedScope}
+          token={token!}
           onClose={() => setSelectedScope(null)}
+          queryKey={queryKey}
         />
       )}
 

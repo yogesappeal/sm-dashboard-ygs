@@ -1,70 +1,138 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
 import { useAuthStore, useAppStore } from '@/lib/store'
-import { getGreeting } from '@/lib/utils'
-import { LogOut, Bell, Menu } from 'lucide-react'
-import { initials } from '@/lib/utils/format'
+import { Bell, Menu, LayoutGrid, Search, X } from 'lucide-react'
+import Image from 'next/image'
+import { GlobalSearch } from './global-search'
+import { NotificationPanel } from './notification-panel'
+import { ToolboxPanel } from './toolbox-panel'
+import { PermissionGuard } from '@/components/shared/permission-guard'
+import { useNotificationsUnreadCount } from '@/lib/hooks/use-notifications'
+
+const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
 
 export function Header() {
-  const router = useRouter()
-  const { user, role, clear } = useAuthStore()
+  const { user } = useAuthStore()
   const { setMobileSidebarOpen } = useAppStore()
-  const supabase = createClient()
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [toolboxOpen, setToolboxOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const { data: unreadCount = 0 } = useNotificationsUnreadCount()
 
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-    clear()
-    router.push('/login')
-    router.refresh()
+  const initials = user?.first_name?.[0]?.toUpperCase() ?? '?'
+  const avatarUrl = user?.image_url
+    ? user.image_url.startsWith('http')
+      ? user.image_url
+      : `${STORAGE_BASE}/${user.image_url.replace(/^\/+/, '')}`
+    : null
+
+  if (mobileSearchOpen) {
+    return (
+      <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-2 px-4 sticky top-0 z-10 md:hidden">
+        <div className="flex-1">
+          <GlobalSearch />
+        </div>
+        <button
+          onClick={() => setMobileSearchOpen(false)}
+          className="p-2 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors shrink-0"
+          aria-label="Close search"
+        >
+          <X size={20} />
+        </button>
+      </header>
+    )
   }
 
   return (
-    <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10">
-      {/* Left: hamburger (mobile) + greeting */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors md:hidden"
-          aria-label="Open menu"
-        >
-          <Menu size={20} />
-        </button>
-        <div>
-          <p className="text-sm text-slate-500">{getGreeting()},</p>
-          <p className="text-sm font-semibold text-slate-800 leading-tight">
-            {user?.fullName || user?.firstName || 'User'}
-          </p>
-        </div>
+    <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-4 px-4 md:px-6 sticky top-0 z-10">
+
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileSidebarOpen(true)}
+        className="p-2 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors md:hidden shrink-0"
+        aria-label="Open menu"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Search */}
+      <div className="hidden md:flex flex-1 max-w-md">
+        <GlobalSearch />
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center gap-3">
-        {role && (
-          <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-[#C66EEB] border border-purple-100">
-            {role}
-          </span>
-        )}
+      {/* Spacer */}
+      <div className="flex-1" />
 
-        <button className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors">
-          <Bell size={18} />
+      {/* Right cluster */}
+      <div className="flex items-center gap-3 shrink-0">
+
+        {/* Mobile search trigger */}
+        <button
+          onClick={() => setMobileSearchOpen(true)}
+          className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors md:hidden"
+          aria-label="Search"
+        >
+          <Search size={18} />
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#C66EEB] flex items-center justify-center">
-            <span className="text-white text-xs font-semibold">
-              {user ? initials(user.fullName || `${user.firstName} ${user.lastName}`) : '?'}
-            </span>
+        {/* SM Toolbox */}
+        <PermissionGuard action="toolbox:view">
+          <div className="relative">
+            <button
+              onClick={() => setToolboxOpen((v) => !v)}
+              className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+              aria-label="SM Toolbox"
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <ToolboxPanel open={toolboxOpen} onClose={() => setToolboxOpen(false)} />
           </div>
+        </PermissionGuard>
+
+        {/* Notification bell + panel */}
+        <div className="relative">
           <button
-            onClick={handleSignOut}
-            title="Sign out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            onClick={() => setNotifOpen((v) => !v)}
+            className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+            aria-label="Notifications"
           >
-            <LogOut size={16} />
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-orange-600" />
+            )}
           </button>
+          <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
         </div>
+
+        {/* User info + avatar */}
+        <div className="flex items-center gap-2.5">
+          <div className="hidden sm:flex flex-col items-end">
+            <p className="text-sm font-semibold text-slate-800 leading-tight">
+              {user?.full_name || user?.first_name || 'User'}
+            </p>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              {user?.job_title === 'Ops' ? 'Operations' : user?.job_title}
+            </p>
+          </div>
+
+          {avatarUrl ? (
+            <div className="relative w-9 h-9 shrink-0">
+              <Image
+                src={avatarUrl}
+                alt={user?.full_name ?? 'avatar'}
+                fill
+                sizes="36px"
+                className="rounded-full object-cover ring-2 ring-[#6692C5]/20"
+              />
+            </div>
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center shrink-0">
+              <span className="text-[#6692C5] text-sm font-semibold">{initials}</span>
+            </div>
+          )}
+        </div>
+
       </div>
     </header>
   )

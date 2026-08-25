@@ -26,7 +26,7 @@ export async function getScopeDetailByContractId(
   token: string,
   contractId: string
 ) {
-  const q = new URLSearchParams({ contract_id: contractId })
+  const q = new URLSearchParams({ build_contract: contractId })
   return api.get<ScopeData>(
     `/functions/v1/get-scope-by-contract-id?${q}`,
     token
@@ -40,4 +40,20 @@ export async function getScopeDetailByPOId(token: string, poId: string) {
 
 export async function insertScopeWithItems(token: string, body: unknown) {
   return api.post('/functions/v1/insert-scopes-with-items', token, body)
+}
+
+export interface UpdateScopeItemsTrade {
+  trade_id: string
+  planned_po_date: string | null
+}
+
+export async function updateScopeItems(
+  token: string,
+  body: { scope_id: string; trades: UpdateScopeItemsTrade[] }
+) {
+  return api.post('/functions/v1/update-scope-items', token, body)
+}
+
+export async function updateScopeData(token: string, body: unknown) {
+  return api.post('/functions/v1/update-scope', token, body)
 }

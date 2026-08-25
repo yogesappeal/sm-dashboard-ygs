@@ -1,40 +1,33 @@
 import { api } from './fetcher'
-import type { PurchaseOrderList, POSupplierInfo, POAttachment } from '../types'
+import type {
+  PurchaseOrderList,
+  POSupplierInfo,
+  POAttachmentUploadEnvelope,
+  PurchaseOrderDetailsEnvelope,
+  InsertPurchaseOrderBody,
+  InsertPurchaseOrderResponse,
+  UpdatePurchaseOrderBody,
+  UpdatePurchaseOrderResponse,
+} from '../types'
 
-export interface PODetail {
-  id: string
-  poNumber: string
-  status: string
-  type: string
-  supplierName: string
-  supplierEmail?: string
-  supplierPhone?: string
-  clientFirstName?: string
-  clientLastName?: string
-  address?: string
-  scheduledDate?: string
-  siteInformation?: string
-  orderDetails?: string
-  totalAmount?: number
-  contractId?: string
-  contractName?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export async function getPODetails(token: string, poId: string) {
-  const q = new URLSearchParams({ id: `eq.${poId}`, select: '*' })
-  return api.get<PODetail[]>(
-    `/rest/v1/purchase_order_details?${q}`,
+// Full PO detail payload (order items, scope snapshot, supplier + client info)
+// from the dedicated purchase-order-details function endpoint.
+export async function getPurchaseOrderDetailsFull(token: string, poId: string) {
+  const q = new URLSearchParams({ po_id: poId })
+  const res = await api.get<PurchaseOrderDetailsEnvelope>(
+    `/functions/v1/purchase-order-details?${q}`,
     token
   )
+  return res.data
 }
 
 interface GetPOParams {
   page?: number
   limit?: number
-  status?: string
+  order_dir?: 'ASC' | 'DESC'
   type?: string
+  status?: string
+  search?: string
   contractId?: string
 }
 
@@ -45,8 +38,10 @@ export async function getPurchaseOrdersPaginated(
   const q = new URLSearchParams({
     page: String(params.page ?? 1),
     limit: String(params.limit ?? 10),
-    ...(params.status ? { status: params.status } : {}),
-    ...(params.type ? { type: params.type } : {}),
+    order_dir: params.order_dir ?? 'DESC',
+    ...(params.type       ? { type:        params.type       } : {}),
+    ...(params.status     ? { status:      params.status     } : {}),
+    ...(params.search     ? { search:      params.search     } : {}),
     ...(params.contractId ? { contract_id: params.contractId } : {}),
   })
   return api.get<PurchaseOrderList>(
@@ -60,23 +55,18 @@ export async function getPOSupplierInformation(token: string, poId: string) {
   return api.get<POSupplierInfo>(`/functions/v1/po-information?${q}`, token)
 }
 
-export async function insertPurchaseOrder(token: string, body: unknown) {
-  return api.post('/functions/v1/insert-purchase-order', token, body)
-}
-
-export async function insertPurchaseOrderSubcontractor(
-  token: string,
-  body: unknown
-) {
-  return api.post('/rest/v1/rpc/insert_purchase_order', token, body)
+// Unified endpoint for both supplier and subcontractor PO creation —
+// distinguished by body.type / body.service_type. See InsertPurchaseOrderBody.
+export async function insertPurchaseOrder(token: string, body: InsertPurchaseOrderBody) {
+  return api.post<InsertPurchaseOrderResponse>('/functions/v1/insert-purchase-order', token, body)
 }
 
 export async function insertSupplierOrSubs(token: string, body: unknown) {
   return api.post('/rest/v1/rpc/insert_po_supplier', token, body)
 }
 
-export async function updatePurchaseOrder(token: string, body: unknown) {
-  return api.post('/functions/v1/update-purchase-order', token, body)
+export async function updatePurchaseOrder(token: string, body: UpdatePurchaseOrderBody) {
+  return api.post<UpdatePurchaseOrderResponse>('/functions/v1/update-purchase-order', token, body)
 }
 
 export async function updatePurchaseOrderStatus(
@@ -96,20 +86,43 @@ export async function updatePOSupplierInformation(token: string, body: unknown) 
   return api.post('/functions/v1/po-supplier-confirmed', token, body)
 }
 
-export async function respondNewDateRequest(token: string, body: unknown) {
-  return api.post('/functions/v1/respond-new-date-request', token, body)
+export interface RespondNewDateRequestBody {
+  po_id: string
+  action: 'approve' | 'decline'
+}
+
+export interface RespondNewDateRequestResponse {
+  success: boolean
+  message: string
+  data: {
+    po_id: string
+    action: 'approve' | 'decline'
+  }
+}
+
+export async function respondNewDateRequest(token: string, body: RespondNewDateRequestBody) {
+  return api.post<RespondNewDateRequestResponse>('/functions/v1/respond-new-date-request', token, body)
 }
 
 export async function autoSendEmailPurchaseOrder(
   token: string,
-  poId: string
+  poId: string,
+  serviceType: 'supplier' | 'subcontractor'
 ) {
-  return api.post('/functions/v1/auto-po-send', token, { po_id: poId })
+  return api.post<{ message: string }>('/functions/v1/auto-po-send', token, {
+    purchase_order_id: poId,
+    service_type: serviceType,
+  })
 }
 
-// Attachments
-export async function uploadPOAttachment(token: string, formData: FormData) {
-  return api.upload<POAttachment>(
+// Attachments — gated behind NEXT_PUBLIC_FEATURE_ATTACHMENTS, see po-attachments-section.tsx
+// Must be uploaded BEFORE the PO is created: one file per call, returns an
+// unlinked attachment id to pass into insert-purchase-order's attachment_ids.
+export async function uploadPOAttachment(token: string, file: File, fileName?: string) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('file_name', fileName ?? file.name)
+  return api.upload<POAttachmentUploadEnvelope>(
     '/functions/v1/po-attachments',
     token,
     formData
@@ -123,17 +136,12 @@ export async function deletePOAttachment(
   return api.delete(`/functions/v1/po-attachments/${attachmentId}`, token)
 }
 
+// Response shape is unconfirmed — po-attachments has twice returned a
+// different shape than documented (flat vs wrapped in {success, data}), so
+// this accepts either and the caller extracts the url defensively.
 export async function getPOAttachmentURL(token: string, attachmentId: string) {
-  return api.get<{ url: string }>(
+  return api.get<{ url: string } | { success: boolean; data: { url: string } }>(
     `/functions/v1/po-attachments/${attachmentId}/url`,
     token
-  )
-}
-
-export async function uploadPOAttachmentAlt(token: string, formData: FormData) {
-  return api.upload<POAttachment>(
-    '/functions/v1/upload-po-attachments',
-    token,
-    formData
   )
 }

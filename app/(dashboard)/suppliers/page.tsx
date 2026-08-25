@@ -6,6 +6,7 @@ import { Search, Users, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { getSuppliersPaginated } from '@/lib/api'
 import { PageHeader } from '@/components/shared/page-header'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { SupplierRow, SupplierTableHeader } from '@/components/cards/supplier-row'
 import { SupplierSlideOver } from '@/components/cards/supplier-slide-over'
 import { SupplierCreateModal } from '@/components/forms/supplier-create-modal'
@@ -21,26 +22,34 @@ const TYPE_FILTERS = [
   { value: 'subcontractor', label: 'Subcontractor' },
 ]
 
-const STATUS_FILTERS = [
-  { value: '', label: 'All Status' },
-  { value: 'Active Supplier', label: 'Active' },
-  { value: 'Inactive', label: 'Inactive' },
+// '' = semua, 'true' = active, 'false' = inactive
+const ACTIVE_FILTERS = [
+  { value: '',      label: 'All Status' },
+  { value: 'true',  label: 'Active' },
+  { value: 'false', label: 'Inactive' },
 ]
 
 export default function SuppliersPage() {
   const { token } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const [typeFilter, setTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [typeFilter, setTypeFilter]     = useState('')
+  const [activeFilter, setActiveFilter] = useState('')   // '', 'true', 'false'
+  const [currentPage, setCurrentPage]   = useState(1)
+  const [search, setSearch]             = useState('')
+  const [searchInput, setSearchInput]   = useState('')
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc')
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierData | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateModal, setShowCreateModal]   = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
-  const queryKey = ['suppliers', currentPage, typeFilter, statusFilter, search]
+  // convert string filter to boolean | null for the API
+  const isActive =
+    activeFilter === 'true'  ? true  :
+    activeFilter === 'false' ? false :
+    null
+
+  const queryKey = ['suppliers', currentPage, typeFilter, activeFilter, search, sortDir]
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
@@ -49,14 +58,15 @@ export default function SuppliersPage() {
         page: currentPage,
         limit: 10,
         type: typeFilter || undefined,
-        status: statusFilter || undefined,
+        is_active: isActive,
         search: search || undefined,
+        order_dir: sortDir,
       }),
     enabled: !!token,
     staleTime: 2 * 60 * 1000,
   })
 
-  const suppliers = data?.data ?? []
+  const suppliers  = data?.data ?? []
   const pagination = data?.pagination
 
   const handleSearch = useCallback((value: string) => {
@@ -74,9 +84,19 @@ export default function SuppliersPage() {
     setCurrentPage(1)
   }, [])
 
-  const handleFilterChange = useCallback((type: string, status: string) => {
+  const handleTypeChange = useCallback((type: string) => {
     setTypeFilter(type)
-    setStatusFilter(status)
+    setCurrentPage(1)
+  }, [])
+
+  const handleActiveChange = useCallback((active: string) => {
+    setActiveFilter(active)
+    setCurrentPage(1)
+  }, [])
+
+  // Backend only supports order_dir (no per-column sort), so any column click just toggles direction
+  const handleSort = useCallback(() => {
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     setCurrentPage(1)
   }, [])
 
@@ -91,103 +111,113 @@ export default function SuppliersPage() {
   const isTableLoading = isLoading || isFetching
 
   return (
-    <div className="flex flex-col min-h-full">
-      <PageHeader
-        title="Suppliers"
-        description="Manage suppliers and subcontractors"
-        action={
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C66EEB] hover:bg-[#A855D4] text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            + Add Supplier
-          </button>
-        }
-      />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Suppliers"
+          description="Manage suppliers and subcontractors"
+          action={
+            <PermissionGuard action="supplier:create">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                + Add Supplier
+              </button>
+            </PermissionGuard>
+          }
+        />
 
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search name, code, company…"
-            className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]"
-          />
-          {searchInput && (
-            <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-              <X size={14} />
-            </button>
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search name, code, company…"
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
+            />
+            {searchInput && (
+              <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Type filter */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => handleTypeChange(f.value)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  typeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Active/Inactive filter */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            {ACTIVE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => handleActiveChange(f.value)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  activeFilter === f.value
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Table — header and pagination stay put, only the row list scrolls */}
+      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-0', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
+        <div className="flex-shrink-0">
+          <SupplierTableHeader sortDir={sortDir} onSort={handleSort} />
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {isTableLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
+          ) : suppliers.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No suppliers found"
+              description={search ? `No results for "${search}"` : 'Add your first supplier to get started'}
+            />
+          ) : (
+            suppliers.map((s) => (
+              <SupplierRow key={s.id} supplier={s} onClick={handleRowClick} />
+            ))
           )}
         </div>
 
-        {/* Type filter */}
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => handleFilterChange(f.value, statusFilter)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                typeFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Status filter */}
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => handleFilterChange(typeFilter, f.value)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                statusFilter === f.value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className={cn('bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1', isFetching && !isLoading && 'opacity-70 transition-opacity')}>
-        <SupplierTableHeader />
-
-        {isTableLoading ? (
-          Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
-        ) : suppliers.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No suppliers found"
-            description={search ? `No results for "${search}"` : 'Add your first supplier to get started'}
-          />
-        ) : (
-          suppliers.map((s) => (
-            <SupplierRow key={s.id} supplier={s} onClick={handleRowClick} />
-          ))
+        {/* Pagination */}
+        {pagination && (
+          <div className="flex-shrink-0">
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={pagination.totalPages ?? pagination.total_pages ?? 1}
+              onPageChange={setCurrentPage}
+              onRefresh={handleRefresh}
+            />
+          </div>
         )}
       </div>
-
-      {/* Pagination */}
-      {pagination && (
-        <PaginationBar
-          currentPage={currentPage}
-          totalPages={pagination.totalPages}
-          onPageChange={setCurrentPage}
-          onRefresh={handleRefresh}
-        />
-      )}
 
       {/* Slide-over */}
       {selectedSupplier && (

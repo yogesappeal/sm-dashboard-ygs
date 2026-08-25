@@ -1,17 +1,34 @@
 import type { Trades, Pagination } from './shared'
 
+export interface ScopeTrade {
+  trade_id: string
+  trade_name: string
+  planned_po_date?: string | null
+  // 'Not Started' | 'In Progress' | 'Completed' | 'Urgent' (no PO created yet
+  // and past planned_po_date).
+  po_status?: string | null
+}
+
+export interface ScopeDetail {
+  status: string
+  trades: ScopeTrade[]
+  building_id: string
+  building_name: string
+}
+
 export interface ScopeData {
-  scopeId: string
-  scopeName: string
-  scopeNumber: string
+  scope_id: string
+  scope_name: string
+  scope_number: string
   type: string
   notes: string
-  scopeDetails: ScopeItem[]
-  orderStatus: string
+  scope_details: ScopeDetail[]
+  order_status: string
   builder: string
-  clientRaNumber: string
-  clientFullName: string
-  streetAddress: string
+  client_ra_number: string
+  client_full_name: string
+  street_address: string
+  total_count?: number
 }
 
 export interface ScopeDataModel {
@@ -23,6 +40,16 @@ export interface ScopeItem {
   id: string
   buildingName: string
   tradeItems: string
+}
+
+// TEMP: testing a trade-first input flow for scope-create-modal.tsx — buildings are
+// entered once, each trade snapshots the current building list (default: applies to
+// all buildings) and buildings can be individually excluded per trade. Still converts
+// down to the wire shape { building_name, trades } on submit.
+export interface ScopeTradeDraft {
+  id: string
+  name: string
+  buildingNames: string[]
 }
 
 export interface Items {

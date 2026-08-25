@@ -26,23 +26,46 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   })
 
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'Current password is required'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.oldPassword !== data.password, {
+    message: 'New password must be different from the current password',
+    path: ['password'],
+  })
+
 export const supplierSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email').or(z.literal('')),
-  phone: z.string().min(1, 'Phone is required'),
-  address: z.string().min(1, 'Address is required'),
   type: z.string().min(1, 'Type is required'),
+  email: z.string().email('Invalid email').or(z.literal('')).optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
   notes: z.string().optional(),
-  company: z.string().optional(),
+})
+
+// Stricter than supplierSchema (email required) — used only when creating a
+// new supplier. Kept separate so editing existing suppliers that predate
+// this rule doesn't get blocked by a missing email.
+export const supplierCreateSchema = supplierSchema.extend({
+  email: z.string().min(1, 'Email is required').email('Invalid email'),
 })
 
 export const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   dueDate: z.string().min(1, 'Due date is required'),
-  assignee: z.string().min(1, 'Assignee is required'),
+  assignee: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
   status: z.string().min(1, 'Status is required'),
+  priority: z.boolean().optional(),
+  projectId: z.string().optional(),
 })
 
 export function validatePOSupplierForm(data: Record<string, unknown>): {

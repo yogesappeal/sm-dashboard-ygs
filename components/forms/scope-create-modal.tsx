@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Plus, Trash2, Loader2 } from 'lucide-react'
-import { insertScopeWithItems } from '@/lib/api'
-import { searchContract } from '@/lib/api'
-import { generateScopeItem } from '@/lib/utils/scope'
+import { X, Loader2, ChevronDown } from 'lucide-react'
+import { insertScopeWithItems, getDropdownContractScope } from '@/lib/api'
+import { scopeDraftsToItems, scopeTypeToLabel } from '@/lib/utils/scope'
+import { ScopeItemsBuilder } from './scope-items-builder'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
-import type { ScopeItem } from '@/lib/types'
+import type { ScopeTradeDraft, ContractScopeDropdownItem } from '@/lib/types'
 
 interface ScopeForm {
   scopeName: string
@@ -25,62 +27,93 @@ interface ScopeCreateModalProps {
 
 export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalProps) {
   const queryClient = useQueryClient()
-  const [items, setItems] = useState<ScopeItem[]>([generateScopeItem('', '')])
+  const toast = useToast()
+  // TEMP: testing a trade-first input flow — see scope-items-builder.tsx.
+  const [buildings, setBuildings] = useState<string[]>([])
+  const [trades, setTrades] = useState<ScopeTradeDraft[]>([])
+  const [buildingsError, setBuildingsError] = useState<string | null>(null)
+  const [tradesError, setTradesError] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
-    defaultValues: { type: 'supplier', notes: '' },
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ScopeForm>({
+    defaultValues: { type: 'supplier', notes: '', contractId: '' },
   })
+  register('contractId', { required: 'Contract is required' })
+  const contractId = watch('contractId')
 
-  // Load contracts for dropdown
   const { data: contractsData } = useQuery({
-    queryKey: ['contracts-search', ''],
-    queryFn: () => searchContract(token, ''),
+    queryKey: ['contracts-dropdown-scope'],
+    queryFn: () => getDropdownContractScope(token),
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   })
-  const contracts = contractsData?.data ?? []
+  const contracts = contractsData ?? []
+  const contractsWithScope = contracts.filter((c) => c.has_scope)
+  const contractsWithoutScope = contracts.filter((c) => !c.has_scope)
 
   const createMutation = useMutation({
     mutationFn: (data: ScopeForm) =>
       insertScopeWithItems(token, {
         scope_name: data.scopeName,
-        contract_id: data.contractId,
-        type: data.type,
+        build_contract_id: data.contractId,
+        type: scopeTypeToLabel(data.type as 'supplier' | 'subcontractor' | 'both'),
         notes: data.notes,
-        items: items
-          .filter((i) => i.buildingName.trim())
-          .map((i) => ({ building_name: i.buildingName, trade_items: i.tradeItems })),
+        items: scopeDraftsToItems(buildings, trades),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(messages.scope.createSuccess, 'success')
       onClose()
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
-  const addItem = () => setItems((prev) => [...prev, generateScopeItem('', '')])
-  const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id))
-  const updateItem = (id: string, field: keyof ScopeItem, value: string) =>
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)))
+  function validateItems() {
+    let valid = true
+    setBuildingsError(null)
+    setTradesError(null)
+
+    if (buildings.length === 0) {
+      setBuildingsError('At least one building is required')
+      valid = false
+    }
+    if (trades.length === 0) {
+      setTradesError('At least one trade is required')
+      valid = false
+    } else if (trades.some((t) => t.buildingNames.length === 0)) {
+      setTradesError('Every trade must have at least one building assigned')
+      valid = false
+    }
+    return valid
+  }
+
+  const onSubmit = (data: ScopeForm) => {
+    if (!validateItems()) return
+    return createMutation.mutateAsync(data)
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40 bg-black/10" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="fixed top-0 right-0 z-50 h-full w-full max-w-[437px] bg-white border-l border-slate-200 shadow-xl flex flex-col rounded-tl-[50px]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-800">Create Scope of Work</h2>
+        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-slate-100">
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
-            <X size={18} />
+            <X size={20} />
           </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-500">New Entry</p>
+            <p className="font-medium text-slate-800">Create Scope of Work</p>
+          </div>
         </div>
 
-        {/* Form body */}
+        {/* Form */}
         <form
-          onSubmit={handleSubmit((d) => createMutation.mutateAsync(d))}
+          onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
         >
-          {/* Scope name */}
-          <Field label="Scope Name *" error={errors.scopeName?.message}>
+          <Field label="Scope Name" required error={errors.scopeName?.message}>
             <input
               {...register('scopeName', { required: 'Scope name is required' })}
               className={inputCls(!!errors.scopeName)}
@@ -89,23 +122,17 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             />
           </Field>
 
-          {/* Contract */}
-          <Field label="Contract *" error={errors.contractId?.message}>
-            <select
-              {...register('contractId', { required: 'Contract is required' })}
-              className={inputCls(!!errors.contractId)}
-            >
-              <option value="">Select contract…</option>
-              {contracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.raNumber} — {c.clientFullName}
-                </option>
-              ))}
-            </select>
+          <Field label="Contract" required error={errors.contractId?.message}>
+            <ContractSearchSelect
+              value={contractId}
+              onChange={(id) => setValue('contractId', id, { shouldValidate: true })}
+              contractsWithScope={contractsWithScope}
+              contractsWithoutScope={contractsWithoutScope}
+              error={!!errors.contractId}
+            />
           </Field>
 
-          {/* Type */}
-          <Field label="Type *" error={errors.type?.message}>
+          <Field label="Type" required error={errors.type?.message}>
             <select
               {...register('type', { required: 'Type is required' })}
               className={inputCls(!!errors.type)}
@@ -116,50 +143,20 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             </select>
           </Field>
 
-          {/* Scope items */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-slate-600">Scope Items</label>
-              <button
-                type="button"
-                onClick={addItem}
-                className="flex items-center gap-1 text-xs text-[#C66EEB] hover:text-[#A855D4] transition-colors"
-              >
-                <Plus size={12} /> Add Building
-              </button>
-            </div>
-            <div className="space-y-2">
-              {items.map((item, idx) => (
-                <div key={item.id} className="flex gap-2 items-start bg-slate-50 rounded-xl p-3">
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.buildingName}
-                      onChange={(e) => updateItem(item.id, 'buildingName', e.target.value)}
-                      placeholder="Building name (e.g. House, Garage)"
-                      className={inputCls(false)}
-                    />
-                    <input
-                      value={item.tradeItems}
-                      onChange={(e) => updateItem(item.id, 'tradeItems', e.target.value)}
-                      placeholder="Trade items (e.g. Roofing, Interior)"
-                      className={inputCls(false)}
-                    />
-                  </div>
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-slate-300 hover:text-red-400 transition-colors mt-1"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+            <label className="text-xs font-medium text-slate-600 block mb-2">
+              Scope Items <span className="text-red-500">*</span>
+            </label>
+            <ScopeItemsBuilder
+              buildings={buildings}
+              trades={trades}
+              onBuildingsChange={(b) => { setBuildings(b); setBuildingsError(null) }}
+              onTradesChange={(t) => { setTrades(t); setTradesError(null) }}
+              buildingsError={buildingsError ?? undefined}
+              tradesError={tradesError ?? undefined}
+            />
           </div>
 
-          {/* Notes */}
           <Field label="Notes" error={undefined}>
             <textarea
               {...register('notes')}
@@ -170,37 +167,146 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
           </Field>
 
           {createMutation.isError && (
-            <p className="text-xs text-red-500 text-center">Failed to create scope. Please try again.</p>
+            <p className="text-xs text-red-500 text-center">{messages.scope.createError}</p>
           )}
-        </form>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit((d) => createMutation.mutateAsync(d))}
-            disabled={isSubmitting || createMutation.isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {(isSubmitting || createMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
-            Create Scope
-          </button>
-        </div>
+          <div className="flex gap-2 pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting || createMutation.isPending}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {(isSubmitting || createMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
+              Create Scope
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
+    </>
+  )
+}
+
+function ContractSearchSelect({
+  value,
+  onChange,
+  contractsWithScope,
+  contractsWithoutScope,
+  error,
+}: {
+  value: string
+  onChange: (id: string) => void
+  contractsWithScope: ContractScopeDropdownItem[]
+  contractsWithoutScope: ContractScopeDropdownItem[]
+  error?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const selected = [...contractsWithoutScope, ...contractsWithScope].find((c) => c.id === value)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  const q = search.trim().toLowerCase()
+  const filterFn = (c: ContractScopeDropdownItem) => !q || c.dropdown_label.toLowerCase().includes(q)
+  const filteredWithoutScope = contractsWithoutScope.filter(filterFn)
+  const filteredWithScope = contractsWithScope.filter(filterFn)
+  const noResults = filteredWithoutScope.length === 0 && filteredWithScope.length === 0
+
+  const select = (id: string) => {
+    onChange(id)
+    setOpen(false)
+    setSearch('')
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(inputCls(!!error), 'flex items-center justify-between gap-2 text-left')}
+      >
+        <span className={cn('truncate', !selected && 'text-slate-400')}>
+          {selected ? selected.dropdown_label : 'Select contract…'}
+        </span>
+        <ChevronDown size={14} className={cn('text-slate-400 flex-shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search contract..."
+              className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {noResults && (
+              <p className="text-xs text-slate-400 text-center py-4">No contracts found</p>
+            )}
+            {filteredWithoutScope.length > 0 && (
+              <ContractOptionGroup label="No Scope Yet" contracts={filteredWithoutScope} value={value} onSelect={select} />
+            )}
+            {filteredWithScope.length > 0 && (
+              <ContractOptionGroup label="Has Scope" contracts={filteredWithScope} value={value} onSelect={select} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function ContractOptionGroup({ label, contracts, value, onSelect }: {
+  label: string
+  contracts: ContractScopeDropdownItem[]
+  value: string
+  onSelect: (id: string) => void
+}) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+      {contracts.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onSelect(c.id)}
+          className={cn(
+            'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors truncate',
+            c.id === value ? 'text-[#6692C5] font-medium bg-[#6692C5]/5' : 'text-slate-700'
+          )}
+        >
+          {c.dropdown_label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       {children}
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
@@ -210,7 +316,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]',
+    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

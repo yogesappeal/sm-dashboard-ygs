@@ -8,6 +8,8 @@ import { X, Loader2 } from 'lucide-react'
 import { insertNewTask, updateExistingTask, searchContract } from '@/lib/api'
 import { taskSchema } from '@/lib/utils/validation'
 import { buildTaskRequestBody } from '@/lib/utils/tasks'
+import { useToast } from '@/components/shared/toast'
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils'
 import type { TaskModel } from '@/lib/types'
 import type { z } from 'zod'
@@ -22,13 +24,14 @@ interface TaskCreateEditModalProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
+  { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'done', label: 'Done' },
 ]
 
 export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCreateEditModalProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const isEditing = !!task
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<TaskForm>({
@@ -36,10 +39,10 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
     defaultValues: {
       title: task?.title ?? '',
       description: task?.description ?? '',
-      dueDate: task?.dueDate ?? '',
+      dueDate: task?.due_date ?? '',
       assignee: task?.assignee ?? '',
       category: task?.category ?? '',
-      status: task?.status ?? 'pending',
+      status: task?.status ?? 'open',
     },
   })
 
@@ -48,10 +51,10 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
       reset({
         title: task.title,
         description: task.description ?? '',
-        dueDate: task.dueDate ?? '',
+        dueDate: task.due_date ?? '',
         assignee: task.assignee ?? '',
         category: task.category ?? '',
-        status: task.status ?? 'pending',
+        status: task.status ?? 'open',
       })
     }
   }, [task, reset])
@@ -70,15 +73,16 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
       const body = buildTaskRequestBody({
         ...data,
         id: task?.id,
-        projectId: task?.projectId,
+        project_id: task?.project_id,
       })
       return isEditing
         ? updateExistingTask(token, { task_id: task!.id, ...body })
         : insertNewTask(token, body)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey })
+      toast(isEditing ? messages.task.updateSuccess : messages.task.createSuccess, 'success')
       onClose()
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
@@ -156,14 +160,14 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
           {contracts.length > 0 && (
             <Field label="Project (optional)" error={undefined}>
               <select
-                defaultValue={task?.projectId ?? ''}
+                defaultValue={task?.project_id ?? ''}
                 onChange={(e) => {/* projectId handled in buildTaskRequestBody */}}
                 className={inputCls(false)}
               >
                 <option value="">No project</option>
                 {contracts.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.raNumber} — {c.clientFullName}
+                    {c.project_name}
                   </option>
                 ))}
               </select>
@@ -172,7 +176,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
 
           {mutation.isError && (
             <p className="text-xs text-red-500 text-center">
-              Failed to {isEditing ? 'update' : 'create'} task. Please try again.
+              {isEditing ? messages.task.updateError : messages.task.createError}
             </p>
           )}
         </form>
@@ -189,7 +193,7 @@ export function TaskCreateEditModal({ token, task, onClose, queryKey }: TaskCrea
           <button
             onClick={handleSubmit((d) => mutation.mutateAsync(d))}
             disabled={isSubmitting || mutation.isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#C66EEB] hover:bg-[#A855D4] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {(isSubmitting || mutation.isPending) && <Loader2 size={14} className="animate-spin" />}
             {isEditing ? 'Save Changes' : 'Create Task'}
@@ -213,7 +217,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#C66EEB]/30 focus:border-[#C66EEB]',
+    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

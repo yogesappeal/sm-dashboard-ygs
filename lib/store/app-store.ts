@@ -19,7 +19,7 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>((set) => ({
   activeMenu: 'home',
-  sidebarOpen: true,
+  sidebarOpen: false,
   mobileSidebarOpen: false,
   toolboxItems: [],
   setActiveMenu: (activeMenu) => set({ activeMenu }),
