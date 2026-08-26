@@ -1,7 +1,23 @@
 'use client'
 
+import { Lock } from 'lucide-react'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { BillsWorkspace } from '@/components/bills/bills-workspace'
 
 export default function RequiresMyReviewPage() {
+  const canReviewBills = usePermission('bill:review')
+
+  if (!canReviewBills) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+          <Lock className="text-slate-300" size={28} />
+        </div>
+        <p className="text-slate-700 font-medium">You don&apos;t have access to bill review</p>
+        <p className="text-slate-400 text-sm mt-1">Contact an admin if you think this is a mistake</p>
+      </div>
+    )
+  }
+
   return <BillsWorkspace categoryFilter="review" />
 }

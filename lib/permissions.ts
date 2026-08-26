@@ -12,6 +12,7 @@ export type PermissionAction =
   | 'task:view'
   | 'contract:edit-planned-start'
   | 'bill:edit'
+  | 'bill:review'
 
 // Flip any boolean to change what a role can do — this table is the only
 // place permission rules live. Admin is spelled out in full (not "always
@@ -31,6 +32,7 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'task:view':       true,
     'contract:edit-planned-start': true,
     'bill:edit':       true,
+    'bill:review':     true,
   },
   'Site Manager': {
     'supplier:create': false,
@@ -43,8 +45,10 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'toolbox:view':    true,
     'task:view':       true,
     'contract:edit-planned-start': true,
-    // SM can review/approve bills but not edit them.
+    // SM is approve/reject only — no editing, and no access to the pre-approval
+    // review queue (On Review / Revision Requested bills or the submit action).
     'bill:edit':       false,
+    'bill:review':     false,
   },
   Operations: {
     'supplier:create': true,
@@ -59,6 +63,7 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'task:view':       false,
     'contract:edit-planned-start': false,
     'bill:edit':       true,
+    'bill:review':     true,
   },
 }
 

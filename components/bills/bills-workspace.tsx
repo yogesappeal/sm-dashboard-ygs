@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useToast } from '@/components/shared/toast'
 import { cn } from '@/lib/utils'
@@ -329,6 +330,7 @@ interface BillsWorkspaceProps {
 
 export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const router = useRouter()
+  const canReviewBills = usePermission('bill:review')
   const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS)
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -345,6 +347,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   // Filter bills according to the category prop
   const filteredCategoryBills = useMemo(() => {
     return bills.filter((b) => {
+      // Roles without bill:review (e.g. Site Manager) are approve/reject only —
+      // On Review and Revision Requested bills never surface for them, in any view.
+      if (!canReviewBills && (b.status === 'ON REVIEW' || b.status === 'Revision Requested')) {
+        return false
+      }
+
       let matchesCategory = true
       if (categoryFilter === 'review') {
         matchesCategory = b.status === 'ON REVIEW'
@@ -358,7 +366,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
       return matchesCategory && matchesSearch
     })
-  }, [bills, categoryFilter, searchQuery])
+  }, [bills, categoryFilter, searchQuery, canReviewBills])
 
   // Select first bill in list if current selection is invalid
   const selectedBill = useMemo(() => {
@@ -648,12 +656,14 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
                     <div className="flex items-center gap-2">
                       {selectedBill.status === 'ON REVIEW' && (
-                        <button
-                          onClick={() => handleSubmitForApproval(selectedBill.id)}
-                          className="px-3.5 py-1.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-                        >
-                          Submit for approval
-                        </button>
+                        <PermissionGuard action="bill:review">
+                          <button
+                            onClick={() => handleSubmitForApproval(selectedBill.id)}
+                            className="px-3.5 py-1.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                          >
+                            Submit for approval
+                          </button>
+                        </PermissionGuard>
                       )}
 
                       {selectedBill.status === 'Pending Approval' && (
