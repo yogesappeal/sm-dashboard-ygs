@@ -12,6 +12,7 @@ import {
   FileText,
   DollarSign,
   ArrowRight,
+  ChevronRight,
   ClipboardList,
   MessageSquare,
   CheckCircle2,
@@ -496,6 +497,31 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const gstTax = useMemo(() => subtotal * 0.1, [subtotal])
   const totalAmount = useMemo(() => subtotal + gstTax, [subtotal, gstTax])
 
+  // Approval workflow steps derived from the bill's status
+  const workflowSteps = useMemo(() => {
+    if (!selectedBill) return []
+    const reviewStatus =
+      selectedBill.status === 'ON REVIEW' || selectedBill.status === 'Revision Requested'
+        ? 'active'
+        : 'completed'
+    const approvalStatus =
+      selectedBill.status === 'Approved'
+        ? 'completed'
+        : selectedBill.status === 'Pending Approval' || selectedBill.status === 'Rejected'
+        ? 'active'
+        : 'pending'
+
+    return [
+      { id: 'review', label: 'Review', status: reviewStatus },
+      { id: 'approval', label: 'Approval', status: approvalStatus },
+    ]
+  }, [selectedBill])
+
+  const approvalCondition = useMemo(() => {
+    if (!selectedBill || selectedBill.approvers.length === 0) return 'No assigned approvers'
+    return selectedBill.approvers.map((a) => a.name).join(', ')
+  }, [selectedBill])
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="flex-shrink-0">
@@ -774,28 +800,37 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
                 {openWorkflowCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
-                    <div className="border border-[#6692C5]/30 bg-[#6692C5]/5 rounded-xl p-3.5 inline-block min-w-[240px]">
-                      <div className="flex justify-between items-center mb-2 text-xs">
-                        <span className="font-semibold text-slate-700">Review & Approval Step</span>
-                        <span className="text-[10px] font-bold uppercase text-[#6692C5] bg-[#6692C5]/10 px-2 py-0.5 rounded">
-                          Active
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {selectedBill.approvers.map((appr, i) => (
-                          <div
-                            key={i}
-                            className="w-7 h-7 rounded-full bg-[#6692C5] text-white flex items-center justify-center text-xs font-bold ring-2 ring-white"
-                            title={`${appr.name} (${appr.role})`}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                      {workflowSteps.map((step, idx) => (
+                        <div key={step.id} className="flex items-center gap-2 flex-shrink-0">
+                          <span
+                            className={cn(
+                              'px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border',
+                              step.status === 'active'
+                                ? 'bg-[#6692C5] text-white border-[#6692C5] shadow-sm'
+                                : step.status === 'completed'
+                                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                : 'bg-white text-slate-400 border-slate-200 opacity-60'
+                            )}
                           >
-                            {appr.name[0]}
-                          </div>
-                        ))}
-                        {selectedBill.approvers.length === 0 && (
-                          <span className="text-xs text-slate-400 italic">No assigned approvers</span>
-                        )}
-                      </div>
+                            {step.status === 'completed' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#6692C5]" />
+                            )}
+                            {step.status === 'active' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            )}
+                            {step.label}
+                          </span>
+                          {idx < workflowSteps.length - 1 && (
+                            <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
+                          )}
+                        </div>
+                      ))}
                     </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Approval condition: Any of{' '}
+                      <span className="font-semibold text-slate-600">{approvalCondition}</span>
+                    </p>
                   </div>
                 )}
               </div>
