@@ -49,17 +49,12 @@ function getStatusConfig(status: string): StatusConfig {
     case 'PO Cancelled':
       return { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'PO Cancelled' }
     // Bills statuses
-    case 'ON REVIEW':
-    case 'On Review':
-      return { bg: 'bg-[#6692C5]/10', text: 'text-[#6692C5]', dot: 'bg-[#6692C5]', label: 'ON REVIEW' }
     case 'Pending Approval':
       return { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400', label: 'Pending Approval' }
     case 'Approved':
       return { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Approved' }
     case 'Rejected':
       return { bg: 'bg-rose-50', text: 'text-rose-600', dot: 'bg-rose-500', label: 'Rejected' }
-    case 'Revision Requested':
-      return { bg: 'bg-indigo-50', text: 'text-indigo-600', dot: 'bg-indigo-500', label: 'Revision Requested' }
     // PO type
     case 'supplier':
       return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'Supplier' }

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Search,
   Receipt,
@@ -22,7 +21,6 @@ import {
   History,
   ChevronDown,
   ChevronUp,
-  Edit2,
   Eye,
   ExternalLink,
   Paperclip,
@@ -66,8 +64,7 @@ interface Bill {
   issueDate: string
   dueDate: string
   amount: number
-  status: 'ON REVIEW' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Revision Requested'
-  category: 'review' | 'approval' | 'all'
+  status: 'Pending Approval' | 'Approved' | 'Rejected'
   createdIn: string
   company: string
   lineItems: LineItem[]
@@ -76,100 +73,6 @@ interface Bill {
 }
 
 const INITIAL_BILLS: Bill[] = [
-  {
-    id: 'b-1',
-    billNumber: 'INV0163',
-    supplierName: 'Cody Gold Roof Plumbing Services',
-    poNumber: 'PO-4820-AH',
-    address: '121 Jubilee Ave, Forest Lake, QLD, 4078',
-    issueDate: '24 Aug 2026',
-    dueDate: '31 Aug 2026',
-    amount: 1171.50,
-    status: 'ON REVIEW',
-    category: 'review',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
-    lineItems: [
-      {
-        id: 'li-1',
-        description: 'Roof plumbing repair & flashing maintenance service',
-        quantity: 1.0,
-        unitPrice: 1065.0,
-        account: '100 - Sub Contractor',
-        tax: 'GST on Expenses (10%)',
-        amount: 1065.0,
-      },
-    ],
-    approvers: [
-      { name: 'Sarah Jenkins', role: 'Site Manager' },
-      { name: 'Marcus Vance', role: 'Operations Lead' },
-    ],
-    auditTrail: [
-      {
-        id: 'at-1',
-        type: 'xero',
-        title: 'Pulled request from Xero.',
-        date: '12 Aug 2026, 10:18',
-      },
-      {
-        id: 'at-2',
-        type: 'system',
-        title: 'This request has been updated in Xero and thus the workflow has been restarted.',
-        date: '24 Aug 2026, 10:39',
-      },
-      {
-        id: 'at-3',
-        type: 'action',
-        title: 'Started over approval workflow for this request',
-        user: 'Ely Novy',
-        date: '21 Aug 2026, 15:15 via Web',
-      },
-      {
-        id: 'at-4',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Ely Novy',
-        notes: 'Here is the updated one, can you do a quick check? Matthew Tutini',
-        date: '24 Aug 2026, 11:00 via Web',
-      },
-    ],
-  },
-  {
-    id: 'b-2',
-    billNumber: '22101',
-    supplierName: 'Australis Safety Rail Pty Ltd',
-    poNumber: 'PO-3918-AH',
-    address: '45 Industrial Pkwy, Wacol, QLD, 4076',
-    issueDate: '20 Aug 2026',
-    dueDate: '30 Aug 2026',
-    amount: 2851.20,
-    status: 'ON REVIEW',
-    category: 'review',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
-    lineItems: [
-      {
-        id: 'li-2',
-        description: 'Perimeter safety rail hire and installation for roof perimeter',
-        quantity: 1.0,
-        unitPrice: 2592.0,
-        account: '200 - Safety Equipment',
-        tax: 'GST on Expenses (10%)',
-        amount: 2592.0,
-      },
-    ],
-    approvers: [
-      { name: 'Alex Johnson', role: 'Operations' },
-    ],
-    auditTrail: [
-      {
-        id: 'at-5',
-        type: 'xero',
-        title: 'Imported bill 22101 from Xero Integration.',
-        date: '20 Aug 2026, 09:30',
-      },
-    ],
-  },
   {
     id: 'b-3',
     billNumber: '0439149',
@@ -180,7 +83,6 @@ const INITIAL_BILLS: Bill[] = [
     dueDate: '28 Aug 2026',
     amount: 4627.39,
     status: 'Pending Approval',
-    category: 'approval',
     createdIn: 'Created in Xero',
     company: 'AusHail',
     lineItems: [
@@ -216,7 +118,6 @@ const INITIAL_BILLS: Bill[] = [
     dueDate: '24 Aug 2026',
     amount: 18250.00,
     status: 'Pending Approval',
-    category: 'approval',
     createdIn: 'Created in Xero',
     company: 'AusHail',
     lineItems: [
@@ -252,42 +153,6 @@ const INITIAL_BILLS: Bill[] = [
     ],
   },
   {
-    id: 'b-5',
-    billNumber: 'BILL-2026-0895',
-    supplierName: 'A1 Plumbing Supplies',
-    poNumber: 'PO-5510-AH',
-    address: '12 Commercial Rd, Acacia Ridge, QLD, 4110',
-    issueDate: '08 Aug 2026',
-    dueDate: '07 Sep 2026',
-    amount: 4120.00,
-    status: 'Revision Requested',
-    category: 'all',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
-    lineItems: [
-      {
-        id: 'li-6',
-        description: 'PVC Pipe 100mm DWV (6m length)',
-        quantity: 40.0,
-        unitPrice: 68.0,
-        account: '100 - Sub Contractor',
-        tax: 'GST on Expenses (10%)',
-        amount: 2720.0,
-      },
-    ],
-    approvers: [],
-    auditTrail: [
-      {
-        id: 'at-8',
-        type: 'action',
-        title: 'Revision Requested',
-        user: 'Marcus Smith',
-        date: '10 Aug 2026, 16:30',
-        notes: 'Quantities delivered on site do not match invoice.',
-      },
-    ],
-  },
-  {
     id: 'b-6',
     billNumber: 'BILL-2026-0893',
     supplierName: 'Metro Electrical Services',
@@ -297,7 +162,6 @@ const INITIAL_BILLS: Bill[] = [
     dueDate: '04 Sep 2026',
     amount: 6720.50,
     status: 'Approved',
-    category: 'all',
     createdIn: 'Created in Xero',
     company: 'AusHail',
     lineItems: [
@@ -325,12 +189,11 @@ const INITIAL_BILLS: Bill[] = [
 ]
 
 interface BillsWorkspaceProps {
-  categoryFilter: 'review' | 'approval' | 'all'
+  categoryFilter: 'approval' | 'all'
 }
 
 export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
-  const router = useRouter()
-  const canReviewBills = usePermission('bill:review')
+  const canApproveBills = usePermission('bill:approve')
   const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS)
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -347,18 +210,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   // Filter bills according to the category prop
   const filteredCategoryBills = useMemo(() => {
     return bills.filter((b) => {
-      // Roles without bill:review (e.g. Site Manager) are approve/reject only —
-      // On Review and Revision Requested bills never surface for them, in any view.
-      if (!canReviewBills && (b.status === 'ON REVIEW' || b.status === 'Revision Requested')) {
-        return false
-      }
-
-      let matchesCategory = true
-      if (categoryFilter === 'review') {
-        matchesCategory = b.status === 'ON REVIEW'
-      } else if (categoryFilter === 'approval') {
-        matchesCategory = b.status === 'Pending Approval'
-      }
+      const matchesCategory = categoryFilter === 'approval' ? b.status === 'Pending Approval' : true
 
       const matchesSearch =
         b.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -366,7 +218,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
       return matchesCategory && matchesSearch
     })
-  }, [bills, categoryFilter, searchQuery, canReviewBills])
+  }, [bills, categoryFilter, searchQuery])
 
   // Select first bill in list if current selection is invalid
   const selectedBill = useMemo(() => {
@@ -375,26 +227,20 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     return filteredCategoryBills[0] ?? null
   }, [filteredCategoryBills, selectedBillId])
 
-  const pageTitle =
-    categoryFilter === 'review'
-      ? 'Requires my review (all)'
-      : categoryFilter === 'approval'
-      ? 'Requires my approval (all)'
-      : 'All Bills'
+  const pageTitle = categoryFilter === 'approval' ? 'Requires my approval (all)' : 'All Bills'
 
   const pageDescription =
-    categoryFilter === 'review'
-      ? 'Bills waiting on your review before they can be submitted for approval'
-      : categoryFilter === 'approval'
-      ? 'Bills waiting on your approval'
-      : 'View and manage all bills'
+    categoryFilter === 'approval' ? 'Bills waiting on your approval' : 'View and manage all bills'
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(val)
   }
 
-  // Handlers for bill workflow actions
+  // Handlers for bill workflow actions. Each bails out if the role lacks
+  // bill:approve — enforced here (not just by hiding the button) since these
+  // are the only two mutating actions Bills has left.
   const handleApprove = useCallback((id: string) => {
+    if (!canApproveBills) return
     setBills((prev) =>
       prev.map((b) => {
         if (b.id === id) {
@@ -418,35 +264,10 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       })
     )
     toast('Bill approved successfully!', 'success')
-  }, [toast])
-
-  const handleSubmitForApproval = useCallback((id: string) => {
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === id) {
-          const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-          return {
-            ...b,
-            status: 'Pending Approval',
-            auditTrail: [
-              ...b.auditTrail,
-              {
-                id: `at-${Date.now()}`,
-                type: 'action',
-                title: 'Submitted for manager approval',
-                user: 'Current User',
-                date: `${nowStr} via Web`,
-              },
-            ],
-          }
-        }
-        return b
-      })
-    )
-    toast('Submitted for approval!', 'info')
-  }, [toast])
+  }, [toast, canApproveBills])
 
   const handleReject = useCallback((id: string) => {
+    if (!canApproveBills) return
     setBills((prev) =>
       prev.map((b) => {
         if (b.id === id) {
@@ -470,7 +291,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       })
     )
     toast('Bill rejected', 'error')
-  }, [toast])
+  }, [toast, canApproveBills])
 
   const handleSendComment = useCallback(() => {
     if (!commentText.trim() || !selectedBill) return
@@ -511,19 +332,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   // Approval workflow steps derived from the bill's status
   const workflowSteps = useMemo(() => {
     if (!selectedBill) return []
-    const reviewStatus =
-      selectedBill.status === 'ON REVIEW' || selectedBill.status === 'Revision Requested'
-        ? 'active'
-        : 'completed'
-    const approvalStatus =
-      selectedBill.status === 'Approved'
-        ? 'completed'
-        : selectedBill.status === 'Pending Approval' || selectedBill.status === 'Rejected'
-        ? 'active'
-        : 'pending'
+    // Bills only ever reach this workspace once they're past review (Bills
+    // is approve/reject only now — see bill:approve), so Review is always done.
+    const approvalStatus = selectedBill.status === 'Approved' ? 'completed' : 'active'
 
     return [
-      { id: 'review', label: 'Review', status: reviewStatus },
+      { id: 'review', label: 'Review', status: 'completed' as const },
       { id: 'approval', label: 'Approval', status: approvalStatus },
     ]
   }, [selectedBill])
@@ -655,43 +469,24 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {selectedBill.status === 'ON REVIEW' && (
-                        <PermissionGuard action="bill:review">
-                          <button
-                            onClick={() => handleSubmitForApproval(selectedBill.id)}
-                            className="px-3.5 py-1.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-                          >
-                            Submit for approval
-                          </button>
+                      {selectedBill.status === 'Pending Approval' && (
+                        <PermissionGuard action="bill:approve">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleApprove(selectedBill.id)}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(selectedBill.id)}
+                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </PermissionGuard>
                       )}
-
-                      {selectedBill.status === 'Pending Approval' && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleApprove(selectedBill.id)}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(selectedBill.id)}
-                            className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-
-                      <PermissionGuard action="bill:edit">
-                        <button
-                          onClick={() => router.push(`/bills/edit?bill=${selectedBill.id}`)}
-                          className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                        >
-                          <Edit2 size={13} />
-                          Edit
-                        </button>
-                      </PermissionGuard>
                     </div>
                   </div>
                 </div>

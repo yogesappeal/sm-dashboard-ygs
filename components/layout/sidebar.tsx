@@ -50,23 +50,19 @@ function getNavItems(role: UserRole): NavItem[] {
     { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
     { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
     { label: 'Scope', href: '/scope', icon: FileText },
-    {
-      label: 'Bills',
-      href: '/bills',
-      icon: Receipt,
-      // Site Managers only review approvals, not the raw review queue —
-      // everyone else keeps the full 3-view Bills menu.
-      children: role === 'Site Manager'
-        ? [
+    // Bills is Site Manager-only right now (see lib/permissions.ts `bill:access`)
+    // — hidden from the nav entirely for every other role.
+    ...(hasPermission(role, 'bill:access')
+      ? [{
+          label: 'Bills',
+          href: '/bills',
+          icon: Receipt,
+          children: [
             { label: 'All Bills', href: '/bills' },
-            { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
-          ]
-        : [
-            { label: 'All Bills', href: '/bills' },
-            { label: 'Requires My Review', href: '/bills/requires-my-review' },
             { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
           ],
-    },
+        }]
+      : []),
     ...(FEATURE_TASK && hasPermission(role, 'task:view') ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
   ]
 }

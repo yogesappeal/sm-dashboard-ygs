@@ -1,7 +1,12 @@
 'use client'
 
+import { BillsAccessGuard } from '@/components/bills/bills-access-guard'
 import { BillsWorkspace } from '@/components/bills/bills-workspace'
 
 export default function AllBillsPage() {
-  return <BillsWorkspace categoryFilter="all" />
+  return (
+    <BillsAccessGuard>
+      <BillsWorkspace categoryFilter="all" />
+    </BillsAccessGuard>
+  )
 }
