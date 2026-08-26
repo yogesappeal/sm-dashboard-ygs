@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
@@ -21,6 +21,17 @@ import { MOCK_BILLS } from '@/lib/data/mock-bills'
 import type { Bill } from '@/lib/types/bill'
 
 // TODO: Replace MOCK_BILLS with useQuery(() => getBillById(token!, id))
+
+// Single static option for now — swap for a currency list from the org/company
+// settings once that's wired up; the dropdown already reads from this array.
+const CURRENCY_OPTIONS = ['AUD']
+
+type TaxMode = 'Tax Exclusive' | 'Tax Inclusive' | 'No Tax'
+const TAX_MODE_OPTIONS: TaxMode[] = ['Tax Exclusive', 'Tax Inclusive', 'No Tax']
+
+// Matches the "(10%)" GST rate referenced elsewhere on this page (tax_rate
+// labels, PdfPreview) — there's no per-bill rate in the data model yet.
+const GST_RATE = 0.1
 
 /** Mock PDF invoice rendered as an HTML page for preview */
 function PdfPreview({ bill }: { bill: Bill }) {
@@ -92,6 +103,27 @@ function EditBillContent() {
   const [dueDate, setDueDate] = useState(bill?.due_date ?? '')
   const [reference, setReference] = useState(bill?.reference ?? '')
   const [note, setNote] = useState('')
+  const [currency, setCurrency] = useState(bill?.currency ?? CURRENCY_OPTIONS[0])
+  const [taxMode, setTaxMode] = useState<TaxMode>('Tax Exclusive')
+
+  // Line items store unit_price as the net (pre-tax) rate; how that rolls up
+  // into subtotal/tax/total depends on which Tax option is selected.
+  const { lineItemsSubtotal, taxAmount, total } = useMemo(() => {
+    const netSubtotal = bill?.line_items.reduce((sum, li) => sum + li.unit_price * li.quantity, 0) ?? 0
+
+    if (taxMode === 'No Tax') {
+      return { lineItemsSubtotal: netSubtotal, taxAmount: 0, total: netSubtotal }
+    }
+    if (taxMode === 'Tax Inclusive') {
+      // Treat unit_price as already including tax — back the tax portion out of it.
+      const gross = netSubtotal
+      const tax = gross - gross / (1 + GST_RATE)
+      return { lineItemsSubtotal: gross - tax, taxAmount: tax, total: gross }
+    }
+    // Tax Exclusive (default): unit_price is pre-tax, so GST is added on top.
+    const tax = netSubtotal * GST_RATE
+    return { lineItemsSubtotal: netSubtotal, taxAmount: tax, total: netSubtotal + tax }
+  }, [bill, taxMode])
 
   if (!bill) {
     return <div className="flex-1 flex items-center justify-center text-slate-400">Bill not found.</div>
@@ -231,8 +263,30 @@ function EditBillContent() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
               <h2 className="text-sm font-semibold text-slate-800">Line Items</h2>
               <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>Currency: <span className="font-medium text-slate-700">AUD</span></span>
-                <span>Amounts are: <span className="font-medium text-slate-700">Tax exclusive</span></span>
+                <label className="flex items-center gap-1.5">
+                  Currency:
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="border border-slate-200 rounded-md pl-1.5 pr-6 py-0.5 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
+                  >
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5">
+                  Amounts are:
+                  <select
+                    value={taxMode}
+                    onChange={(e) => setTaxMode(e.target.value as TaxMode)}
+                    className="border border-slate-200 rounded-md pl-1.5 pr-6 py-0.5 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
+                  >
+                    {TAX_MODE_OPTIONS.map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -314,16 +368,16 @@ function EditBillContent() {
               <div className="w-56 bg-slate-50 rounded-lg p-3 space-y-1">
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>Subtotal</span>
-                  <span className="font-mono">{bill.line_items.reduce((s, li) => s + li.unit_price * li.quantity, 0).toFixed(2)}</span>
+                  <span className="font-mono">{lineItemsSubtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>Total Tax</span>
-                  <span className="font-mono">{bill.line_items.reduce((s, li) => s + (li.amount - li.unit_price * li.quantity), 0).toFixed(2)}</span>
+                  <span className="font-mono">{taxAmount.toFixed(2)}</span>
                 </div>
                 <div className="h-px bg-slate-200" />
                 <div className="flex justify-between text-sm font-bold text-slate-800">
-                  <span>Total AUD</span>
-                  <span className="font-mono">{bill.amount.toFixed(2)}</span>
+                  <span>Total {currency}</span>
+                  <span className="font-mono">{total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
