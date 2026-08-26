@@ -16,7 +16,9 @@ import {
   Plus,
   Trash2,
   UploadCloud,
+  Lock,
 } from 'lucide-react'
+import { usePermission } from '@/lib/hooks/use-permission'
 import { MOCK_BILLS } from '@/lib/data/mock-bills'
 import type { Bill } from '@/lib/types/bill'
 
@@ -95,6 +97,7 @@ function PdfPreview({ bill }: { bill: Bill }) {
 function EditBillContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const canEditBills = usePermission('bill:edit')
   const billId = searchParams.get('bill') ?? MOCK_BILLS[0]?.id ?? ''
   const bill = MOCK_BILLS.find((b) => b.id === billId) ?? MOCK_BILLS[0]
 
@@ -124,6 +127,18 @@ function EditBillContent() {
     const tax = netSubtotal * GST_RATE
     return { lineItemsSubtotal: netSubtotal, taxAmount: tax, total: netSubtotal + tax }
   }, [bill, taxMode])
+
+  if (!canEditBills) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+          <Lock className="text-slate-300" size={28} />
+        </div>
+        <p className="text-slate-700 font-medium">You don&apos;t have access to edit bills</p>
+        <p className="text-slate-400 text-sm mt-1">Contact an admin if you think this is a mistake</p>
+      </div>
+    )
+  }
 
   if (!bill) {
     return <div className="flex-1 flex items-center justify-center text-slate-400">Bill not found.</div>

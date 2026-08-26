@@ -54,11 +54,18 @@ function getNavItems(role: UserRole): NavItem[] {
       label: 'Bills',
       href: '/bills',
       icon: Receipt,
-      children: [
-        { label: 'All Bills', href: '/bills' },
-        { label: 'Requires My Review', href: '/bills/requires-my-review' },
-        { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
-      ],
+      // Site Managers only review approvals, not the raw review queue —
+      // everyone else keeps the full 3-view Bills menu.
+      children: role === 'Site Manager'
+        ? [
+            { label: 'All Bills', href: '/bills' },
+            { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
+          ]
+        : [
+            { label: 'All Bills', href: '/bills' },
+            { label: 'Requires My Review', href: '/bills/requires-my-review' },
+            { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
+          ],
     },
     ...(FEATURE_TASK && hasPermission(role, 'task:view') ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
   ]

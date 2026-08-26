@@ -30,6 +30,7 @@ import {
   User,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { PermissionGuard } from '@/components/shared/permission-guard'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useToast } from '@/components/shared/toast'
 import { cn } from '@/lib/utils'
@@ -672,13 +673,15 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                         </div>
                       )}
 
-                      <button
-                        onClick={() => router.push(`/bills/edit?bill=${selectedBill.id}`)}
-                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                      >
-                        <Edit2 size={13} />
-                        Edit
-                      </button>
+                      <PermissionGuard action="bill:edit">
+                        <button
+                          onClick={() => router.push(`/bills/edit?bill=${selectedBill.id}`)}
+                          className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                        >
+                          <Edit2 size={13} />
+                          Edit
+                        </button>
+                      </PermissionGuard>
                     </div>
                   </div>
                 </div>
