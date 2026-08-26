@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Search,
   Receipt,
@@ -326,6 +327,7 @@ interface BillsWorkspaceProps {
 }
 
 export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
+  const router = useRouter()
   const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS)
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -671,7 +673,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       )}
 
                       <button
-                        onClick={() => toast('Edit feature coming soon', 'info')}
+                        onClick={() => router.push(`/bills/edit?bill=${selectedBill.id}`)}
                         className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5 transition-colors"
                       >
                         <Edit2 size={13} />
