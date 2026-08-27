@@ -22,7 +22,6 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  ExternalLink,
   Paperclip,
   Send,
   User,
@@ -53,20 +52,18 @@ interface AuditTrailEvent {
   user?: string
   userAvatar?: string
   notes?: string
+  isMine?: boolean // comment authored by the current user — right-aligned bubble
 }
 
 interface Bill {
   id: string
   billNumber: string
   supplierName: string
-  poNumber: string
   address: string
   issueDate: string
   dueDate: string
   amount: number
   status: 'Pending Approval' | 'Approved' | 'Rejected'
-  createdIn: string
-  company: string
   lineItems: LineItem[]
   approvers: { name: string; role: string; avatar?: string }[]
   auditTrail: AuditTrailEvent[]
@@ -77,14 +74,11 @@ const INITIAL_BILLS: Bill[] = [
     id: 'b-3',
     billNumber: '0439149',
     supplierName: 'Queensland Sheet Metal & Roofing Supplies',
-    poNumber: 'PO-9201-AH',
     address: '88 Magnesium Dr, Crestmead, QLD, 4132',
     issueDate: '18 Aug 2026',
     dueDate: '28 Aug 2026',
     amount: 4627.39,
     status: 'Pending Approval',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
     lineItems: [
       {
         id: 'li-3',
@@ -101,10 +95,33 @@ const INITIAL_BILLS: Bill[] = [
     ],
     auditTrail: [
       {
+        id: 'at-5',
+        type: 'xero',
+        title: 'Pulled request from Xero',
+        date: '18 Aug 2026, 08:00',
+      },
+      {
         id: 'at-6',
         type: 'xero',
         title: 'Bill submitted and matched to PO-9201-AH.',
         date: '18 Aug 2026, 14:12',
+      },
+      {
+        id: 'at-6a',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Matthew Tutini',
+        notes: 'Please double check the freight surcharge on this one before approving.',
+        date: '18 Aug 2026, 15:05 via Web',
+      },
+      {
+        id: 'at-6b',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Ryan Cotter',
+        notes: 'Confirmed with the supplier — freight is already included in the unit price.',
+        date: '18 Aug 2026, 15:22 via Web',
+        isMine: true,
       },
     ],
   },
@@ -112,14 +129,11 @@ const INITIAL_BILLS: Bill[] = [
     id: 'b-4',
     billNumber: 'BILL-2026-0894',
     supplierName: 'Timber & Framing Suppliers',
-    poNumber: 'PO-1029-AH',
     address: '77 Boundary Rd, Coopers Plains, QLD, 4108',
     issueDate: '25 Jul 2026',
     dueDate: '24 Aug 2026',
     amount: 18250.00,
     status: 'Pending Approval',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
     lineItems: [
       {
         id: 'li-4',
@@ -145,10 +159,33 @@ const INITIAL_BILLS: Bill[] = [
     ],
     auditTrail: [
       {
+        id: 'at-8b',
+        type: 'xero',
+        title: 'Pulled request from Xero',
+        date: '25 Jul 2026, 09:00',
+      },
+      {
         id: 'at-7',
         type: 'system',
         title: 'Submitted for final approval by Site Manager.',
         date: '25 Jul 2026, 15:10',
+      },
+      {
+        id: 'at-8',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Matthew Tutini',
+        notes: 'Delivery docket matches the quantities on this bill — good to approve.',
+        date: '25 Jul 2026, 15:20 via Web',
+      },
+      {
+        id: 'at-8a',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Ryan Cotter',
+        notes: 'Thanks for checking — approving now.',
+        date: '25 Jul 2026, 15:31 via Web',
+        isMine: true,
       },
     ],
   },
@@ -156,14 +193,11 @@ const INITIAL_BILLS: Bill[] = [
     id: 'b-6',
     billNumber: 'BILL-2026-0893',
     supplierName: 'Metro Electrical Services',
-    poNumber: 'PO-9201-AH',
     address: '99 Logan Rd, Woolloongabba, QLD, 4102',
     issueDate: '05 Aug 2026',
     dueDate: '04 Sep 2026',
     amount: 6720.50,
     status: 'Approved',
-    createdIn: 'Created in Xero',
-    company: 'AusHail',
     lineItems: [
       {
         id: 'li-7',
@@ -178,11 +212,34 @@ const INITIAL_BILLS: Bill[] = [
     approvers: [],
     auditTrail: [
       {
+        id: 'at-8c',
+        type: 'xero',
+        title: 'Pulled request from Xero',
+        date: '05 Aug 2026, 09:00',
+      },
+      {
         id: 'at-9',
         type: 'action',
         title: 'Approved for payment',
         user: 'Alex Johnson',
         date: '06 Aug 2026, 10:05',
+      },
+      {
+        id: 'at-9a',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Matthew Tutini',
+        notes: 'Nice work getting this one through quickly.',
+        date: '06 Aug 2026, 10:12 via Web',
+      },
+      {
+        id: 'at-9b',
+        type: 'comment',
+        title: 'Comment',
+        user: 'Ryan Cotter',
+        notes: 'Cheers — all good on our end.',
+        date: '06 Aug 2026, 10:15 via Web',
+        isMine: true,
       },
     ],
   },
@@ -197,7 +254,6 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS)
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [showAddressMore, setShowAddressMore] = useState(false)
   const [commentText, setCommentText] = useState('')
 
   // Accordion state for Right Detail sections
@@ -300,9 +356,10 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       id: `at-${Date.now()}`,
       type: 'comment',
       title: 'Comment',
-      user: 'Current User',
+      user: 'Ryan Cotter',
       notes: commentText.trim(),
       date: `${nowStr} via Web`,
+      isMine: true,
     }
 
     setBills((prev) =>
@@ -406,20 +463,14 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   )}
                 >
                   <div className="flex justify-between items-start mb-1.5">
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
-                      <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                        X
-                      </div>
-                      <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight">
-                        Bill {bill.billNumber} from {bill.supplierName}
-                      </span>
-                    </div>
-                    <StatusBadge status={bill.status} />
+                    <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
+                      Bill {bill.billNumber} from {bill.supplierName}
+                    </span>
+                    <StatusBadge status={bill.status} size="xs" />
                   </div>
 
-                  <div className="pl-7 flex justify-between items-center text-xs mt-2">
+                  <div className="text-xs mt-2">
                     <span className="font-bold text-slate-800">{formatCurrency(bill.amount)}</span>
-                    <span className="text-[11px] text-slate-400 font-medium">{bill.company}</span>
                   </div>
                 </div>
               ))
@@ -442,22 +493,6 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       Address<br />
                       {selectedBill.address}
                     </div>
-                    <button
-                      onClick={() => setShowAddressMore((prev) => !prev)}
-                      className="text-xs text-[#6692C5] font-medium flex items-center gap-1 hover:underline mt-1"
-                    >
-                      {showAddressMore ? 'View less' : 'View more'}
-                      <ChevronDown
-                        size={14}
-                        className={cn('transition-transform', showAddressMore && 'rotate-180')}
-                      />
-                    </button>
-                    {showAddressMore && (
-                      <div className="pt-2 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
-                        <p><span className="font-semibold text-slate-700">PO Ref:</span> {selectedBill.poNumber}</p>
-                        <p><span className="font-semibold text-slate-700">Company:</span> {selectedBill.company}</p>
-                      </div>
-                    )}
                   </div>
 
                   <div className="text-right flex flex-col items-end gap-3">
@@ -489,13 +524,6 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       )}
                     </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-slate-500 pt-3 border-t border-slate-100">
-                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
-                    X
-                  </div>
-                  <span>{selectedBill.createdIn} ({selectedBill.company})</span>
                 </div>
               </div>
 
@@ -568,15 +596,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   </table>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-2">
-                  <button
-                    onClick={() => toast('Opening Xero link...', 'info')}
-                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                  >
-                    Open in Xero
-                    <ExternalLink size={13} />
-                  </button>
-
+                <div className="flex justify-end pt-2">
                   <div className="w-full sm:w-64 text-xs space-y-1.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                     <div className="text-slate-400 text-[11px] mb-1 italic">Amounts are Tax Exclusive</div>
                     <div className="flex justify-between text-slate-600">
@@ -662,18 +682,40 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
                     {selectedBill.auditTrail.map((ev) => (
                       <div key={ev.id} className="relative group">
-                        {/* Timeline Bullet */}
-                        <div className="absolute -left-[31px] top-0.5 w-5 h-5 rounded-full bg-white border-2 border-[#6692C5] flex items-center justify-center text-[9px] font-bold text-[#6692C5]">
-                          {ev.type === 'xero' ? 'X' : '✓'}
+                        {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
+                        <div
+                          className={cn(
+                            'absolute -left-[31px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                            ev.type === 'comment' ? 'bg-slate-300' : 'bg-emerald-500 text-white'
+                          )}
+                        >
+                          {ev.type !== 'comment' && '✓'}
                         </div>
 
                         {ev.type === 'comment' ? (
-                          <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <div className="w-7 h-7 rounded-full bg-[#6692C5]/20 text-[#6692C5] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          <div
+                            className={cn(
+                              'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
+                              ev.isMine
+                                ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
+                                : 'bg-slate-50 border-slate-100'
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                                ev.isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
+                              )}
+                            >
                               {ev.user?.[0] ?? 'U'}
                             </div>
                             <div className="flex-1 text-xs">
-                              <div className="flex justify-between items-center mb-1">
+                              <div
+                                className={cn(
+                                  'flex items-center justify-between mb-1',
+                                  ev.isMine && 'flex-row-reverse'
+                                )}
+                              >
                                 <span className="font-semibold text-slate-800">{ev.user}</span>
                                 <span className="text-[10px] text-slate-400">{ev.date}</span>
                               </div>
