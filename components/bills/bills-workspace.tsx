@@ -117,6 +117,51 @@ function getFileTypeInfo(file: BillFile) {
   }
 }
 
+// Every bill's audit log always shows exactly these 3 entries, in this
+// exact order: Push to Xero, then a comment from Matthew Tutini, then a
+// comment from Ryan Cotter (isMine — right-aligned bubble).
+function buildAuditTrail(billId: string, params: {
+  pushDate: string
+  matthewNote: string
+  matthewDate: string
+  ryanNote: string
+  ryanDate: string
+}): AuditTrailEvent[] {
+  return [
+    {
+      id: `${billId}-push-xero`,
+      type: 'xero',
+      title: 'Push to Xero',
+      date: params.pushDate,
+    },
+    {
+      id: `${billId}-comment-matthew`,
+      type: 'comment',
+      title: 'Comment',
+      user: 'Matthew Tutini',
+      notes: params.matthewNote,
+      date: params.matthewDate,
+    },
+    {
+      id: `${billId}-comment-ryan`,
+      type: 'comment',
+      title: 'Comment',
+      user: 'Ryan Cotter',
+      notes: params.ryanNote,
+      date: params.ryanDate,
+      isMine: true,
+    },
+  ]
+}
+
+// Reference width (px) for the attachment preview at 100% zoom — see the
+// zoom controls in the Document Render Canvas below. Deliberately smaller
+// than the preview panel so 100% renders un-clamped and every zoom step
+// (50%-175%) actually changes the rendered size, overflow-scrolling past
+// the panel edge once zoomed in — same as the old transform: scale()
+// behavior, but via a real box resize so the browser re-renders sharp.
+const PREVIEW_BASE_WIDTH = 400
+
 const INITIAL_BILLS: Bill[] = [
   {
     id: 'b-3',
@@ -150,37 +195,13 @@ const INITIAL_BILLS: Bill[] = [
     approvers: [
       { name: 'Marcus Vance', role: 'Operations Admin' },
     ],
-    auditTrail: [
-      {
-        id: 'at-5',
-        type: 'xero',
-        title: 'Pulled request from Xero',
-        date: '18 Aug 2026, 08:00',
-      },
-      {
-        id: 'at-6',
-        type: 'xero',
-        title: 'Bill submitted and matched to PO-9201-AH.',
-        date: '18 Aug 2026, 14:12',
-      },
-      {
-        id: 'at-6a',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Matthew Tutini',
-        notes: 'Please double check the freight surcharge on this one before approving.',
-        date: '18 Aug 2026, 15:05 via Web',
-      },
-      {
-        id: 'at-6b',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Ryan Cotter',
-        notes: 'Confirmed with the supplier — freight is already included in the unit price.',
-        date: '18 Aug 2026, 15:22 via Web',
-        isMine: true,
-      },
-    ],
+    auditTrail: buildAuditTrail('b-3', {
+      pushDate: '18 Aug 2026, 08:00',
+      matthewNote: 'Please double check the freight surcharge on this one before approving.',
+      matthewDate: '18 Aug 2026, 15:05 via Web',
+      ryanNote: 'Confirmed with the supplier — freight is already included in the unit price.',
+      ryanDate: '18 Aug 2026, 15:22 via Web',
+    }),
   },
   {
     id: 'b-4',
@@ -230,37 +251,13 @@ const INITIAL_BILLS: Bill[] = [
     approvers: [
       { name: 'Sarah Jenkins', role: 'Site Manager' },
     ],
-    auditTrail: [
-      {
-        id: 'at-8b',
-        type: 'xero',
-        title: 'Pulled request from Xero',
-        date: '25 Jul 2026, 09:00',
-      },
-      {
-        id: 'at-7',
-        type: 'system',
-        title: 'Submitted for final approval by Site Manager.',
-        date: '25 Jul 2026, 15:10',
-      },
-      {
-        id: 'at-8',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Matthew Tutini',
-        notes: 'Delivery docket matches the quantities on this bill — good to approve.',
-        date: '25 Jul 2026, 15:20 via Web',
-      },
-      {
-        id: 'at-8a',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Ryan Cotter',
-        notes: 'Thanks for checking — approving now.',
-        date: '25 Jul 2026, 15:31 via Web',
-        isMine: true,
-      },
-    ],
+    auditTrail: buildAuditTrail('b-4', {
+      pushDate: '25 Jul 2026, 09:00',
+      matthewNote: 'Delivery docket matches the quantities on this bill — good to approve.',
+      matthewDate: '25 Jul 2026, 15:20 via Web',
+      ryanNote: 'Thanks for checking — approving now.',
+      ryanDate: '25 Jul 2026, 15:31 via Web',
+    }),
   },
   {
     id: 'b-6',
@@ -284,38 +281,139 @@ const INITIAL_BILLS: Bill[] = [
     ],
     files: [],
     approvers: [],
-    auditTrail: [
+    auditTrail: buildAuditTrail('b-6', {
+      pushDate: '05 Aug 2026, 09:00',
+      matthewNote: 'Nice work getting this one through quickly.',
+      matthewDate: '06 Aug 2026, 10:12 via Web',
+      ryanNote: 'Cheers — all good on our end.',
+      ryanDate: '06 Aug 2026, 10:15 via Web',
+    }),
+  },
+  {
+    id: 'b-10',
+    billNumber: 'BILL-2026-0901',
+    supplierName: 'Coastal Concrete & Aggregates',
+    address: '14 Wharf St, Redland Bay, QLD, 4165',
+    issueDate: '02 Aug 2026',
+    dueDate: '01 Sep 2026',
+    amount: 3960.00,
+    status: 'Rejected',
+    lineItems: [
       {
-        id: 'at-8c',
-        type: 'xero',
-        title: 'Pulled request from Xero',
-        date: '05 Aug 2026, 09:00',
-      },
-      {
-        id: 'at-9',
-        type: 'action',
-        title: 'Approved for payment',
-        user: 'Alex Johnson',
-        date: '06 Aug 2026, 10:05',
-      },
-      {
-        id: 'at-9a',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Matthew Tutini',
-        notes: 'Nice work getting this one through quickly.',
-        date: '06 Aug 2026, 10:12 via Web',
-      },
-      {
-        id: 'at-9b',
-        type: 'comment',
-        title: 'Comment',
-        user: 'Ryan Cotter',
-        notes: 'Cheers — all good on our end.',
-        date: '06 Aug 2026, 10:15 via Web',
-        isMine: true,
+        id: 'li-10a',
+        description: 'Ready-mix concrete 25 MPa (6m³ load)',
+        quantity: 4.0,
+        unitPrice: 900.0,
+        account: '150 - Materials',
+        tax: 'GST on Expenses (10%)',
+        amount: 3600.0,
       },
     ],
+    files: [],
+    approvers: [
+      { name: 'Marcus Vance', role: 'Operations Admin' },
+    ],
+    auditTrail: buildAuditTrail('b-10', {
+      pushDate: '02 Aug 2026, 08:15',
+      matthewNote: 'Quantity looks higher than what was ordered — can we confirm before approving?',
+      matthewDate: '02 Aug 2026, 11:20 via Web',
+      ryanNote: "Checked with the site — over-pour wasn't authorized, rejecting this one.",
+      ryanDate: '02 Aug 2026, 11:46 via Web',
+    }),
+  },
+  {
+    id: 'b-11',
+    billNumber: 'BILL-2026-0912',
+    supplierName: 'Precision Glazing & Aluminium',
+    address: '221 Sherwood Rd, Rocklea, QLD, 4106',
+    issueDate: '10 Aug 2026',
+    dueDate: '09 Sep 2026',
+    amount: 6435.00,
+    status: 'Rejected',
+    lineItems: [
+      {
+        id: 'li-11a',
+        description: 'Aluminium window frames — powder coated (custom sizes)',
+        quantity: 6.0,
+        unitPrice: 975.0,
+        account: '150 - Materials',
+        tax: 'GST on Expenses (10%)',
+        amount: 5850.0,
+      },
+    ],
+    files: [],
+    approvers: [
+      { name: 'Sarah Jenkins', role: 'Site Manager' },
+    ],
+    auditTrail: buildAuditTrail('b-11', {
+      pushDate: '10 Aug 2026, 09:05',
+      matthewNote: "Pricing doesn't match the quote we approved — flagging for review.",
+      matthewDate: '10 Aug 2026, 13:05 via Web',
+      ryanNote: 'Confirmed — supplier applied the wrong rate. Rejecting until a corrected invoice is issued.',
+      ryanDate: '10 Aug 2026, 13:30 via Web',
+    }),
+  },
+  {
+    id: 'b-12',
+    billNumber: 'BILL-2026-0925',
+    supplierName: 'GreenScape Landscaping Co.',
+    address: '58 Beenleigh-Redland Bay Rd, Carbrook, QLD, 4130',
+    issueDate: '15 Aug 2026',
+    dueDate: '14 Sep 2026',
+    amount: 7177.50,
+    status: 'Pending Approval',
+    lineItems: [
+      {
+        id: 'li-12a',
+        description: 'Turf supply & installation — Sir Walter Buffalo (450m²)',
+        quantity: 450.0,
+        unitPrice: 14.5,
+        account: '150 - Materials',
+        tax: 'GST on Expenses (10%)',
+        amount: 6525.0,
+      },
+    ],
+    files: [],
+    approvers: [
+      { name: 'Daniel McKenna', role: 'Site Manager' },
+    ],
+    auditTrail: buildAuditTrail('b-12', {
+      pushDate: '15 Aug 2026, 08:30',
+      matthewNote: 'Turf area matches the landscaping plan sign-off.',
+      matthewDate: '15 Aug 2026, 14:15 via Web',
+      ryanNote: 'Good to go — approving shortly.',
+      ryanDate: '15 Aug 2026, 14:22 via Web',
+    }),
+  },
+  {
+    id: 'b-13',
+    billNumber: 'BILL-2026-0876',
+    supplierName: 'Apex Plumbing & Gas Fitters',
+    address: '12 Kingston Rd, Underwood, QLD, 4119',
+    issueDate: '20 Jul 2026',
+    dueDate: '19 Aug 2026',
+    amount: 2464.00,
+    status: 'Approved',
+    lineItems: [
+      {
+        id: 'li-13a',
+        description: 'Copper pipe & fittings — 20mm (rough-in stage)',
+        quantity: 80.0,
+        unitPrice: 28.0,
+        account: '150 - Materials',
+        tax: 'GST on Expenses (10%)',
+        amount: 2240.0,
+      },
+    ],
+    files: [],
+    approvers: [],
+    auditTrail: buildAuditTrail('b-13', {
+      pushDate: '20 Jul 2026, 07:50',
+      matthewNote: 'Rough-in passed inspection, all good here.',
+      matthewDate: '21 Jul 2026, 09:30 via Web',
+      ryanNote: 'Great — thanks for confirming.',
+      ryanDate: '21 Jul 2026, 09:40 via Web',
+    }),
   },
 ]
 
@@ -506,7 +604,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
         {showLeftPreview ? (
-          <div className="w-80 md:w-96 bg-slate-900/5 border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden relative">
+          <div className="w-96 lg:w-110 xl:w-120 bg-slate-900/5 border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden relative">
             {/* Viewer Header Toolbar */}
             <div className="h-12 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 shadow-2xs z-10">
               <div className="flex items-center gap-1.5 min-w-0">
@@ -596,21 +694,30 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   </button>
                 </div>
               ) : activeTypeInfo.icon === ImageIcon ? (
+                // Zoom is applied as an actual box-width change (not a CSS
+                // transform: scale()) so the browser decodes/paints the
+                // bitmap at the target size instead of stretching an
+                // already-rasterized image, which is what was causing the
+                // blurriness.
                 <div
-                  style={{ transform: `scale(${pdfZoom / 100})`, transformOrigin: 'top center' }}
-                  className="w-full flex flex-col items-center transition-transform duration-150"
+                  style={{ width: `${(PREVIEW_BASE_WIDTH * pdfZoom) / 100}px` }}
+                  className="flex flex-col items-center transition-[width] duration-150 ease-out"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={activeAttachment.url}
                     alt={activeAttachment.name}
-                    className="max-w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
+                    className="w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
                   />
                 </div>
               ) : (
+                // Same box-width zoom approach for the PDF iframe: resizing
+                // the iframe (rather than CSS-scaling it) lets the browser's
+                // native PDF viewer — which fits the page to the iframe's
+                // width — re-render sharp at the new size.
                 <div
-                  style={{ transform: `scale(${pdfZoom / 100})`, transformOrigin: 'top center' }}
-                  className="w-full min-h-[780px] flex flex-col items-center transition-transform duration-150"
+                  style={{ width: `${(PREVIEW_BASE_WIDTH * pdfZoom) / 100}px` }}
+                  className="min-h-[780px] flex flex-col items-center transition-[width] duration-150 ease-out"
                 >
                   <iframe
                     src={`${activeAttachment.url}#toolbar=0&navpanes=0`}
@@ -622,7 +729,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             </div>
           </div>
         ) : (
-        <div className="w-80 md:w-96 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden">
+        <div className="w-96 lg:w-110 xl:w-120 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden">
           {/* Search bar */}
           <div className="p-3 border-b border-slate-100 bg-slate-50/50">
             <div className="relative">
