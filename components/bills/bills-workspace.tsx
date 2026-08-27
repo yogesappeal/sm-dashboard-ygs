@@ -893,6 +893,8 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                         <th className="px-4 py-3 text-right">Unit Price</th>
                         <th className="px-4 py-3">Account</th>
                         <th className="px-4 py-3">Tax</th>
+                        <th className="px-4 py-3">SM/Dept</th>
+                        <th className="px-4 py-3">Site/Tag</th>
                         <th className="px-4 py-3 text-right">Amount AUD</th>
                       </tr>
                     </thead>
@@ -904,6 +906,8 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                           <td className="px-4 py-3 text-right">{formatCurrency(item.unitPrice)}</td>
                           <td className="px-4 py-3">{item.account}</td>
                           <td className="px-4 py-3">{item.tax}</td>
+                          <td className="px-4 py-3">* SM - Ryan Cotter</td>
+                          <td className="px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
                           <td className="px-4 py-3 text-right font-semibold text-slate-800">
                             {formatCurrency(item.amount)}
                           </td>
