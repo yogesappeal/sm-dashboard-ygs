@@ -25,6 +25,10 @@ import {
   Paperclip,
   Send,
   User,
+  Download,
+  ImageIcon,
+  FileQuestion,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
@@ -55,6 +59,14 @@ interface AuditTrailEvent {
   isMine?: boolean // comment authored by the current user — right-aligned bubble
 }
 
+interface BillFile {
+  id: string
+  name: string
+  sizeMb: number
+  type: 'pdf' | 'image' | 'other'
+  url: string
+}
+
 interface Bill {
   id: string
   billNumber: string
@@ -67,6 +79,42 @@ interface Bill {
   lineItems: LineItem[]
   approvers: { name: string; role: string; avatar?: string }[]
   auditTrail: AuditTrailEvent[]
+  files: BillFile[]
+}
+
+// Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
+// the icon + colors the Files & Attachments card renders it with, and
+// whether it's previewable inline vs. download-only.
+function getFileTypeInfo(file: BillFile) {
+  if (file.type === 'pdf') {
+    return {
+      label: 'PDF Document',
+      icon: FileText,
+      colorClass: 'bg-red-50 text-red-600',
+      badgeClass: 'text-red-700 bg-red-50 border-red-200',
+      canPreview: true,
+    }
+  }
+
+  if (file.type === 'image') {
+    const ext = file.name.split('.').pop()?.toUpperCase() || 'IMG'
+    return {
+      label: `Image (${ext})`,
+      icon: ImageIcon,
+      colorClass: 'bg-indigo-50 text-indigo-600',
+      badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
+      canPreview: true,
+    }
+  }
+
+  const ext = file.name.split('.').pop()?.toUpperCase() || ''
+  return {
+    label: ext ? `${ext} File` : 'File Attachment',
+    icon: ext === 'XLSX' || ext === 'CSV' ? FileSpreadsheet : FileQuestion,
+    colorClass: 'bg-amber-50 text-amber-700',
+    badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
+    canPreview: false,
+  }
 }
 
 const INITIAL_BILLS: Bill[] = [
@@ -88,6 +136,15 @@ const INITIAL_BILLS: Bill[] = [
         account: '150 - Materials',
         tax: 'GST on Expenses (10%)',
         amount: 4206.72,
+      },
+    ],
+    files: [
+      {
+        id: 'file-3',
+        name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
+        sizeMb: 0.3,
+        type: 'pdf',
+        url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
       },
     ],
     approvers: [
@@ -154,6 +211,22 @@ const INITIAL_BILLS: Bill[] = [
         amount: 7130.0,
       },
     ],
+    files: [
+      {
+        id: 'file-4a',
+        name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
+        sizeMb: 0.3,
+        type: 'pdf',
+        url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
+      },
+      {
+        id: 'file-4b',
+        name: 'site-photo-delivery-docket.png',
+        sizeMb: 0.19,
+        type: 'image',
+        url: '/bills-attachments/site-photo-delivery-docket.png',
+      },
+    ],
     approvers: [
       { name: 'Sarah Jenkins', role: 'Site Manager' },
     ],
@@ -209,6 +282,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 2220.0,
       },
     ],
+    files: [],
     approvers: [],
     auditTrail: [
       {
@@ -258,8 +332,16 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
   // Accordion state for Right Detail sections
   const [openDetailsCard, setOpenDetailsCard] = useState(true)
+  const [openFilesCard, setOpenFilesCard] = useState(true)
   const [openWorkflowCard, setOpenWorkflowCard] = useState(true)
   const [openAuditCard, setOpenAuditCard] = useState(true)
+
+  // Attachment preview — ported from Resource/BillWorkspace2.tsx: clicking a
+  // file in Files & Attachments swaps the left list pane for a document
+  // viewer (image via <img>, PDF via <iframe>) instead of opening a modal.
+  const [showLeftPreview, setShowLeftPreview] = useState(false)
+  const [activeAttachmentId, setActiveAttachmentId] = useState<string>('')
+  const [pdfZoom, setPdfZoom] = useState(100)
 
   const toast = useToast()
 
@@ -282,6 +364,16 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     if (found) return found
     return filteredCategoryBills[0] ?? null
   }, [filteredCategoryBills, selectedBillId])
+
+  const activeAttachment = useMemo(() => {
+    if (!selectedBill || !activeAttachmentId) return null
+    return selectedBill.files.find((f) => f.id === activeAttachmentId) ?? null
+  }, [selectedBill, activeAttachmentId])
+
+  const activeTypeInfo = useMemo(
+    () => (activeAttachment ? getFileTypeInfo(activeAttachment) : null),
+    [activeAttachment]
+  )
 
   const pageTitle = categoryFilter === 'approval' ? 'Requires my approval (all)' : 'All Bills'
 
@@ -412,7 +504,124 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
       {/* Main Workspace Split Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Contextual Left List Pane */}
+        {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
+        {showLeftPreview ? (
+          <div className="w-80 md:w-96 bg-slate-900/5 border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden relative">
+            {/* Viewer Header Toolbar */}
+            <div className="h-12 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 shadow-2xs z-10">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowLeftPreview(false)}
+                  className="p-1.5 -ml-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold flex-shrink-0"
+                  title="Return to bills list"
+                >
+                  <ArrowRight size={14} className="rotate-180" />
+                </button>
+                <div className="h-4 w-px bg-slate-200 mx-0.5 flex-shrink-0" />
+                {activeTypeInfo && (
+                  <div className={cn('w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0', activeTypeInfo.colorClass)}>
+                    <activeTypeInfo.icon size={13} />
+                  </div>
+                )}
+                <span className="text-xs font-bold text-slate-800 truncate">
+                  {activeAttachment?.name || 'Document'}
+                </span>
+              </div>
+
+              {/* Zoom & Action Controls */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {activeTypeInfo?.canPreview && (
+                  <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPdfZoom((z) => Math.max(50, z - 15))}
+                      className="w-6 h-6 rounded hover:bg-white flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors font-bold text-xs"
+                      title="Zoom Out"
+                    >
+                      -
+                    </button>
+                    <span className="px-1 font-mono text-[10px] text-slate-700 min-w-[32px] text-center font-medium">
+                      {pdfZoom}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPdfZoom((z) => Math.min(175, z + 15))}
+                      className="w-6 h-6 rounded hover:bg-white flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors font-bold text-xs"
+                      title="Zoom In"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => toast(`Downloading ${activeAttachment?.name || 'document'}...`, 'info')}
+                  className="p-1.5 text-slate-500 hover:text-[#6692C5] hover:bg-[#6692C5]/10 rounded-lg transition-colors"
+                  title="Download File"
+                >
+                  <Download size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLeftPreview(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Close Preview"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Render Canvas */}
+            <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-200/60">
+              {!activeAttachment || !activeTypeInfo ? (
+                <div className="m-auto text-xs text-slate-400">No document available to preview</div>
+              ) : !activeTypeInfo.canPreview ? (
+                <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 border border-amber-100">
+                    <activeTypeInfo.icon size={28} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 mb-1">Preview Not Available</h3>
+                  <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                    <strong className="text-slate-700 font-mono">{activeAttachment.name}</strong> can&apos;t be previewed inline. Only PDF and image files are supported.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => toast(`Downloading ${activeAttachment.name}...`, 'info')}
+                    className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Download size={13} />
+                    Download File
+                  </button>
+                </div>
+              ) : activeTypeInfo.icon === ImageIcon ? (
+                <div
+                  style={{ transform: `scale(${pdfZoom / 100})`, transformOrigin: 'top center' }}
+                  className="w-full flex flex-col items-center transition-transform duration-150"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activeAttachment.url}
+                    alt={activeAttachment.name}
+                    className="max-w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
+                  />
+                </div>
+              ) : (
+                <div
+                  style={{ transform: `scale(${pdfZoom / 100})`, transformOrigin: 'top center' }}
+                  className="w-full min-h-[780px] flex flex-col items-center transition-transform duration-150"
+                >
+                  <iframe
+                    src={`${activeAttachment.url}#toolbar=0&navpanes=0`}
+                    className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
+                    title={activeAttachment.name}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="w-80 md:w-96 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden">
           {/* Search bar */}
           <div className="p-3 border-b border-slate-100 bg-slate-50/50">
@@ -477,6 +686,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Detail Workspace */}
         <div className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5">
@@ -613,6 +823,86 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Files & Attachments Card Accordion */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <button
+                  onClick={() => setOpenFilesCard((v) => !v)}
+                  className="w-full flex items-center justify-between text-slate-800 font-semibold text-sm mb-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Paperclip size={16} className="text-slate-400" />
+                    <span>Files &amp; Attachments</span>
+                    <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                      {selectedBill.files.length}
+                    </span>
+                  </div>
+                  {openFilesCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                {openFilesCard && (
+                  <div className="pt-3 border-t border-slate-100 mt-2">
+                    {selectedBill.files.length === 0 ? (
+                      <div className="text-xs text-slate-400 py-2 italic">
+                        No attached documents found for this bill.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectedBill.files.map((file) => {
+                          const fInfo = getFileTypeInfo(file)
+                          const FIcon = fInfo.icon
+                          return (
+                            <div
+                              key={file.id}
+                              onClick={() => {
+                                setActiveAttachmentId(file.id)
+                                setPdfZoom(100)
+                                setShowLeftPreview(true)
+                                toast(
+                                  fInfo.canPreview
+                                    ? `Loaded ${file.name} on left side`
+                                    : `${file.name} cannot be previewed in browser`,
+                                  'info'
+                                )
+                              }}
+                              className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-[#6692C5]/50 hover:bg-[#6692C5]/5 transition-all cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', fInfo.colorClass)}>
+                                  <FIcon size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-[#6692C5] transition-colors">
+                                    {file.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400">{file.sizeMb} MB &middot; {fInfo.label}</p>
+                                </div>
+                              </div>
+                              {fInfo.canPreview ? (
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
+                                >
+                                  <Eye size={12} />
+                                  Preview
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-400 group-hover:border-amber-400 group-hover:text-amber-700 rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
+                                >
+                                  <Download size={12} />
+                                  Download
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Approval Workflow Card Accordion */}
