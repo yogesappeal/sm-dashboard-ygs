@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
@@ -27,11 +28,21 @@ const STATUS_FILTERS = [
 
 export default function DashboardPage() {
   const { token, role, user } = useAuthStore()
+  const router = useRouter()
   const queryClient = useQueryClient()
   const isOps = role === 'Operations'
   // Admin sees the same unfiltered contract list as Ops (all-client-paginated),
   // distinct from isOps above which also drives the metrics/row variant.
   const usesAllClientsApi = role === 'Operations' || role === 'Admin'
+
+  // Site Managers land on Bills instead of the contracts dashboard — Bills
+  // is their primary workflow. AuthProvider blocks rendering until role is
+  // resolved, so this fires before any dashboard content is shown to them.
+  useEffect(() => {
+    if (role === 'Site Manager') {
+      router.replace('/bills')
+    }
+  }, [role, router])
 
   const [activeFilter, setActiveFilter] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -52,12 +63,13 @@ export default function DashboardPage() {
 
   const activeStatus = STATUS_FILTERS.find((f) => f.index === activeFilter)?.status
 
-  // Metrics query
+  // Metrics query — skipped for Site Managers, who are redirected to Bills
+  // before this dashboard is ever shown to them.
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['dashboard-metrics', role],
     queryFn: () =>
       isOps ? getOpsMetrics(token!) : getDashboardMetrics(token!),
-    enabled: !!token,
+    enabled: !!token && role !== 'Site Manager',
     staleTime: 5 * 60 * 1000,
   })
 
@@ -73,7 +85,7 @@ export default function DashboardPage() {
         ? getAllClientsPaginatedForOps(token!, params)
         : getClientsPaginated(token!, params)
     },
-    enabled: !!token,
+    enabled: !!token && role !== 'Site Manager',
     staleTime: 2 * 60 * 1000,
   })
 
@@ -128,6 +140,11 @@ export default function DashboardPage() {
 
   const firstName = user?.first_name ?? (isOps ? 'Ops' : 'SM')
   const isContractsLoading = contractsLoading || isFetching || isPageChanging
+
+  // Redirecting away — render nothing rather than flashing dashboard content.
+  if (role === 'Site Manager') {
+    return null
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
