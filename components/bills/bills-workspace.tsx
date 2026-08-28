@@ -591,13 +591,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
         <PageHeader title={pageTitle} description={pageDescription} />
       </div>
 
-      {/* Main Workspace Split Layout — left:right is a 40:60 ratio, set via
-          the `flex-40` / `flex-60` classes below (the two numbers are
-          literally the percentage split, so they must always sum to 100).
-          There are 3 panels sharing this ratio: the left panel in both its
-          states (Bills List below, and the attachment preview above it),
-          and the "Right Detail Workspace" panel further down this file.
-          Change all three flex-N values together to adjust the split. */}
+      {/* Main Workspace Split Layout — left:right ratio is set via the
+          flex-N classes below. Only the two values sharing a row matter
+          (their ratio, not their sum), and the two left-side states — the
+          Bills List and the attachment preview above it — are independent,
+          so each can have its own ratio against the "Right Detail
+          Workspace" panel further down this file. */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
         {showLeftPreview ? (
@@ -730,7 +729,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             </div>
           </div>
         ) : (
-          <div className="flex-40 min-w-80 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
+          <div className="flex-23 min-w-80 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
             {/* Search bar */}
             <div className="p-3 border-b border-slate-100 bg-slate-50/50">
               <div className="relative">
