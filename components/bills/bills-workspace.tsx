@@ -154,13 +154,27 @@ function buildAuditTrail(billId: string, params: {
   ]
 }
 
-// Reference width (px) for the attachment preview at 100% zoom — see the
-// zoom controls in the Document Render Canvas below. Deliberately smaller
-// than the preview panel so 100% renders un-clamped and every zoom step
-// (50%-175%) actually changes the rendered size, overflow-scrolling past
-// the panel edge once zoomed in — same as the old transform: scale()
-// behavior, but via a real box resize so the browser re-renders sharp.
-const PREVIEW_BASE_WIDTH = 400
+// Every bill gets the same two prototype attachments — sourced from
+// lib/data/ and served from public/bills-attachments/ — one PDF and one
+// image, in that order.
+function buildBillFiles(billId: string): BillFile[] {
+  return [
+    {
+      id: `${billId}-file-pdf`,
+      name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
+      sizeMb: 0.3,
+      type: 'pdf',
+      url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
+    },
+    {
+      id: `${billId}-file-image`,
+      name: 'bill-document-scan.jpeg',
+      sizeMb: 0.03,
+      type: 'image',
+      url: '/bills-attachments/bill-document-scan.jpeg',
+    },
+  ]
+}
 
 const INITIAL_BILLS: Bill[] = [
   {
@@ -183,15 +197,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 4206.72,
       },
     ],
-    files: [
-      {
-        id: 'file-3',
-        name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
-        sizeMb: 0.3,
-        type: 'pdf',
-        url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
-      },
-    ],
+    files: buildBillFiles('b-3'),
     approvers: [
       { name: 'Marcus Vance', role: 'Operations Admin' },
     ],
@@ -232,22 +238,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 7130.0,
       },
     ],
-    files: [
-      {
-        id: 'file-4a',
-        name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
-        sizeMb: 0.3,
-        type: 'pdf',
-        url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
-      },
-      {
-        id: 'file-4b',
-        name: 'site-photo-delivery-docket.png',
-        sizeMb: 0.19,
-        type: 'image',
-        url: '/bills-attachments/site-photo-delivery-docket.png',
-      },
-    ],
+    files: buildBillFiles('b-4'),
     approvers: [
       { name: 'Sarah Jenkins', role: 'Site Manager' },
     ],
@@ -279,7 +270,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 2220.0,
       },
     ],
-    files: [],
+    files: buildBillFiles('b-6'),
     approvers: [],
     auditTrail: buildAuditTrail('b-6', {
       pushDate: '05 Aug 2026, 09:00',
@@ -309,7 +300,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 3600.0,
       },
     ],
-    files: [],
+    files: buildBillFiles('b-10'),
     approvers: [
       { name: 'Marcus Vance', role: 'Operations Admin' },
     ],
@@ -341,7 +332,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 5850.0,
       },
     ],
-    files: [],
+    files: buildBillFiles('b-11'),
     approvers: [
       { name: 'Sarah Jenkins', role: 'Site Manager' },
     ],
@@ -373,7 +364,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 6525.0,
       },
     ],
-    files: [],
+    files: buildBillFiles('b-12'),
     approvers: [
       { name: 'Daniel McKenna', role: 'Site Manager' },
     ],
@@ -405,7 +396,7 @@ const INITIAL_BILLS: Bill[] = [
         amount: 2240.0,
       },
     ],
-    files: [],
+    files: buildBillFiles('b-13'),
     approvers: [],
     auditTrail: buildAuditTrail('b-13', {
       pushDate: '20 Jul 2026, 07:50',
@@ -600,11 +591,17 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
         <PageHeader title={pageTitle} description={pageDescription} />
       </div>
 
-      {/* Main Workspace Split Layout */}
+      {/* Main Workspace Split Layout — left:right is a 40:60 ratio, set via
+          the `flex-40` / `flex-60` classes below (the two numbers are
+          literally the percentage split, so they must always sum to 100).
+          There are 3 panels sharing this ratio: the left panel in both its
+          states (Bills List below, and the attachment preview above it),
+          and the "Right Detail Workspace" panel further down this file.
+          Change all three flex-N values together to adjust the split. */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
         {showLeftPreview ? (
-          <div className="w-96 lg:w-110 xl:w-120 bg-slate-900/5 border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden relative">
+          <div className="flex-45 min-w-80 bg-slate-900/5 border-r border-slate-200 flex flex-col h-full overflow-hidden relative">
             {/* Viewer Header Toolbar */}
             <div className="h-12 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 shadow-2xs z-10">
               <div className="flex items-center gap-1.5 min-w-0">
@@ -654,14 +651,6 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                 )}
                 <button
                   type="button"
-                  onClick={() => toast(`Downloading ${activeAttachment?.name || 'document'}...`, 'info')}
-                  className="p-1.5 text-slate-500 hover:text-[#6692C5] hover:bg-[#6692C5]/10 rounded-lg transition-colors"
-                  title="Download File"
-                >
-                  <Download size={14} />
-                </button>
-                <button
-                  type="button"
                   onClick={() => setShowLeftPreview(false)}
                   className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                   title="Close Preview"
@@ -671,8 +660,9 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
               </div>
             </div>
 
-            {/* Document Render Canvas */}
-            <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-200/60">
+            {/* Document Render Canvas — padding kept minimal so the document
+                gets as much of the panel as possible. */}
+            <div className="flex-1 overflow-auto p-1.5 flex justify-center bg-slate-200/60">
               {!activeAttachment || !activeTypeInfo ? (
                 <div className="m-auto text-xs text-slate-400">No document available to preview</div>
               ) : !activeTypeInfo.canPreview ? (
@@ -694,14 +684,17 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   </button>
                 </div>
               ) : activeTypeInfo.icon === ImageIcon ? (
-                // Zoom is applied as an actual box-width change (not a CSS
-                // transform: scale()) so the browser decodes/paints the
-                // bitmap at the target size instead of stretching an
-                // already-rasterized image, which is what was causing the
-                // blurriness.
+                // Zoom is a percentage of the panel's own width (not a fixed
+                // px base) so 100% always fills the available canvas exactly
+                // — no leftover whitespace — and scales automatically as the
+                // panel's responsive width changes. It's a real box-width
+                // change rather than a CSS transform: scale(), so the
+                // browser decodes/paints the bitmap at the target size
+                // instead of stretching an already-rasterized image, which
+                // is what was causing the blurriness.
                 <div
-                  style={{ width: `${(PREVIEW_BASE_WIDTH * pdfZoom) / 100}px` }}
-                  className="flex flex-col items-center transition-[width] duration-150 ease-out"
+                  style={{ width: `${pdfZoom}%` }}
+                  className="flex-shrink-0 flex flex-col items-center transition-[width] duration-150 ease-out"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -711,16 +704,24 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   />
                 </div>
               ) : (
-                // Same box-width zoom approach for the PDF iframe: resizing
-                // the iframe (rather than CSS-scaling it) lets the browser's
-                // native PDF viewer — which fits the page to the iframe's
-                // width — re-render sharp at the new size.
-                <div
-                  style={{ width: `${(PREVIEW_BASE_WIDTH * pdfZoom) / 100}px` }}
-                  className="min-h-[780px] flex flex-col items-center transition-[width] duration-150 ease-out"
-                >
+                // Unlike the <img> above, resizing this iframe's CSS box
+                // doesn't make the browser's native PDF viewer re-render
+                // bigger — that viewer computes its "fit to width" once, at
+                // load, and doesn't react to later box resizes. So zoom is
+                // driven instead through the viewer's own #zoom= open
+                // parameter, which does control it live — but only if the
+                // browser actually re-navigates the iframe. A URL that
+                // differs *only* in its fragment (e.g. just #zoom=115 vs
+                // #zoom=100) is treated as an in-page fragment jump, not a
+                // real navigation, so the new zoom param gets ignored; the
+                // `?z=` query param forces a genuine reload so the new zoom
+                // level actually takes effect. No `key` here, though — that
+                // would fully unmount/remount the iframe (blank flash on
+                // every click); updating `src` on the same element instead
+                // keeps the previous page visible until the new one is ready.
+                <div className="w-full min-h-[780px] flex flex-col items-center">
                   <iframe
-                    src={`${activeAttachment.url}#toolbar=0&navpanes=0`}
+                    src={`${activeAttachment.url}?z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
                     className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
                     title={activeAttachment.name}
                   />
@@ -729,74 +730,74 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             </div>
           </div>
         ) : (
-        <div className="w-96 lg:w-110 xl:w-120 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 h-full overflow-hidden">
-          {/* Search bar */}
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search bill or supplier..."
-                className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] bg-white"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={14} />
-                </button>
+          <div className="flex-40 min-w-80 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
+            {/* Search bar */}
+            <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search bill or supplier..."
+                  className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] bg-white"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Header count badge for selected view */}
+            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600">
+              <span>Bills List</span>
+              <span className="bg-[#6692C5]/10 text-[#6692C5] px-2 py-0.5 rounded-full text-[11px] font-bold">
+                {filteredCategoryBills.length}
+              </span>
+            </div>
+
+            {/* List items for this category */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+              {filteredCategoryBills.length === 0 ? (
+                <div className="px-4 py-12 text-center text-xs text-slate-400">
+                  No bills found for this view
+                </div>
+              ) : (
+                filteredCategoryBills.map((bill) => (
+                  <div
+                    key={bill.id}
+                    onClick={() => setSelectedBillId(bill.id)}
+                    className={cn(
+                      'p-4 border-b border-slate-100 cursor-pointer transition-all hover:bg-slate-50',
+                      selectedBill?.id === bill.id
+                        ? 'bg-[#6692C5]/10 border-l-4 border-[#6692C5] shadow-xs'
+                        : 'bg-white'
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-1.5">
+                      <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
+                        Bill {bill.billNumber} from {bill.supplierName}
+                      </span>
+                      <StatusBadge status={bill.status} size="xs" />
+                    </div>
+
+                    <div className="text-xs mt-2">
+                      <span className="font-bold text-slate-800">{formatCurrency(bill.amount)}</span>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
-
-          {/* Header count badge for selected view */}
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600">
-            <span>Bills List</span>
-            <span className="bg-[#6692C5]/10 text-[#6692C5] px-2 py-0.5 rounded-full text-[11px] font-bold">
-              {filteredCategoryBills.length}
-            </span>
-          </div>
-
-          {/* List items for this category */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {filteredCategoryBills.length === 0 ? (
-              <div className="px-4 py-12 text-center text-xs text-slate-400">
-                No bills found for this view
-              </div>
-            ) : (
-              filteredCategoryBills.map((bill) => (
-                <div
-                  key={bill.id}
-                  onClick={() => setSelectedBillId(bill.id)}
-                  className={cn(
-                    'p-4 border-b border-slate-100 cursor-pointer transition-all hover:bg-slate-50',
-                    selectedBill?.id === bill.id
-                      ? 'bg-[#6692C5]/10 border-l-4 border-[#6692C5] shadow-xs'
-                      : 'bg-white'
-                  )}
-                >
-                  <div className="flex justify-between items-start mb-1.5">
-                    <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
-                      Bill {bill.billNumber} from {bill.supplierName}
-                    </span>
-                    <StatusBadge status={bill.status} size="xs" />
-                  </div>
-
-                  <div className="text-xs mt-2">
-                    <span className="font-bold text-slate-800">{formatCurrency(bill.amount)}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
         )}
 
         {/* Right Detail Workspace */}
-        <div className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5">
+        <div className="flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5">
           {selectedBill ? (
             <div className="space-y-5">
               {/* Header Card */}
@@ -1040,8 +1041,8 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                               step.status === 'active'
                                 ? 'bg-[#6692C5] text-white border-[#6692C5] shadow-sm'
                                 : step.status === 'completed'
-                                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                                : 'bg-white text-slate-400 border-slate-200 opacity-60'
+                                  ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                  : 'bg-white text-slate-400 border-slate-200 opacity-60'
                             )}
                           >
                             {step.status === 'completed' && (
