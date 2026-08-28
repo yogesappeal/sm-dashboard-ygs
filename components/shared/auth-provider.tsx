@@ -81,6 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function handleSignOut() {
     await supabase.auth.signOut()
     clear()
+    // So the next login redirects a Site Manager to /bills again — see
+    // app/(dashboard)/page.tsx, which sets this flag once per login.
+    sessionStorage.removeItem('sm-post-login-redirect-done')
     router.push('/login')
     router.refresh()
   }
