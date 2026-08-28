@@ -60,6 +60,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Bills-only lockdown — every other authenticated page is temporarily
+  // unreachable, including by typing the URL directly (Home "/",
+  // Purchase Orders, Suppliers & Subs, Scope, Tasks, Contract,
+  // Contract Preview, Profile, Settings, Notifications). Restore access by
+  // removing this block (sidebar entries are commented out separately in
+  // components/layout/sidebar.tsx).
+  const isBillsRoute =
+    request.nextUrl.pathname === '/bills' ||
+    request.nextUrl.pathname.startsWith('/bills/')
+  if (user && !isAuthRoute && !isPublicRoute && !isBillsRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/bills'
+    return NextResponse.redirect(url)
+  }
+
   return supabaseResponse
 }
 

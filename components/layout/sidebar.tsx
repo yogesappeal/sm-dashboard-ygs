@@ -46,10 +46,13 @@ interface NavItem {
 
 function getNavItems(role: UserRole): NavItem[] {
   return [
-    { label: 'Home', href: '/', icon: LayoutDashboard },
-    { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
-    { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
-    { label: 'Scope', href: '/scope', icon: FileText },
+    // Sidebar temporarily restricted to Bills only — every other module is
+    // commented out below (routes kept in place) rather than removed, so
+    // they can be restored later by simply uncommenting.
+    // { label: 'Home', href: '/', icon: LayoutDashboard },
+    // { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
+    // { label: 'Suppliers & Subs', href: '/suppliers', icon: Users },
+    // { label: 'Scope', href: '/scope', icon: FileText },
     // Bills is Site Manager-only right now (see lib/permissions.ts `bill:access`)
     // — hidden from the nav entirely for every other role.
     ...(hasPermission(role, 'bill:access')
@@ -63,7 +66,7 @@ function getNavItems(role: UserRole): NavItem[] {
           ],
         }]
       : []),
-    ...(FEATURE_TASK && hasPermission(role, 'task:view') ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
+    // ...(FEATURE_TASK && hasPermission(role, 'task:view') ? [{ label: 'Tasks', href: '/tasks', icon: CheckSquare }] : []),
   ]
 }
 

@@ -432,6 +432,14 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const [activeAttachmentId, setActiveAttachmentId] = useState<string>('')
   const [pdfZoom, setPdfZoom] = useState(100)
 
+  // Mobile-only master/detail toggle — desktop (md: and up) always shows
+  // both panes side by side, completely unaffected by this. Below md, only
+  // one pane is visible at a time: the bills list until a bill is tapped,
+  // then the detail workspace, with an explicit "Back to Bills List" way
+  // back. Ignored entirely at md+ via the `md:flex`/`md:block` overrides
+  // applied alongside it further down.
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+
   const toast = useToast()
 
   // Filter bills according to the category prop
@@ -463,6 +471,13 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     () => (activeAttachment ? getFileTypeInfo(activeAttachment) : null),
     [activeAttachment]
   )
+
+  // Mobile-only visibility for the two top-level panes (see
+  // mobileDetailOpen above). The preview always takes priority over the
+  // detail pane on mobile since it's opened from a control inside the
+  // detail pane and must stay reachable there.
+  const showMobileLeftSlot = !mobileDetailOpen || showLeftPreview
+  const showMobileRightSlot = mobileDetailOpen && !showLeftPreview
 
   const pageTitle = categoryFilter === 'approval' ? 'Requires my approval (all)' : 'All Bills'
 
@@ -600,7 +615,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
         {showLeftPreview ? (
-          <div className="flex-45 min-w-80 bg-slate-900/5 border-r border-slate-200 flex flex-col h-full overflow-hidden relative">
+          <div
+            className={cn(
+              showMobileLeftSlot ? 'flex' : 'hidden',
+              'md:flex flex-col flex-45 min-w-0 md:min-w-80 bg-slate-900/5 border-r border-slate-200 h-full overflow-hidden relative'
+            )}
+          >
             {/* Viewer Header Toolbar */}
             <div className="h-12 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 shadow-2xs z-10">
               <div className="flex items-center gap-1.5 min-w-0">
@@ -729,7 +749,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             </div>
           </div>
         ) : (
-          <div className="flex-23 min-w-80 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
+          <div
+            className={cn(
+              showMobileLeftSlot ? 'flex' : 'hidden',
+              'md:flex flex-col flex-23 min-w-0 md:min-w-80 bg-white border-r border-slate-200 h-full overflow-hidden'
+            )}
+          >
             {/* Search bar */}
             <div className="p-3 border-b border-slate-100 bg-slate-50/50">
               <div className="relative">
@@ -770,7 +795,10 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                 filteredCategoryBills.map((bill) => (
                   <div
                     key={bill.id}
-                    onClick={() => setSelectedBillId(bill.id)}
+                    onClick={() => {
+                      setSelectedBillId(bill.id)
+                      setMobileDetailOpen(true)
+                    }}
                     className={cn(
                       'p-4 border-b border-slate-100 cursor-pointer transition-all hover:bg-slate-50',
                       selectedBill?.id === bill.id
@@ -796,12 +824,29 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
         )}
 
         {/* Right Detail Workspace */}
-        <div className="flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5">
+        <div
+          className={cn(
+            showMobileRightSlot ? 'block' : 'hidden',
+            'md:block flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
+          )}
+        >
           {selectedBill ? (
             <div className="space-y-5">
+              {/* Mobile-only: return to the bills list without disturbing
+                  the desktop side-by-side layout, which never renders
+                  this (md:hidden). */}
+              <button
+                type="button"
+                onClick={() => setMobileDetailOpen(false)}
+                className="md:hidden flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <ArrowRight size={14} className="rotate-180" />
+                Back to Bills List
+              </button>
+
               {/* Header Card */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                   <div className="space-y-1 max-w-xl">
                     <h2 className="text-lg font-bold text-slate-800">
                       Bill {selectedBill.billNumber} from {selectedBill.supplierName}
@@ -812,15 +857,15 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     </div>
                   </div>
 
-                  <div className="text-right flex flex-col items-end gap-3">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-start md:items-end md:text-right gap-3 w-full md:w-auto">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xl font-bold text-slate-800">
                         {formatCurrency(selectedBill.amount)}
                       </span>
                       <StatusBadge status={selectedBill.status} />
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {selectedBill.status === 'Pending Approval' && (
                         <PermissionGuard action="bill:approve">
                           <div className="flex items-center gap-2">
@@ -888,27 +933,27 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 font-semibold">
                       <tr>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3 text-right">Qty</th>
-                        <th className="px-4 py-3 text-right">Unit Price</th>
-                        <th className="px-4 py-3">Account</th>
-                        <th className="px-4 py-3">Tax</th>
-                        <th className="px-4 py-3">SM/Dept</th>
-                        <th className="px-4 py-3">Site/Tag</th>
-                        <th className="px-4 py-3 text-right">Amount AUD</th>
+                        <th className="px-3 md:px-4 py-3">Description</th>
+                        <th className="px-3 md:px-4 py-3 text-right">Qty</th>
+                        <th className="px-3 md:px-4 py-3 text-right">Unit Price</th>
+                        <th className="px-3 md:px-4 py-3">Account</th>
+                        <th className="px-3 md:px-4 py-3">Tax</th>
+                        <th className="px-3 md:px-4 py-3">SM/Dept</th>
+                        <th className="px-3 md:px-4 py-3">Site/Tag</th>
+                        <th className="px-3 md:px-4 py-3 text-right">Amount AUD</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {selectedBill.lineItems.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-medium text-slate-800">{item.description}</td>
-                          <td className="px-4 py-3 text-right">{item.quantity.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-4 py-3">{item.account}</td>
-                          <td className="px-4 py-3">{item.tax}</td>
-                          <td className="px-4 py-3">* SM - Ryan Cotter</td>
-                          <td className="px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
-                          <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          <td className="px-3 md:px-4 py-3 font-medium text-slate-800">{item.description}</td>
+                          <td className="px-3 md:px-4 py-3 text-right">{item.quantity.toFixed(2)}</td>
+                          <td className="px-3 md:px-4 py-3 text-right">{formatCurrency(item.unitPrice)}</td>
+                          <td className="px-3 md:px-4 py-3">{item.account}</td>
+                          <td className="px-3 md:px-4 py-3">{item.tax}</td>
+                          <td className="px-3 md:px-4 py-3">* SM - Ryan Cotter</td>
+                          <td className="px-3 md:px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
+                          <td className="px-3 md:px-4 py-3 text-right font-semibold text-slate-800">
                             {formatCurrency(item.amount)}
                           </td>
                         </tr>
