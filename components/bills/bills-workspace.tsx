@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Search,
   Receipt,
@@ -29,62 +29,34 @@ import {
   ImageIcon,
   FileQuestion,
   FileSpreadsheet,
+  Loader2,
+  RefreshCw,
+  KeyRound,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useToast } from '@/components/shared/toast'
+import {
+  getBills,
+  getBillDetail,
+  getBillActivities,
+  getBillAttachment,
+  mapApiBillToBill,
+  mapApiActivitiesToAuditTrail,
+  unwrapApiData,
+  formatCurrencyAmount,
+  NO_DATA,
+} from '@/lib/api'
+import type { Bill, BillFile, AuditTrailEvent, ApiActivities } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-interface LineItem {
-  id: string
-  description: string
-  quantity: number
-  unitPrice: number
-  account: string
-  tax: string
-  amount: number
-}
-
-interface AuditTrailEvent {
-  id: string
-  type: 'system' | 'xero' | 'action' | 'comment'
-  title: string
-  subtitle?: string
-  date: string
-  user?: string
-  userAvatar?: string
-  notes?: string
-  isMine?: boolean // comment authored by the current user — right-aligned bubble
-}
-
-interface BillFile {
-  id: string
-  name: string
-  sizeMb: number
-  type: 'pdf' | 'image' | 'other'
-  url: string
-}
-
-interface Bill {
-  id: string
-  billNumber: string
-  supplierName: string
-  address: string
-  issueDate: string
-  dueDate: string
-  amount: number
-  status: 'Pending Approval' | 'Approved' | 'Rejected'
-  lineItems: LineItem[]
-  approvers: { name: string; role: string; avatar?: string }[]
-  auditTrail: AuditTrailEvent[]
-  files: BillFile[]
-}
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
 // the icon + colors the Files & Attachments card renders it with, and
-// whether it's previewable inline vs. download-only.
+// whether it's previewable inline vs. download-only. Kept here (rather than
+// in lib/api/bills.ts) since it returns lucide icon components and Tailwind
+// classes — presentation, not data.
 function getFileTypeInfo(file: BillFile) {
   if (file.type === 'pdf') {
     return {
@@ -117,304 +89,32 @@ function getFileTypeInfo(file: BillFile) {
   }
 }
 
-// Every bill's audit log always shows exactly these 3 entries, in this
-// exact order: Push to Xero, then a comment from Matthew Tutini, then a
-// comment from Ryan Cotter (isMine — right-aligned bubble).
-function buildAuditTrail(billId: string, params: {
-  pushDate: string
-  matthewNote: string
-  matthewDate: string
-  ryanNote: string
-  ryanDate: string
-}): AuditTrailEvent[] {
-  return [
-    {
-      id: `${billId}-push-xero`,
-      type: 'xero',
-      title: 'Push to Xero',
-      date: params.pushDate,
-    },
-    {
-      id: `${billId}-comment-matthew`,
-      type: 'comment',
-      title: 'Comment',
-      user: 'Matthew Tutini',
-      notes: params.matthewNote,
-      date: params.matthewDate,
-    },
-    {
-      id: `${billId}-comment-ryan`,
-      type: 'comment',
-      title: 'Comment',
-      user: 'Ryan Cotter',
-      notes: params.ryanNote,
-      date: params.ryanDate,
-      isMine: true,
-    },
-  ]
-}
-
-// Every bill gets the same two prototype attachments — sourced from
-// lib/data/ and served from public/bills-attachments/ — one PDF and one
-// image, in that order.
-function buildBillFiles(billId: string): BillFile[] {
-  return [
-    {
-      id: `${billId}-file-pdf`,
-      name: 'QBCC Level 2 and Consumer Guide - CS Security - AD Deposit.pdf',
-      sizeMb: 0.3,
-      type: 'pdf',
-      url: '/bills-attachments/qbcc-level-2-consumer-guide.pdf',
-    },
-    {
-      id: `${billId}-file-image`,
-      name: 'bill-document-scan.jpeg',
-      sizeMb: 0.03,
-      type: 'image',
-      url: '/bills-attachments/bill-document-scan.jpeg',
-    },
-  ]
-}
-
-const INITIAL_BILLS: Bill[] = [
-  {
-    id: 'b-3',
-    billNumber: '0439149',
-    supplierName: 'Queensland Sheet Metal & Roofing Supplies',
-    address: '88 Magnesium Dr, Crestmead, QLD, 4132',
-    issueDate: '18 Aug 2026',
-    dueDate: '28 Aug 2026',
-    amount: 4627.39,
-    status: 'Pending Approval',
-    lineItems: [
-      {
-        id: 'li-3',
-        description: 'Custom corrugated steel roof sheets (0.48mm BMT)',
-        quantity: 120.0,
-        unitPrice: 35.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 4206.72,
-      },
-    ],
-    files: buildBillFiles('b-3'),
-    approvers: [
-      { name: 'Marcus Vance', role: 'Operations Admin' },
-    ],
-    auditTrail: buildAuditTrail('b-3', {
-      pushDate: '18 Aug 2026, 08:00',
-      matthewNote: 'Please double check the freight surcharge on this one before approving.',
-      matthewDate: '18 Aug 2026, 15:05 via Web',
-      ryanNote: 'Confirmed with the supplier — freight is already included in the unit price.',
-      ryanDate: '18 Aug 2026, 15:22 via Web',
-    }),
-  },
-  {
-    id: 'b-4',
-    billNumber: 'BILL-2026-0894',
-    supplierName: 'Timber & Framing Suppliers',
-    address: '77 Boundary Rd, Coopers Plains, QLD, 4108',
-    issueDate: '25 Jul 2026',
-    dueDate: '24 Aug 2026',
-    amount: 18250.00,
-    status: 'Pending Approval',
-    lineItems: [
-      {
-        id: 'li-4',
-        description: 'MGP10 Treated Pine 90x45 (6.0m)',
-        quantity: 250.0,
-        unitPrice: 42.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 10500.0,
-      },
-      {
-        id: 'li-5',
-        description: 'MGP10 Treated Pine 70x45 (5.4m)',
-        quantity: 230.0,
-        unitPrice: 31.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 7130.0,
-      },
-    ],
-    files: buildBillFiles('b-4'),
-    approvers: [
-      { name: 'Sarah Jenkins', role: 'Site Manager' },
-    ],
-    auditTrail: buildAuditTrail('b-4', {
-      pushDate: '25 Jul 2026, 09:00',
-      matthewNote: 'Delivery docket matches the quantities on this bill — good to approve.',
-      matthewDate: '25 Jul 2026, 15:20 via Web',
-      ryanNote: 'Thanks for checking — approving now.',
-      ryanDate: '25 Jul 2026, 15:31 via Web',
-    }),
-  },
-  {
-    id: 'b-6',
-    billNumber: 'BILL-2026-0893',
-    supplierName: 'Metro Electrical Services',
-    address: '99 Logan Rd, Woolloongabba, QLD, 4102',
-    issueDate: '05 Aug 2026',
-    dueDate: '04 Sep 2026',
-    amount: 6720.50,
-    status: 'Approved',
-    lineItems: [
-      {
-        id: 'li-7',
-        description: 'Electrical Conduit & Cable Roll (2.5mm)',
-        quantity: 12.0,
-        unitPrice: 185.0,
-        account: '100 - Sub Contractor',
-        tax: 'GST on Expenses (10%)',
-        amount: 2220.0,
-      },
-    ],
-    files: buildBillFiles('b-6'),
-    approvers: [],
-    auditTrail: buildAuditTrail('b-6', {
-      pushDate: '05 Aug 2026, 09:00',
-      matthewNote: 'Nice work getting this one through quickly.',
-      matthewDate: '06 Aug 2026, 10:12 via Web',
-      ryanNote: 'Cheers — all good on our end.',
-      ryanDate: '06 Aug 2026, 10:15 via Web',
-    }),
-  },
-  {
-    id: 'b-10',
-    billNumber: 'BILL-2026-0901',
-    supplierName: 'Coastal Concrete & Aggregates',
-    address: '14 Wharf St, Redland Bay, QLD, 4165',
-    issueDate: '02 Aug 2026',
-    dueDate: '01 Sep 2026',
-    amount: 3960.00,
-    status: 'Rejected',
-    lineItems: [
-      {
-        id: 'li-10a',
-        description: 'Ready-mix concrete 25 MPa (6m³ load)',
-        quantity: 4.0,
-        unitPrice: 900.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 3600.0,
-      },
-    ],
-    files: buildBillFiles('b-10'),
-    approvers: [
-      { name: 'Marcus Vance', role: 'Operations Admin' },
-    ],
-    auditTrail: buildAuditTrail('b-10', {
-      pushDate: '02 Aug 2026, 08:15',
-      matthewNote: 'Quantity looks higher than what was ordered — can we confirm before approving?',
-      matthewDate: '02 Aug 2026, 11:20 via Web',
-      ryanNote: "Checked with the site — over-pour wasn't authorized, rejecting this one.",
-      ryanDate: '02 Aug 2026, 11:46 via Web',
-    }),
-  },
-  {
-    id: 'b-11',
-    billNumber: 'BILL-2026-0912',
-    supplierName: 'Precision Glazing & Aluminium',
-    address: '221 Sherwood Rd, Rocklea, QLD, 4106',
-    issueDate: '10 Aug 2026',
-    dueDate: '09 Sep 2026',
-    amount: 6435.00,
-    status: 'Rejected',
-    lineItems: [
-      {
-        id: 'li-11a',
-        description: 'Aluminium window frames — powder coated (custom sizes)',
-        quantity: 6.0,
-        unitPrice: 975.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 5850.0,
-      },
-    ],
-    files: buildBillFiles('b-11'),
-    approvers: [
-      { name: 'Sarah Jenkins', role: 'Site Manager' },
-    ],
-    auditTrail: buildAuditTrail('b-11', {
-      pushDate: '10 Aug 2026, 09:05',
-      matthewNote: "Pricing doesn't match the quote we approved — flagging for review.",
-      matthewDate: '10 Aug 2026, 13:05 via Web',
-      ryanNote: 'Confirmed — supplier applied the wrong rate. Rejecting until a corrected invoice is issued.',
-      ryanDate: '10 Aug 2026, 13:30 via Web',
-    }),
-  },
-  {
-    id: 'b-12',
-    billNumber: 'BILL-2026-0925',
-    supplierName: 'GreenScape Landscaping Co.',
-    address: '58 Beenleigh-Redland Bay Rd, Carbrook, QLD, 4130',
-    issueDate: '15 Aug 2026',
-    dueDate: '14 Sep 2026',
-    amount: 7177.50,
-    status: 'Pending Approval',
-    lineItems: [
-      {
-        id: 'li-12a',
-        description: 'Turf supply & installation — Sir Walter Buffalo (450m²)',
-        quantity: 450.0,
-        unitPrice: 14.5,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 6525.0,
-      },
-    ],
-    files: buildBillFiles('b-12'),
-    approvers: [
-      { name: 'Daniel McKenna', role: 'Site Manager' },
-    ],
-    auditTrail: buildAuditTrail('b-12', {
-      pushDate: '15 Aug 2026, 08:30',
-      matthewNote: 'Turf area matches the landscaping plan sign-off.',
-      matthewDate: '15 Aug 2026, 14:15 via Web',
-      ryanNote: 'Good to go — approving shortly.',
-      ryanDate: '15 Aug 2026, 14:22 via Web',
-    }),
-  },
-  {
-    id: 'b-13',
-    billNumber: 'BILL-2026-0876',
-    supplierName: 'Apex Plumbing & Gas Fitters',
-    address: '12 Kingston Rd, Underwood, QLD, 4119',
-    issueDate: '20 Jul 2026',
-    dueDate: '19 Aug 2026',
-    amount: 2464.00,
-    status: 'Approved',
-    lineItems: [
-      {
-        id: 'li-13a',
-        description: 'Copper pipe & fittings — 20mm (rough-in stage)',
-        quantity: 80.0,
-        unitPrice: 28.0,
-        account: '150 - Materials',
-        tax: 'GST on Expenses (10%)',
-        amount: 2240.0,
-      },
-    ],
-    files: buildBillFiles('b-13'),
-    approvers: [],
-    auditTrail: buildAuditTrail('b-13', {
-      pushDate: '20 Jul 2026, 07:50',
-      matthewNote: 'Rough-in passed inspection, all good here.',
-      matthewDate: '21 Jul 2026, 09:30 via Web',
-      ryanNote: 'Great — thanks for confirming.',
-      ryanDate: '21 Jul 2026, 09:40 via Web',
-    }),
-  },
-]
-
 interface BillsWorkspaceProps {
   categoryFilter: 'approval' | 'all'
 }
 
 export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const canApproveBills = usePermission('bill:approve')
-  const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS)
+
+  // Temporary: the Bills API (a separate Supabase project from the rest of
+  // this app) currently needs its own bearer token, entered manually here
+  // rather than reused from the app's own session — see
+  // lib/api/bills-fetcher.ts for why. Remove this field once real auth is
+  // wired up; every API call below reads from this, never a hardcoded value.
+  const [apiToken, setApiToken] = useState('')
+
+  const [bills, setBills] = useState<Bill[]>([])
+  const [billsLoading, setBillsLoading] = useState(false)
+  const [billsError, setBillsError] = useState<string | null>(null)
+  const [billsReloadKey, setBillsReloadKey] = useState(0)
+
+  // Per-bill detail (line items, files, audit trail) is fetched lazily on
+  // selection — getBillDetail + getBillActivities in parallel — since the
+  // bills list endpoint likely only returns summary fields.
+  const [detailLoadedIds, setDetailLoadedIds] = useState<Set<string>>(new Set())
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
@@ -431,6 +131,11 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const [showLeftPreview, setShowLeftPreview] = useState(false)
   const [activeAttachmentId, setActiveAttachmentId] = useState<string>('')
   const [pdfZoom, setPdfZoom] = useState(100)
+  // The bill detail response only gives an attachment's storage location,
+  // not a usable URL — resolved just-in-time via getBillAttachment() when
+  // Preview is clicked.
+  const [attachmentUrlLoading, setAttachmentUrlLoading] = useState(false)
+  const [attachmentUrlError, setAttachmentUrlError] = useState<string | null>(null)
 
   // Mobile-only master/detail toggle — desktop (md: and up) always shows
   // both panes side by side, completely unaffected by this. Below md, only
@@ -441,6 +146,44 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
   const toast = useToast()
+
+  // Fetch the bills list once a token is entered. `scope` is deliberately
+  // omitted — Resource/data-curl-api.md only confirms one value
+  // (`approved_by_me`), whose exact semantics don't clearly line up with
+  // this component's own `categoryFilter` prop ("requires my approval"),
+  // so category filtering stays client-side below exactly as it worked
+  // with the mock data.
+  useEffect(() => {
+    if (!apiToken) return
+    let cancelled = false
+
+    // Deferred a tick (not called synchronously in the effect body) per
+    // react-hooks/set-state-in-effect — resolves before paint, so there's
+    // no visible delay before the loading state shows.
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      setBillsLoading(true)
+      setBillsError(null)
+    })
+
+    getBills(apiToken)
+      .then((json) => {
+        if (cancelled) return
+        const list = unwrapApiData(json) ?? []
+        setBills(list.map((b) => mapApiBillToBill(b)))
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setBillsError(err instanceof Error ? err.message : 'Failed to load bills')
+      })
+      .finally(() => {
+        if (!cancelled) setBillsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiToken, billsReloadKey])
 
   // Filter bills according to the category prop
   const filteredCategoryBills = useMemo(() => {
@@ -462,6 +205,56 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     return filteredCategoryBills[0] ?? null
   }, [filteredCategoryBills, selectedBillId])
 
+  // Fetch this bill's full detail (line items, attachments) and activity
+  // log the first time it's selected, then cache — getBillDetail() and
+  // getBillActivities() in parallel. Activities failing independently
+  // doesn't block the rest of the detail from showing.
+  useEffect(() => {
+    const id = selectedBill?.id
+    if (!id || !apiToken || detailLoadedIds.has(id)) return
+    let cancelled = false
+
+    // Deferred a tick — see the bills-list effect above for why.
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      setDetailLoading(true)
+      setDetailError(null)
+    })
+
+    Promise.all([
+      getBillDetail(apiToken, id),
+      getBillActivities(apiToken, id).catch(() => ({}) as ApiActivities),
+    ])
+      .then(([billJson, activitiesJson]) => {
+        if (cancelled) return
+        const apiBill = unwrapApiData(billJson)
+        const activities = unwrapApiData(activitiesJson) ?? {}
+
+        setBills((prev) =>
+          prev.map((b) =>
+            b.id === id
+              ? {
+                  ...mapApiBillToBill(apiBill, b),
+                  auditTrail: mapApiActivitiesToAuditTrail(activities),
+                }
+              : b
+          )
+        )
+        setDetailLoadedIds((prev) => new Set(prev).add(id))
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setDetailError(err instanceof Error ? err.message : 'Failed to load bill details')
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedBill?.id, apiToken, detailLoadedIds])
+
   const activeAttachment = useMemo(() => {
     if (!selectedBill || !activeAttachmentId) return null
     return selectedBill.files.find((f) => f.id === activeAttachmentId) ?? null
@@ -479,14 +272,22 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const showMobileLeftSlot = !mobileDetailOpen || showLeftPreview
   const showMobileRightSlot = mobileDetailOpen && !showLeftPreview
 
+  // True while the selected bill's line items / files / audit trail are
+  // still being fetched (see the detail-fetch effect above) — the Header
+  // Card's own summary fields come straight from the list fetch and don't
+  // need to wait on this.
+  const isSelectedBillDetailLoading =
+    !!selectedBill && detailLoading && !detailLoadedIds.has(selectedBill.id)
+
   const pageTitle = categoryFilter === 'approval' ? 'Requires my approval (all)' : 'All Bills'
 
   const pageDescription =
     categoryFilter === 'approval' ? 'Bills waiting on your approval' : 'View and manage all bills'
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(val)
-  }
+  // Defaults to AUD (matching prior mock-data behavior everywhere this is
+  // called without a currency) but respects the bill's own currencyCode
+  // where it's known, fixing amounts silently mislabeled as AUD.
+  const formatCurrency = (val: number, currencyCode?: string) => formatCurrencyAmount(val, currencyCode)
 
   // Handlers for bill workflow actions. Each bails out if the role lacks
   // bill:approve — enforced here (not just by hiding the button) since these
@@ -573,6 +374,55 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     toast('Comment added to audit trail', 'info')
   }, [commentText, selectedBill, toast])
 
+  // Opens the preview panel immediately; if the file's URL hasn't been
+  // resolved yet (bill detail only gives storage location, not a URL),
+  // fetches it from getBillAttachment() first.
+  const resolveAndPreviewAttachment = useCallback(
+    async (file: BillFile) => {
+      if (!selectedBill) return
+      const fInfo = getFileTypeInfo(file)
+
+      if (!fInfo.canPreview) {
+        toast(`${file.name} cannot be previewed in browser`, 'info')
+        return
+      }
+
+      setActiveAttachmentId(file.id)
+      setPdfZoom(100)
+      setShowLeftPreview(true)
+      setAttachmentUrlError(null)
+
+      if (file.url) {
+        toast(`Loaded ${file.name} on left side`, 'info')
+        return
+      }
+
+      if (!apiToken) return
+      setAttachmentUrlLoading(true)
+      try {
+        const json = await getBillAttachment(apiToken, selectedBill.id, file.id)
+        const apiAttachment = unwrapApiData(json)
+        const resolvedUrl = apiAttachment.url ?? ''
+        if (!resolvedUrl) throw new Error('No preview URL returned for this attachment')
+
+        setBills((prev) =>
+          prev.map((b) =>
+            b.id !== selectedBill.id
+              ? b
+              : { ...b, files: b.files.map((f) => (f.id === file.id ? { ...f, url: resolvedUrl } : f)) }
+          )
+        )
+        toast(`Loaded ${file.name} on left side`, 'info')
+      } catch (err) {
+        setAttachmentUrlError(err instanceof Error ? err.message : 'Failed to load attachment')
+        toast(`Couldn't load ${file.name}`, 'error')
+      } finally {
+        setAttachmentUrlLoading(false)
+      }
+    },
+    [selectedBill, apiToken, toast]
+  )
+
   // Subtotal calculations
   const subtotal = useMemo(() => {
     if (!selectedBill) return 0
@@ -604,6 +454,27 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="flex-shrink-0">
         <PageHeader title={pageTitle} description={pageDescription} />
+      </div>
+
+      {/* Temporary — remove once the Bills API accepts the app's own
+          session token. Every request in this component reads from
+          `apiToken`; nothing is hardcoded. */}
+      <div className="flex-shrink-0 px-4 md:px-6 pt-4">
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          <KeyRound size={14} className="text-amber-600 flex-shrink-0" />
+          <label htmlFor="bills-api-token" className="text-xs font-semibold text-amber-800 flex-shrink-0">
+            Bearer Token (temporary):
+          </label>
+          <input
+            id="bills-api-token"
+            type="password"
+            value={apiToken}
+            onChange={(e) => setApiToken(e.target.value)}
+            placeholder="Paste the Bills API bearer token to load live data..."
+            autoComplete="off"
+            className="flex-1 min-w-0 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-amber-700/50 outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400"
+          />
+        </div>
       </div>
 
       {/* Main Workspace Split Layout — left:right ratio is set via the
@@ -682,7 +553,26 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             {/* Document Render Canvas — padding kept minimal so the document
                 gets as much of the panel as possible. */}
             <div className="flex-1 overflow-auto p-1.5 flex justify-center bg-slate-200/60">
-              {!activeAttachment || !activeTypeInfo ? (
+              {attachmentUrlLoading ? (
+                <div className="m-auto flex flex-col items-center gap-2 text-xs text-slate-400">
+                  <Loader2 size={20} className="animate-spin" />
+                  Loading document...
+                </div>
+              ) : attachmentUrlError ? (
+                <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
+                  <AlertCircle size={28} className="text-rose-500 mb-3" />
+                  <h3 className="text-sm font-bold text-slate-900 mb-1">Couldn&apos;t load document</h3>
+                  <p className="text-xs text-slate-500 mb-4">{attachmentUrlError}</p>
+                  <button
+                    type="button"
+                    onClick={() => activeAttachment && resolveAndPreviewAttachment(activeAttachment)}
+                    className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <RefreshCw size={13} />
+                    Retry
+                  </button>
+                </div>
+              ) : !activeAttachment || !activeTypeInfo ? (
                 <div className="m-auto text-xs text-slate-400">No document available to preview</div>
               ) : !activeTypeInfo.canPreview ? (
                 <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -787,9 +677,31 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
             {/* List items for this category */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {filteredCategoryBills.length === 0 ? (
+              {!apiToken ? (
                 <div className="px-4 py-12 text-center text-xs text-slate-400">
-                  No bills found for this view
+                  Enter a Bearer Token above to load bills.
+                </div>
+              ) : billsLoading ? (
+                <div className="px-4 py-12 flex flex-col items-center gap-2 text-xs text-slate-400">
+                  <Loader2 size={18} className="animate-spin" />
+                  Loading bills...
+                </div>
+              ) : billsError ? (
+                <div className="px-4 py-12 flex flex-col items-center gap-3 text-center">
+                  <AlertCircle size={22} className="text-rose-500" />
+                  <p className="text-xs text-slate-500">{billsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setBillsReloadKey((k) => k + 1)}
+                    className="px-3 py-1.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Retry
+                  </button>
+                </div>
+              ) : filteredCategoryBills.length === 0 ? (
+                <div className="px-4 py-12 text-center text-xs text-slate-400">
+                  {bills.length === 0 ? 'No bills found.' : 'No bills found for this view'}
                 </div>
               ) : (
                 filteredCategoryBills.map((bill) => (
@@ -814,7 +726,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     </div>
 
                     <div className="text-xs mt-2">
-                      <span className="font-bold text-slate-800">{formatCurrency(bill.amount)}</span>
+                      <span className="font-bold text-slate-800">{formatCurrency(bill.amount, bill.currencyCode)}</span>
                     </div>
                   </div>
                 ))
@@ -830,7 +742,29 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             'md:block flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
           )}
         >
-          {selectedBill ? (
+          {!apiToken ? (
+            <div className="h-full flex items-center justify-center text-slate-400 text-sm text-center px-6">
+              Enter a Bearer Token above to load bills.
+            </div>
+          ) : billsLoading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
+              <Loader2 size={20} className="animate-spin" />
+              Loading bills...
+            </div>
+          ) : billsError ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
+              <AlertCircle size={28} className="text-rose-500" />
+              <p className="text-sm text-slate-500">{billsError}</p>
+              <button
+                type="button"
+                onClick={() => setBillsReloadKey((k) => k + 1)}
+                className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <RefreshCw size={13} />
+                Retry
+              </button>
+            </div>
+          ) : selectedBill ? (
             <div className="space-y-5">
               {/* Mobile-only: return to the bills list without disturbing
                   the desktop side-by-side layout, which never renders
@@ -860,9 +794,14 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   <div className="flex flex-col items-start md:items-end md:text-right gap-3 w-full md:w-auto">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xl font-bold text-slate-800">
-                        {formatCurrency(selectedBill.amount)}
+                        {formatCurrency(selectedBill.amount, selectedBill.currencyCode)}
                       </span>
                       <StatusBadge status={selectedBill.status} />
+                      {selectedBill.externalStatus && (
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">
+                          Xero: {selectedBill.externalStatus}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
@@ -903,7 +842,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                 </button>
 
                 {openDetailsCard && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-3 border-t border-slate-100 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-xs pt-3 border-t border-slate-100 mt-2">
                     <div>
                       <div className="text-slate-400 mb-1">Date</div>
                       <div className="text-slate-800 font-semibold">{selectedBill.issueDate}</div>
@@ -915,6 +854,16 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     <div>
                       <div className="text-slate-400 mb-1">Reference</div>
                       <div className="text-slate-800 font-semibold font-mono">{selectedBill.billNumber}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 mb-1">PO Reference</div>
+                      <div className="text-slate-800 font-semibold font-mono">
+                        {selectedBill.reference ?? NO_DATA}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 mb-1">Currency</div>
+                      <div className="text-slate-800 font-semibold">{selectedBill.currencyCode ?? NO_DATA}</div>
                     </div>
                   </div>
                 )}
@@ -944,20 +893,43 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {selectedBill.lineItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-50/50">
-                          <td className="px-3 md:px-4 py-3 font-medium text-slate-800">{item.description}</td>
-                          <td className="px-3 md:px-4 py-3 text-right">{item.quantity.toFixed(2)}</td>
-                          <td className="px-3 md:px-4 py-3 text-right">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-3 md:px-4 py-3">{item.account}</td>
-                          <td className="px-3 md:px-4 py-3">{item.tax}</td>
-                          <td className="px-3 md:px-4 py-3">* SM - Ryan Cotter</td>
-                          <td className="px-3 md:px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
-                          <td className="px-3 md:px-4 py-3 text-right font-semibold text-slate-800">
-                            {formatCurrency(item.amount)}
+                      {isSelectedBillDetailLoading ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-slate-400">
+                            <Loader2 size={16} className="inline animate-spin mr-2" />
+                            Loading line items...
                           </td>
                         </tr>
-                      ))}
+                      ) : detailError ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-rose-500">
+                            {detailError}
+                          </td>
+                        </tr>
+                      ) : selectedBill.lineItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-slate-400 italic">
+                            No line items found for this bill.
+                          </td>
+                        </tr>
+                      ) : (
+                        selectedBill.lineItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50">
+                            <td className="px-3 md:px-4 py-3 font-medium text-slate-800">{item.description}</td>
+                            <td className="px-3 md:px-4 py-3 text-right">{item.quantity.toFixed(2)}</td>
+                            <td className="px-3 md:px-4 py-3 text-right">
+                              {formatCurrency(item.unitPrice, selectedBill.currencyCode)}
+                            </td>
+                            <td className="px-3 md:px-4 py-3">{item.account}</td>
+                            <td className="px-3 md:px-4 py-3">{item.tax}</td>
+                            <td className="px-3 md:px-4 py-3">* SM - Ryan Cotter</td>
+                            <td className="px-3 md:px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
+                            <td className="px-3 md:px-4 py-3 text-right font-semibold text-slate-800">
+                              {formatCurrency(item.amount, selectedBill.currencyCode)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -967,15 +939,15 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     <div className="text-slate-400 text-[11px] mb-1 italic">Amounts are Tax Exclusive</div>
                     <div className="flex justify-between text-slate-600">
                       <span>Subtotal:</span>
-                      <span>{formatCurrency(subtotal)}</span>
+                      <span>{formatCurrency(subtotal, selectedBill.currencyCode)}</span>
                     </div>
                     <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-200">
                       <span>GST on Expenses (10%):</span>
-                      <span>{formatCurrency(gstTax)}</span>
+                      <span>{formatCurrency(gstTax, selectedBill.currencyCode)}</span>
                     </div>
                     <div className="flex justify-between pt-1 font-bold text-slate-800 text-sm">
                       <span>Total:</span>
-                      <span className="text-[#6692C5]">{formatCurrency(totalAmount)}</span>
+                      <span className="text-[#6692C5]">{formatCurrency(totalAmount, selectedBill.currencyCode)}</span>
                     </div>
                   </div>
                 </div>
@@ -999,7 +971,14 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
                 {openFilesCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
-                    {selectedBill.files.length === 0 ? (
+                    {isSelectedBillDetailLoading ? (
+                      <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin" />
+                        Loading attachments...
+                      </div>
+                    ) : detailError ? (
+                      <div className="text-xs text-rose-500 py-2">{detailError}</div>
+                    ) : selectedBill.files.length === 0 ? (
                       <div className="text-xs text-slate-400 py-2 italic">
                         No attached documents found for this bill.
                       </div>
@@ -1011,17 +990,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                           return (
                             <div
                               key={file.id}
-                              onClick={() => {
-                                setActiveAttachmentId(file.id)
-                                setPdfZoom(100)
-                                setShowLeftPreview(true)
-                                toast(
-                                  fInfo.canPreview
-                                    ? `Loaded ${file.name} on left side`
-                                    : `${file.name} cannot be previewed in browser`,
-                                  'info'
-                                )
-                              }}
+                              onClick={() => resolveAndPreviewAttachment(file)}
                               className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-[#6692C5]/50 hover:bg-[#6692C5]/5 transition-all cursor-pointer group"
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -1124,7 +1093,16 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                   {openAuditCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
-                {openAuditCard && (
+                {openAuditCard && isSelectedBillDetailLoading ? (
+                  <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    Loading audit trail...
+                  </div>
+                ) : openAuditCard && detailError ? (
+                  <div className="text-xs text-rose-500 py-2">{detailError}</div>
+                ) : openAuditCard && selectedBill.auditTrail.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 italic">No activity recorded for this bill.</div>
+                ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
                     {selectedBill.auditTrail.map((ev) => (
                       <div key={ev.id} className="relative group">
@@ -1185,7 +1163,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       </div>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* Comment Input Card */}
@@ -1219,7 +1197,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-              Select a bill from the left list to view details.
+              {bills.length === 0 ? 'No bills found.' : 'Select a bill from the left list to view details.'}
             </div>
           )}
         </div>
