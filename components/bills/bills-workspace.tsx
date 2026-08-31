@@ -207,6 +207,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return filteredBills[0] ?? null
   }, [filteredBills, selectedBillId])
 
+
   // Fetch this bill's full detail (line items, attachments) and activity
   // log the first time it's selected, then cache — getBillDetail() and
   // getBillActivities() in parallel. Activities failing independently
@@ -753,12 +754,14 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   >
                     <div className="flex justify-between items-start mb-1.5">
                       <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
-                        Bill {bill.billNumber} from {bill.supplierName}
+                        Bill {bill.billNumber}
+                        {bill.supplierName !== NO_DATA && ` from ${bill.supplierName}`}
                       </span>
                       <StatusBadge status={bill.status} size="xs" />
                     </div>
 
                     <div className="text-xs mt-2">
+                      <div className="text-slate-400 text-[10px] mb-0.5">Total</div>
                       <span className="font-bold text-slate-800">{formatCurrency(bill.amount, bill.currencyCode)}</span>
                     </div>
                   </div>
@@ -816,7 +819,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                   <div className="space-y-1 max-w-xl">
                     <h2 className="text-lg font-bold text-slate-800">
-                      Bill {selectedBill.billNumber} from {selectedBill.supplierName}
+                      Bill {selectedBill.billNumber}
+                      {selectedBill.supplierName !== NO_DATA && ` from ${selectedBill.supplierName}`}
                     </h2>
                     <div className="text-xs text-slate-500 leading-relaxed">
                       Address<br />
