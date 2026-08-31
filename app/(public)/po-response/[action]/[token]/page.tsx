@@ -99,7 +99,7 @@ function AcceptForm({ token, currentScheduledDate, onSuccess, onError }: FormPro
       </p>
       <button
         onClick={() => setOpen(true)}
-        className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+        className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
       >
         Accept Order
       </button>
@@ -191,7 +191,7 @@ function RescheduleForm({
           min={today}
           value={newDate}
           onChange={(e) => setNewDate(e.target.value)}
-          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
 
@@ -204,14 +204,14 @@ function RescheduleForm({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           placeholder="Let the site manager know why you need to reschedule..."
-          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none"
+          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
         />
       </div>
 
       <button
         onClick={() => mutation.mutate()}
         disabled={!newDate || !reason.trim() || mutation.isPending}
-        className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {mutation.isPending && <Loader2 size={14} className="animate-spin" />}
         {mutation.isPending ? 'Submitting...' : 'Confirm New Date'}

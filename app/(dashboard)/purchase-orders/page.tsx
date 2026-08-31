@@ -108,7 +108,7 @@ export default function PurchaseOrdersPage() {
               <div className="relative">
                 <button
                   onClick={() => setNewPOOpen((v) => !v)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   + Create PO
                   <ChevronDown size={14} className={cn('transition-transform', newPOOpen && 'rotate-180')} />
@@ -181,7 +181,7 @@ export default function PurchaseOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => handleFilterChange(typeFilter, e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {STATUS_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
@@ -196,7 +196,7 @@ export default function PurchaseOrdersPage() {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search PO..."
-              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]/50"
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
             />
             {search && (
               <button
@@ -252,7 +252,7 @@ function PoStatusTile({ status, count, description, isActive, onClick }: {
       onClick={onClick}
       className={cn(
         'flex-shrink-0 w-48 h-[124px] flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-colors',
-        isActive ? 'bg-[#6692C5]/10 border-[#6692C5]/40' : 'bg-white border-slate-200 hover:border-slate-300'
+        isActive ? 'bg-primary/10 border-primary/40' : 'bg-white border-slate-200 hover:border-slate-300'
       )}
     >
       <StatusBadge status={status} />

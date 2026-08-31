@@ -135,7 +135,7 @@ function AttachmentPreviewModal({ attachment, onClose }: { attachment: PreviewSt
                 href={attachment.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
               >
                 <Download size={14} /> Open file
               </a>

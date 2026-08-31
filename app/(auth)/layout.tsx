@@ -1,7 +1,5 @@
 import Image from 'next/image'
-
-const FULL_LOGO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/company-logos/logo_ah.png`
-const BG_IMAGE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/background/image-cover.jpg` //'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=80'
+import { LOGO_FULL_URL, BG_IMAGE_URL, COMPANY_ALT_TEXT } from '@/lib/branding'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Left — 60% image panel */}
       <div className="hidden lg:flex lg:w-[65%] relative overflow-hidden">
         <Image
-          src={BG_IMAGE}
+          src={BG_IMAGE_URL}
           alt="background"
           fill
           className="object-cover"
@@ -35,8 +33,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {/* Logo above Welcome back */}
           <div className="relative w-[180px] h-[66px] mb-6 mx-auto">
             <Image
-              src={FULL_LOGO}
-              alt="AusHail"
+              src={LOGO_FULL_URL}
+              alt={COMPANY_ALT_TEXT}
               fill
               sizes="180px"
               className="object-contain"

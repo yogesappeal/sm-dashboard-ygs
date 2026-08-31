@@ -67,7 +67,7 @@ export function WelcomeModal({ open, onFinish }: WelcomeModalProps) {
           <X size={16} />
         </button>
 
-        <div className="w-20 h-20 rounded-full bg-[#6692C5]/10 flex items-center justify-center mt-4 mb-6 text-4xl">
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mt-4 mb-6 text-4xl">
           {current.emoji}
         </div>
 
@@ -80,7 +80,7 @@ export function WelcomeModal({ open, onFinish }: WelcomeModalProps) {
               key={i}
               className={cn(
                 'h-1.5 w-1.5 rounded-full transition-all',
-                i === step ? 'bg-[#6692C5]' : 'bg-slate-200'
+                i === step ? 'bg-primary' : 'bg-slate-200'
               )}
             />
           ))}
@@ -89,13 +89,13 @@ export function WelcomeModal({ open, onFinish }: WelcomeModalProps) {
         <div className="flex justify-center gap-2.5 mt-8">
           <button
             onClick={() => (step === 0 ? finish() : setStep((s) => s - 1))}
-            className="w-28 py-1.5 text-xs font-medium text-[#6692C5] bg-white border border-[#6692C5] hover:bg-[#6692C5]/5 rounded-lg transition-colors"
+            className="w-28 py-1.5 text-xs font-medium text-primary bg-white border border-primary hover:bg-primary/5 rounded-lg transition-colors"
           >
             {step === 0 ? 'Skip' : 'Back'}
           </button>
           <button
             onClick={() => (isLast ? finish() : setStep((s) => s + 1))}
-            className="w-28 py-1.5 text-xs font-medium text-white bg-[#6692C5] hover:bg-[#4F7CB3] rounded-lg transition-colors"
+            className="w-28 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors"
           >
             {isLast ? 'Get Started' : 'Continue'}
           </button>

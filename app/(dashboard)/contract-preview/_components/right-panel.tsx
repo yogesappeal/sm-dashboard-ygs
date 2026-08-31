@@ -103,7 +103,7 @@ function PlannedPoDateControl({
         }}
         className={cn(
           'flex items-center gap-1 text-[10px] font-medium whitespace-nowrap transition-colors',
-          value ? (overdue ? 'text-red-500' : 'text-slate-500 hover:text-[#6692C5]') : 'text-slate-300 hover:text-[#6692C5]'
+          value ? (overdue ? 'text-red-500' : 'text-slate-500 hover:text-primary') : 'text-slate-300 hover:text-primary'
         )}
         title="Set planned PO date"
       >
@@ -122,7 +122,7 @@ function PlannedPoDateControl({
             value={pending}
             min={minDate}
             onChange={(e) => setPending(e.target.value)}
-            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           {belowMin && (
             <p className="text-xs text-red-500 mt-2">
@@ -147,7 +147,7 @@ function PlannedPoDateControl({
               <button
                 onClick={() => mutation.mutate(pending)}
                 disabled={mutation.isPending || !pending || belowMin}
-                className="px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#5a82b3] text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-xs bg-primary hover:bg-primary-hover text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {mutation.isPending ? 'Saving...' : 'Save'}
               </button>
@@ -259,7 +259,7 @@ function DraftReviewBar({
         <button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || invalidCount > 0}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] hover:bg-[#5a82b3] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? 'Saving...' : `Save ${count} change${count === 1 ? '' : 's'}`}
         </button>
@@ -403,7 +403,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                 {canCreatePo && (
                   <button
                     onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: inlinePoType })}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#6692C5]/10 text-[#6692C5] hover:bg-[#6692C5]/20 transition-colors border border-[#6692C5]/20"
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
                   >
                     <Plus size={11} /> Create PO
                   </button>
@@ -467,7 +467,7 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {editMode ? (
-                              <div className={cn('relative w-[112px] rounded-md', !draftValue && 'focus-within:ring-2 focus-within:ring-[#6692C5]/30')}>
+                              <div className={cn('relative w-[112px] rounded-md', !draftValue && 'focus-within:ring-2 focus-within:ring-primary/30')}>
                                 {!draftValue && (
                                   <div
                                     className={cn(
@@ -489,11 +489,11 @@ function ScopeNavigator({ scopeData, onCanvas, contractId, plannedStart }: {
                                     !draftValue
                                       ? 'opacity-0'
                                       : cn(
-                                          'focus:ring-2 focus:ring-[#6692C5]/30',
+                                          'focus:ring-2 focus:ring-primary/30',
                                           draftInvalid
                                             ? 'border-red-400 bg-red-50 text-red-600 font-medium'
                                             : drafts.has(trade.trade_id)
-                                              ? 'border-[#6692C5] bg-[#6692C5]/5 text-[#6692C5] font-medium'
+                                              ? 'border-primary bg-primary/5 text-primary font-medium'
                                               : 'border-slate-200 text-slate-500'
                                         )
                                   )}
@@ -573,14 +573,14 @@ function POTracker({ pos, onCanvas }: {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center px-4">
         <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
-          <FileText size={20} className="text-[#6692C5]" />
+          <FileText size={20} className="text-primary" />
         </div>
         <p className="text-sm text-slate-500 font-medium">No purchase orders</p>
         <p className="text-xs text-slate-400 mt-1">Create your first PO to get started</p>
         <PermissionGuard action="po:create">
           <button
             onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-            className="flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+            className="flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
           >
             <Plus size={14} /> Create PO
           </button>
@@ -602,7 +602,7 @@ function POTracker({ pos, onCanvas }: {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+          className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All Status ({pos.length})</option>
           {availableStatuses.map(status => (
@@ -679,7 +679,7 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
             className={cn(
               'flex-1 py-3 text-xs font-semibold transition-colors border-b-2',
               tab === t.key
-                ? 'border-[#6692C5] text-[#6692C5]'
+                ? 'border-primary text-primary'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             )}
           >
@@ -695,7 +695,7 @@ export function RightPanel({ pos, onCanvas, plannedStart }: RightPanelProps) {
           <PermissionGuard action="po:create">
             <button
               onClick={() => onCanvas({ type: 'SHOW_CREATE_PO', poType: 'supplier' })}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[#6692C5] text-white hover:bg-[#5a82b3] transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
             >
               <Plus size={12} /> Create PO
             </button>

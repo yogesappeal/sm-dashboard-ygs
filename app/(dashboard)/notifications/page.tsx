@@ -109,7 +109,7 @@ export default function NotificationsPage() {
           <button
             onClick={() => markAllRead.mutate()}
             disabled={markAllRead.isPending}
-            className="flex items-center gap-1.5 text-sm text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary-dark font-medium transition-colors disabled:opacity-50"
           >
             <CheckCheck size={15} />
             Mark all as read
@@ -126,8 +126,8 @@ export default function NotificationsPage() {
             onClick={() => handleFilterChange(f.value)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               filter === f.value
-                ? 'bg-[#6692C5] text-white'
-                : 'bg-white border border-slate-200 text-slate-500 hover:border-[#6692C5]/50 hover:text-[#6692C5]'
+                ? 'bg-primary text-white'
+                : 'bg-white border border-slate-200 text-slate-500 hover:border-primary/50 hover:text-primary'
             }`}
           >
             {f.label}
@@ -169,7 +169,7 @@ export default function NotificationsPage() {
                           </p>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[11px] text-slate-400 whitespace-nowrap">{formatTime(n.created_at)}</span>
-                            {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#6692C5] shrink-0" />}
+                            {!n.is_read && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                           </div>
                         </div>
                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">{n.message}</p>

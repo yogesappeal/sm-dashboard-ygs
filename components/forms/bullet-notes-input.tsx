@@ -96,7 +96,7 @@ export function BulletNotesInput({ value, onChange, placeholder, rows = 3, class
   }
 
   return (
-    <div className={cn('border border-slate-200 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-[#6692C5]/40 focus-within:border-[#6692C5]', className)}>
+    <div className={cn('border border-slate-200 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary', className)}>
       <div className="flex items-center px-2 py-1 border-b border-slate-100 bg-slate-50">
         <button
           type="button"

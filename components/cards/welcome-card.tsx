@@ -42,7 +42,7 @@ export function WelcomeCard({ firstName, variant = 'sm' }: WelcomeCardProps) {
 
   if (variant === 'ops') {
     return (
-      <div className="bg-gradient-to-br from-[#D3BE39] to-[#B8A42A] rounded-xl p-5 h-full flex items-center justify-between overflow-hidden relative">
+      <div className="bg-gradient-to-br from-primary-secondary to-primary-secondary-dark rounded-xl p-5 h-full flex items-center justify-between overflow-hidden relative">
         <div className="flex flex-col justify-between h-full flex-1 min-w-0">
           <div>
             <p className="text-white/90 text-sm font-semibold">
@@ -65,7 +65,7 @@ export function WelcomeCard({ firstName, variant = 'sm' }: WelcomeCardProps) {
   }
 
   return (
-    <div className="bg-gradient-to-br from-[#D3BE39] to-[#B8A42A] rounded-xl px-5 py-4 h-full flex items-center justify-between overflow-hidden relative">
+    <div className="bg-gradient-to-br from-primary-secondary to-primary-secondary-dark rounded-xl px-5 py-4 h-full flex items-center justify-between overflow-hidden relative">
       <div className="absolute right-0 top-0 w-36 h-36 rounded-full bg-black/5 -translate-y-10 translate-x-10" />
 
       <div className="flex flex-col justify-between h-full flex-1 min-w-0">

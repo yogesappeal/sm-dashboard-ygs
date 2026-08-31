@@ -10,8 +10,8 @@ const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
 function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string }) {
   return (
     <div className="flex items-start gap-4 py-4 border-b border-slate-100 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-[#6692C5]/10 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={15} className="text-[#6692C5]" />
+      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon size={15} className="text-primary" />
       </div>
       <div className="min-w-0">
         <p className="text-xs text-slate-400 mb-0.5">{label}</p>
@@ -94,7 +94,7 @@ export default function ProfilePage() {
                 alt={displayName}
                 fill
                 sizes="80px"
-                className="rounded-2xl object-cover ring-4 ring-[#6692C5]/10 transition-all duration-200 group-hover:ring-[#6692C5]/30 group-hover:brightness-90"
+                className="rounded-2xl object-cover ring-4 ring-primary/10 transition-all duration-200 group-hover:ring-primary/30 group-hover:brightness-90"
               />
               {/* Zoom hint overlay */}
               <div className="absolute inset-0 rounded-2xl flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-200">
@@ -102,14 +102,14 @@ export default function ProfilePage() {
               </div>
             </button>
           ) : (
-            <div className="w-20 h-20 rounded-2xl bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center shrink-0">
-              <span className="text-[#6692C5] text-2xl font-bold">{initials}</span>
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <span className="text-primary text-2xl font-bold">{initials}</span>
             </div>
           )}
           <div>
             <h2 className="text-lg font-bold text-slate-800">{displayName}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{user?.job_title || role || 'Site Manager'}</p>
-            <span className="inline-flex items-center mt-2 px-2.5 py-1 rounded-full text-xs font-medium bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20">
+            <span className="inline-flex items-center mt-2 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
               {role || 'Site Manager'}
             </span>
           </div>

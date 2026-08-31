@@ -1,14 +1,13 @@
 import Image from 'next/image'
-
-const FULL_LOGO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/company-logos/logo_ah.png`
+import { LOGO_FULL_URL, COMPANY_ALT_TEXT } from '@/lib/branding'
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="relative w-[160px] h-[58px] mb-6">
         <Image
-          src={FULL_LOGO}
-          alt="AusHail"
+          src={LOGO_FULL_URL}
+          alt={COMPANY_ALT_TEXT}
           fill
           sizes="160px"
           className="object-contain"

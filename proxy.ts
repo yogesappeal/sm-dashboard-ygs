@@ -65,6 +65,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // icon/apple-icon are Next.js's dynamic favicon routes (app/icon.tsx) —
+    // no file extension in the URL, so they need an explicit exclusion
+    // alongside the static-asset extensions below.
+    '/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

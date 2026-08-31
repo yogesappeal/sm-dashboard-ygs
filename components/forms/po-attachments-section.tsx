@@ -114,7 +114,7 @@ export function PoAttachmentsSection({ attachmentIds, onAttachmentIdsChange, onU
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="w-full flex flex-col items-center justify-center gap-1.5 py-6 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-[#6692C5] hover:text-[#6692C5] hover:bg-[#6692C5]/5 transition-colors"
+        className="w-full flex flex-col items-center justify-center gap-1.5 py-6 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
       >
         <Upload size={18} />
         <span className="text-xs font-medium">Click to upload files</span>

@@ -1,5 +1,6 @@
 import { api } from './fetcher'
 import type { SupplierList } from '../types'
+import { COMPANY_NAME } from '../branding'
 
 interface GetSuppliersParams {
   page?: number
@@ -18,7 +19,7 @@ export async function getSuppliersPaginated(
   const q = new URLSearchParams({
     page: String(params.page ?? 1),
     limit: String(params.limit ?? 10),
-    company: params.company ?? 'AusHail',
+    company: params.company ?? COMPANY_NAME,
     order_dir: params.order_dir ?? 'desc',
     ...(params.search ? { search: params.search } : {}),
     ...(params.type ? { type: params.type } : {}),

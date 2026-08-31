@@ -112,7 +112,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
               <button
                 type="submit"
                 disabled={isSubmitting || liveMismatch}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {isSubmitting && <Loader2 size={14} className="animate-spin" />}
                 Update Password
@@ -179,7 +179,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

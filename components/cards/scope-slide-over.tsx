@@ -100,7 +100,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
             <PermissionGuard action="scope:edit">
               <button
                 onClick={handleStartEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
               >
                 <Edit2 size={14} />
                 Edit
@@ -160,7 +160,7 @@ export function ScopeSlideOver({ scope, token, onClose, queryKey }: ScopeSlideOv
                 <button
                   type="submit"
                   disabled={isSubmitting || updateMutation.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {(isSubmitting || updateMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
                   Save Changes
@@ -294,7 +294,7 @@ function Field({
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }
