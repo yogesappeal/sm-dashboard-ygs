@@ -107,14 +107,19 @@ function mapExternalStatus(raw?: string | null): Bill['status'] {
 // `decision` reflects our own approval-run outcome and can be ahead of
 // `external_status` (e.g. Xero still says "SUBMITTED" after we've already
 // approved it here) — so a present `decision` wins over external_status.
-function mapBillStatus(api: ApiBill): Bill['status'] {
+// `existingStatus` (from a prior mapping of the same bill, e.g. the list
+// fetch) is the fallback when this response has neither — the bill detail
+// endpoint isn't confirmed to echo `decision` back, so without this a
+// correctly-"Approved" bill would flip to "Pending Approval" the moment its
+// detail loads and `decision` is missing from that response.
+function mapBillStatus(api: ApiBill, existingStatus?: Bill['status']): Bill['status'] {
   switch ((api.decision ?? '').toLowerCase()) {
     case 'approved':
       return 'Approved'
     case 'rejected':
       return 'Rejected'
     default:
-      return mapExternalStatus(api.external_status)
+      return existingStatus ?? mapExternalStatus(api.external_status)
   }
 }
 
@@ -144,7 +149,7 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
     issueDate: formatApiDate(api.bill_date),
     dueDate: formatApiDate(api.due_date),
     amount: api.amount_total ?? 0,
-    status: mapBillStatus(api),
+    status: mapBillStatus(api, existing?.status),
     lineItems: (api.line_items ?? []).map((li) => ({
       id: li.id,
       description: li.description ?? NO_DATA,
@@ -157,13 +162,13 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
     files: (api.attachments ?? []).map(mapApiAttachmentToFile),
     approvers: existing?.approvers ?? [], // not provided by this API
     auditTrail: existing?.auditTrail ?? [],
-    reference: api.reference ?? undefined,
-    currencyCode: api.currency_code ?? undefined,
-    externalStatus: api.external_status ?? undefined,
-    approvalStage: api.stage ?? undefined,
-    approvalStepName: api.step_name ?? undefined,
-    decision: api.decision ?? undefined,
-    decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : undefined,
+    reference: api.reference ?? existing?.reference,
+    currencyCode: api.currency_code ?? existing?.currencyCode,
+    externalStatus: api.external_status ?? existing?.externalStatus,
+    approvalStage: api.stage ?? existing?.approvalStage,
+    approvalStepName: api.step_name ?? existing?.approvalStepName,
+    decision: api.decision ?? existing?.decision,
+    decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : existing?.decidedDate,
   }
 }
 
