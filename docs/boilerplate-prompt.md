@@ -31,7 +31,7 @@ STRUKTUR FOLDER:
 - components/{cards,forms,layout,tables,shared}/ — komponen per kategori
 
 KONVENSI:
-- Environment variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_COMPANY, feature flags via NEXT_PUBLIC_FEATURE_*
+- Environment variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_COMPANY, feature flags via NEXT_PUBLIC_FEATURE_*
 - Role-based views via env var (mis. NEXT_PUBLIC_ROLE_SM / NEXT_PUBLIC_ROLE_OPS)
 - Tidak ada app/api/ Next.js — backend logic 100% di Supabase Edge Functions
 - Auth token disimpan di Zustand store, di-hydrate saat app load

@@ -9,7 +9,7 @@ import type { PoResponseValidation, PoResponseActionResult, PoResponseLinkStatus
 // ============================================================================
 
 const BASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 
 // Local convenience for manual QA only: visiting a link with the literal
 // token "test" swaps in whatever real token is currently set in
