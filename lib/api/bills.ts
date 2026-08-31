@@ -8,6 +8,7 @@ import type {
   AuditTrailEvent,
   Bill,
   BillFile,
+  BillScope,
   MaybeWrapped,
 } from '../types'
 
@@ -23,8 +24,12 @@ export function unwrapApiData<T>(json: MaybeWrapped<T>): T {
   return json as T
 }
 
-export async function getBills(token: string) {
-  return billsApi.get<MaybeWrapped<ApiBill[]>>('/functions/v1/bills?is_dummy=false', token)
+// `scope` selects which Bills view to fetch. Only `approved_by_me` is
+// confirmed by Resource/data-curl-api.md; `pending` and `all` follow the
+// same vocabulary per the product spec for the "Requires My Approval" /
+// "All Bills" sidebar views.
+export async function getBills(token: string, scope: BillScope) {
+  return billsApi.get<MaybeWrapped<ApiBill[]>>(`/functions/v1/bills?scope=${scope}`, token)
 }
 
 export async function getBillDetail(token: string, billId: string) {
@@ -40,6 +45,17 @@ export async function getBillAttachment(token: string, billId: string, attachmen
     `/functions/v1/bills/${billId}/attachments/${attachmentId}`,
     token
   )
+}
+
+// The API requires a `comment` field on both endpoints, but the UI doesn't
+// collect one for approve/reject (the "Leave a comment" box is a separate,
+// local-only audit-trail note) — sent empty rather than a fabricated value.
+export async function approveBill(token: string, billId: string) {
+  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/approve`, token, { comment: '' })
+}
+
+export async function rejectBill(token: string, billId: string) {
+  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/reject`, token, { comment: '' })
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +104,20 @@ function mapExternalStatus(raw?: string | null): Bill['status'] {
   }
 }
 
+// `decision` reflects our own approval-run outcome and can be ahead of
+// `external_status` (e.g. Xero still says "SUBMITTED" after we've already
+// approved it here) — so a present `decision` wins over external_status.
+function mapBillStatus(api: ApiBill): Bill['status'] {
+  switch ((api.decision ?? '').toLowerCase()) {
+    case 'approved':
+      return 'Approved'
+    case 'rejected':
+      return 'Rejected'
+    default:
+      return mapExternalStatus(api.external_status)
+  }
+}
+
 export function mapApiAttachmentToFile(a: ApiAttachment): BillFile {
   const mime = a.mime_type ?? ''
   const type: BillFile['type'] = mime === 'application/pdf' ? 'pdf' : mime.startsWith('image/') ? 'image' : 'other'
@@ -114,7 +144,7 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
     issueDate: formatApiDate(api.bill_date),
     dueDate: formatApiDate(api.due_date),
     amount: api.amount_total ?? 0,
-    status: mapExternalStatus(api.external_status),
+    status: mapBillStatus(api),
     lineItems: (api.line_items ?? []).map((li) => ({
       id: li.id,
       description: li.description ?? NO_DATA,
@@ -130,6 +160,10 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
     reference: api.reference ?? undefined,
     currencyCode: api.currency_code ?? undefined,
     externalStatus: api.external_status ?? undefined,
+    approvalStage: api.stage ?? undefined,
+    approvalStepName: api.step_name ?? undefined,
+    decision: api.decision ?? undefined,
+    decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : undefined,
   }
 }
 

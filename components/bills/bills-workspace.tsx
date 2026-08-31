@@ -43,13 +43,15 @@ import {
   getBillDetail,
   getBillActivities,
   getBillAttachment,
+  approveBill,
+  rejectBill,
   mapApiBillToBill,
   mapApiActivitiesToAuditTrail,
   unwrapApiData,
   formatCurrencyAmount,
   NO_DATA,
 } from '@/lib/api'
-import type { Bill, BillFile, AuditTrailEvent, ApiActivities } from '@/lib/types'
+import type { Bill, BillFile, AuditTrailEvent, ApiActivities, BillScope } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
@@ -90,10 +92,12 @@ function getFileTypeInfo(file: BillFile) {
 }
 
 interface BillsWorkspaceProps {
-  categoryFilter: 'approval' | 'all'
+  // Each sidebar route passes its own scope — see GET /bills?scope=<value>
+  // in lib/api/bills.ts.
+  scope: BillScope
 }
 
-export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
+export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const canApproveBills = usePermission('bill:approve')
 
   // Temporary: the Bills API (a separate Supabase project from the rest of
@@ -118,6 +122,11 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
+
+  // Which bill currently has an approve/reject request in flight — disables
+  // both buttons on that bill only, so switching to another bill isn't
+  // blocked by an unrelated pending action.
+  const [actionPendingId, setActionPendingId] = useState<string | null>(null)
 
   // Accordion state for Right Detail sections
   const [openDetailsCard, setOpenDetailsCard] = useState(true)
@@ -147,12 +156,8 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
   const toast = useToast()
 
-  // Fetch the bills list once a token is entered. `scope` is deliberately
-  // omitted — Resource/data-curl-api.md only confirms one value
-  // (`approved_by_me`), whose exact semantics don't clearly line up with
-  // this component's own `categoryFilter` prop ("requires my approval"),
-  // so category filtering stays client-side below exactly as it worked
-  // with the mock data.
+  // Re-fetches whenever the token changes, or `scope` (set by which sidebar
+  // route rendered this component) changes — GET /bills?scope=<value>.
   useEffect(() => {
     if (!apiToken) return
     let cancelled = false
@@ -166,7 +171,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
       setBillsError(null)
     })
 
-    getBills(apiToken)
+    getBills(apiToken, scope)
       .then((json) => {
         if (cancelled) return
         const list = unwrapApiData(json) ?? []
@@ -183,27 +188,24 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
     return () => {
       cancelled = true
     }
-  }, [apiToken, billsReloadKey])
+  }, [apiToken, scope, billsReloadKey])
 
-  // Filter bills according to the category prop
-  const filteredCategoryBills = useMemo(() => {
-    return bills.filter((b) => {
-      const matchesCategory = categoryFilter === 'approval' ? b.status === 'Pending Approval' : true
-
-      const matchesSearch =
+  // Search is still client-side — scoping (which view) is server-side now,
+  // search within a view isn't.
+  const filteredBills = useMemo(() => {
+    return bills.filter(
+      (b) =>
         b.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         b.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
-
-      return matchesCategory && matchesSearch
-    })
-  }, [bills, categoryFilter, searchQuery])
+    )
+  }, [bills, searchQuery])
 
   // Select first bill in list if current selection is invalid
   const selectedBill = useMemo(() => {
-    const found = filteredCategoryBills.find((b) => b.id === selectedBillId)
+    const found = filteredBills.find((b) => b.id === selectedBillId)
     if (found) return found
-    return filteredCategoryBills[0] ?? null
-  }, [filteredCategoryBills, selectedBillId])
+    return filteredBills[0] ?? null
+  }, [filteredBills, selectedBillId])
 
   // Fetch this bill's full detail (line items, attachments) and activity
   // log the first time it's selected, then cache — getBillDetail() and
@@ -279,10 +281,19 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
   const isSelectedBillDetailLoading =
     !!selectedBill && detailLoading && !detailLoadedIds.has(selectedBill.id)
 
-  const pageTitle = categoryFilter === 'approval' ? 'Requires my approval (all)' : 'All Bills'
+  const pageTitle =
+    scope === 'pending'
+      ? 'Requires My Approval'
+      : scope === 'approved_by_me'
+        ? 'Approved by Me'
+        : 'All Bills'
 
   const pageDescription =
-    categoryFilter === 'approval' ? 'Bills waiting on your approval' : 'View and manage all bills'
+    scope === 'pending'
+      ? 'Bills waiting on your approval'
+      : scope === 'approved_by_me'
+        ? 'Bills you have approved'
+        : 'View and manage all bills'
 
   // Defaults to AUD (matching prior mock-data behavior everywhere this is
   // called without a currency) but respects the bill's own currencyCode
@@ -291,60 +302,82 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
 
   // Handlers for bill workflow actions. Each bails out if the role lacks
   // bill:approve — enforced here (not just by hiding the button) since these
-  // are the only two mutating actions Bills has left.
-  const handleApprove = useCallback((id: string) => {
-    if (!canApproveBills) return
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === id) {
-          const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-          return {
-            ...b,
-            status: 'Approved',
-            auditTrail: [
-              ...b.auditTrail,
-              {
-                id: `at-${Date.now()}`,
-                type: 'action',
-                title: 'Approved for payment',
-                user: 'Current User',
-                date: `${nowStr} via Web`,
-              },
-            ],
-          }
-        }
-        return b
-      })
-    )
-    toast('Bill approved successfully!', 'success')
-  }, [toast, canApproveBills])
+  // are the only two mutating actions Bills has left. The bill's status is
+  // set locally right after a successful call (the approve/reject endpoints
+  // don't return the updated bill) rather than by refetching — mirrors the
+  // audit-trail entry, which is likewise appended locally since Get Bill
+  // Activities isn't guaranteed to reflect the action immediately either.
+  const handleApprove = useCallback(
+    async (id: string) => {
+      if (!canApproveBills || !apiToken) return
+      setActionPendingId(id)
+      try {
+        await approveBill(apiToken, id)
+        setBills((prev) =>
+          prev.map((b) => {
+            if (b.id !== id) return b
+            const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+            return {
+              ...b,
+              status: 'Approved',
+              auditTrail: [
+                ...b.auditTrail,
+                {
+                  id: `at-${Date.now()}`,
+                  type: 'action',
+                  title: 'Approved for payment',
+                  user: 'Current User',
+                  date: `${nowStr} via Web`,
+                },
+              ],
+            }
+          })
+        )
+        toast('Bill approved successfully!', 'success')
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
+      } finally {
+        setActionPendingId(null)
+      }
+    },
+    [toast, canApproveBills, apiToken]
+  )
 
-  const handleReject = useCallback((id: string) => {
-    if (!canApproveBills) return
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === id) {
-          const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-          return {
-            ...b,
-            status: 'Rejected',
-            auditTrail: [
-              ...b.auditTrail,
-              {
-                id: `at-${Date.now()}`,
-                type: 'action',
-                title: 'Rejected bill',
-                user: 'Current User',
-                date: `${nowStr} via Web`,
-              },
-            ],
-          }
-        }
-        return b
-      })
-    )
-    toast('Bill rejected', 'error')
-  }, [toast, canApproveBills])
+  const handleReject = useCallback(
+    async (id: string) => {
+      if (!canApproveBills || !apiToken) return
+      setActionPendingId(id)
+      try {
+        await rejectBill(apiToken, id)
+        setBills((prev) =>
+          prev.map((b) => {
+            if (b.id !== id) return b
+            const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+            return {
+              ...b,
+              status: 'Rejected',
+              auditTrail: [
+                ...b.auditTrail,
+                {
+                  id: `at-${Date.now()}`,
+                  type: 'action',
+                  title: 'Rejected bill',
+                  user: 'Current User',
+                  date: `${nowStr} via Web`,
+                },
+              ],
+            }
+          })
+        )
+        toast('Bill rejected', 'error')
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Failed to reject bill', 'error')
+      } finally {
+        setActionPendingId(null)
+      }
+    },
+    [toast, canApproveBills, apiToken]
+  )
 
   const handleSendComment = useCallback(() => {
     if (!commentText.trim() || !selectedBill) return
@@ -671,7 +704,7 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600">
               <span>Bills List</span>
               <span className="bg-[#6692C5]/10 text-[#6692C5] px-2 py-0.5 rounded-full text-[11px] font-bold">
-                {filteredCategoryBills.length}
+                {filteredBills.length}
               </span>
             </div>
 
@@ -699,12 +732,12 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                     Retry
                   </button>
                 </div>
-              ) : filteredCategoryBills.length === 0 ? (
+              ) : filteredBills.length === 0 ? (
                 <div className="px-4 py-12 text-center text-xs text-slate-400">
                   {bills.length === 0 ? 'No bills found.' : 'No bills found for this view'}
                 </div>
               ) : (
-                filteredCategoryBills.map((bill) => (
+                filteredBills.map((bill) => (
                   <div
                     key={bill.id}
                     onClick={() => {
@@ -810,14 +843,18 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleApprove(selectedBill.id)}
-                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
                             >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
                               Approve
                             </button>
                             <button
                               onClick={() => handleReject(selectedBill.id)}
-                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
                             >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
                               Reject
                             </button>
                           </div>
@@ -1076,6 +1113,29 @@ export function BillsWorkspace({ categoryFilter }: BillsWorkspaceProps) {
                       Approval condition: Any of{' '}
                       <span className="font-semibold text-slate-600">{approvalCondition}</span>
                     </p>
+                    {(selectedBill.approvalStepName || selectedBill.decision) && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        {selectedBill.approvalStepName && (
+                          <>
+                            Current step:{' '}
+                            <span className="font-semibold text-slate-600">
+                              {selectedBill.approvalStepName}
+                              {selectedBill.approvalStage != null && ` (stage ${selectedBill.approvalStage})`}
+                            </span>
+                          </>
+                        )}
+                        {selectedBill.decision && (
+                          <>
+                            {selectedBill.approvalStepName && ' — '}
+                            Decision:{' '}
+                            <span className="font-semibold text-slate-600 capitalize">
+                              {selectedBill.decision}
+                            </span>
+                            {selectedBill.decidedDate && ` on ${selectedBill.decidedDate}`}
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

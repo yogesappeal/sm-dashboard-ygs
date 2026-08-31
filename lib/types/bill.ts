@@ -37,6 +37,16 @@ export interface ApiBill {
   amount_total?: number | null
   line_items?: ApiLineItem[]
   attachments?: ApiAttachment[]
+  updated_at?: string | null
+  // The bill's approval-run progress — `decision` reflects our own
+  // approval workflow and can be ahead of `external_status` (which mirrors
+  // Xero and may still say e.g. "SUBMITTED" after we've already approved
+  // it), so `decision` takes priority when mapping to the UI's `status`.
+  approval_run_id?: string | null
+  stage?: number | null
+  step_name?: string | null
+  decision?: string | null
+  decided_at?: string | null
 }
 
 // GET /bills/{id}/activities — confirmed shape (see lib/api/bills.ts).
@@ -79,6 +89,10 @@ export interface ApiActivities {
 // A GET response may wrap its payload in `{ data: ... }` or return it bare
 // — both are handled by unwrapApiData in lib/api/bills.ts.
 export type MaybeWrapped<T> = T | { data: T }
+
+// The Bills views, driven by GET /bills?scope=<value> — see getBills in
+// lib/api/bills.ts for which values are confirmed vs. per-spec.
+export type BillScope = 'pending' | 'approved_by_me' | 'all'
 
 // ---------------------------------------------------------------------------
 // UI-facing shapes — what components/bills/bills-workspace.tsx renders.
@@ -135,4 +149,8 @@ export interface Bill {
   reference?: string
   currencyCode?: string
   externalStatus?: string
+  approvalStage?: number
+  approvalStepName?: string
+  decision?: string
+  decidedDate?: string
 }

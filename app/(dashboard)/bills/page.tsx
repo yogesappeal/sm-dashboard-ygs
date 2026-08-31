@@ -6,7 +6,7 @@ import { BillsWorkspace } from '@/components/bills/bills-workspace'
 export default function AllBillsPage() {
   return (
     <BillsAccessGuard>
-      <BillsWorkspace categoryFilter="all" />
+      <BillsWorkspace scope="all" />
     </BillsAccessGuard>
   )
 }

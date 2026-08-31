@@ -16,12 +16,13 @@ export class BillsApiError extends Error {
   }
 }
 
-async function request<T>(path: string, token: string): Promise<T> {
+async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   if (!BILLS_BASE_URL) {
     throw new BillsApiError(0, 'NEXT_PUBLIC_BILLS_SUPABASE_URL is not configured')
   }
   const res = await fetch(`${BILLS_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...init?.headers },
   })
 
   if (!res.ok) {
@@ -29,9 +30,16 @@ async function request<T>(path: string, token: string): Promise<T> {
     throw new BillsApiError(res.status, text || `Request failed (${res.status})`)
   }
 
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
 export const billsApi = {
   get: <T>(path: string, token: string) => request<T>(path, token),
+  post: <T>(path: string, token: string, body?: unknown) =>
+    request<T>(path, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
 }
