@@ -60,6 +60,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Bills-only lockdown — every other authenticated page is temporarily
+  // unreachable, including by typing the URL directly (Home "/",
+  // Purchase Orders, Suppliers & Subs, Scope, Tasks, Contract,
+  // Contract Preview, Profile, Settings, Notifications). Restore access by
+  // removing this block (sidebar entries are commented out separately in
+  // components/layout/sidebar.tsx).
+  const isBillsRoute =
+    request.nextUrl.pathname === '/bills' ||
+    request.nextUrl.pathname.startsWith('/bills/')
+  if (user && !isAuthRoute && !isPublicRoute && !isBillsRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/bills'
+    return NextResponse.redirect(url)
+  }
+
   return supabaseResponse
 }
 
@@ -68,6 +83,6 @@ export const config = {
     // icon/apple-icon are Next.js's dynamic favicon routes (app/icon.tsx) —
     // no file extension in the URL, so they need an explicit exclusion
     // alongside the static-asset extensions below.
-    '/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pdf)$).*)',
   ],
 }

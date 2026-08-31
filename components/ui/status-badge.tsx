@@ -1,6 +1,7 @@
 interface StatusBadgeProps {
   status: string
   className?: string
+  size?: 'sm' | 'xs'
 }
 
 type StatusConfig = {
@@ -48,6 +49,13 @@ function getStatusConfig(status: string): StatusConfig {
       return { bg: 'bg-red-50', text: 'text-red-500', dot: 'bg-red-400', label: 'PO Rejected' }
     case 'PO Cancelled':
       return { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'PO Cancelled' }
+    // Bills statuses
+    case 'Pending Approval':
+      return { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400', label: 'Pending Approval' }
+    case 'Approved':
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Approved' }
+    case 'Rejected':
+      return { bg: 'bg-rose-50', text: 'text-rose-600', dot: 'bg-rose-500', label: 'Rejected' }
     // PO type
     case 'supplier':
       return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', label: 'Supplier' }
@@ -58,13 +66,15 @@ function getStatusConfig(status: string): StatusConfig {
   }
 }
 
-export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
+export function StatusBadge({ status, className = '', size = 'sm' }: StatusBadgeProps) {
   const cfg = getStatusConfig(status)
+  const sizeClasses = size === 'xs' ? 'gap-1 px-2 py-0.5 text-[11px]' : 'gap-1.5 px-2.5 py-1 text-xs'
+  const dotSize = size === 'xs' ? 'w-1 h-1' : 'w-1.5 h-1.5'
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text} ${className}`}
+      className={`inline-flex flex-shrink-0 items-center whitespace-nowrap rounded-full font-medium ${sizeClasses} ${cfg.bg} ${cfg.text} ${className}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      <span className={`rounded-full ${dotSize} ${cfg.dot} flex-shrink-0`} />
       {cfg.label}
     </span>
   )

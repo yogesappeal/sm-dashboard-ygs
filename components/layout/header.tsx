@@ -27,6 +27,10 @@ export function Header() {
       : `${STORAGE_BASE}/${user.image_url.replace(/^\/+/, '')}`
     : null
 
+  // Search, notifications, and SM Toolbox ("block" grid icon) are
+  // temporarily hidden — commented out (not removed) throughout this file
+  // so they can be restored later by uncommenting.
+  /*
   if (mobileSearchOpen) {
     return (
       <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-2 px-4 sticky top-0 z-10 md:hidden">
@@ -43,6 +47,7 @@ export function Header() {
       </header>
     )
   }
+  */
 
   return (
     <header className="h-16 bg-white border-b border-slate-100 flex items-center gap-4 px-4 md:px-6 sticky top-0 z-10">
@@ -56,10 +61,10 @@ export function Header() {
         <Menu size={20} />
       </button>
 
-      {/* Search */}
-      <div className="hidden md:flex flex-1 max-w-md">
+      {/* Search — commented out (not removed), see note above */}
+      {/* <div className="hidden md:flex flex-1 max-w-md">
         <GlobalSearch />
-      </div>
+      </div> */}
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -67,17 +72,17 @@ export function Header() {
       {/* Right cluster */}
       <div className="flex items-center gap-3 shrink-0">
 
-        {/* Mobile search trigger */}
-        <button
+        {/* Mobile search trigger — commented out (not removed) */}
+        {/* <button
           onClick={() => setMobileSearchOpen(true)}
           className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors md:hidden"
           aria-label="Search"
         >
           <Search size={18} />
-        </button>
+        </button> */}
 
-        {/* SM Toolbox */}
-        <PermissionGuard action="toolbox:view">
+        {/* SM Toolbox ("block" grid icon) — commented out (not removed) */}
+        {/* <PermissionGuard action="toolbox:view">
           <div className="relative">
             <button
               onClick={() => setToolboxOpen((v) => !v)}
@@ -88,10 +93,10 @@ export function Header() {
             </button>
             <ToolboxPanel open={toolboxOpen} onClose={() => setToolboxOpen(false)} />
           </div>
-        </PermissionGuard>
+        </PermissionGuard> */}
 
-        {/* Notification bell + panel */}
-        <div className="relative">
+        {/* Notification bell + panel — commented out (not removed) */}
+        {/* <div className="relative">
           <button
             onClick={() => setNotifOpen((v) => !v)}
             className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
@@ -103,7 +108,7 @@ export function Header() {
             )}
           </button>
           <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
-        </div>
+        </div> */}
 
         {/* User info + avatar */}
         <div className="flex items-center gap-2.5">

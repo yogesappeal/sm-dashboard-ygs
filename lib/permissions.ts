@@ -11,6 +11,8 @@ export type PermissionAction =
   | 'toolbox:view'
   | 'task:view'
   | 'contract:edit-planned-start'
+  | 'bill:access'
+  | 'bill:approve'
 
 // Flip any boolean to change what a role can do — this table is the only
 // place permission rules live. Admin is spelled out in full (not "always
@@ -29,6 +31,10 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'toolbox:view':    false,
     'task:view':       true,
     'contract:edit-planned-start': true,
+    // Bills is Site Manager-only — Admin has no access at all,
+    // same as Operations below.
+    'bill:access':     false,
+    'bill:approve':    false,
   },
   'Site Manager': {
     'supplier:create': false,
@@ -41,6 +47,9 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     'toolbox:view':    true,
     'task:view':       true,
     'contract:edit-planned-start': true,
+    // SM's entire Bills capability is view + approve/reject — no editing.
+    'bill:access':     true,
+    'bill:approve':    true,
   },
   Operations: {
     'supplier:create': true,
@@ -54,6 +63,9 @@ const PERMISSIONS: Record<Exclude<UserRole, null>, Record<PermissionAction, bool
     // Ops doesn't get the Tasks menu at all.
     'task:view':       false,
     'contract:edit-planned-start': false,
+    // Bills is Site Manager-only — Operations has no access at all.
+    'bill:access':     false,
+    'bill:approve':    false,
   },
 }
 

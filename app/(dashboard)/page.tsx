@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
@@ -27,11 +28,35 @@ const STATUS_FILTERS = [
 
 export default function DashboardPage() {
   const { token, role, user } = useAuthStore()
+  const router = useRouter()
   const queryClient = useQueryClient()
   const isOps = role === 'Operations'
   // Admin sees the same unfiltered contract list as Ops (all-client-paginated),
   // distinct from isOps above which also drives the metrics/row variant.
   const usesAllClientsApi = role === 'Operations' || role === 'Admin'
+
+  // Site Managers land on Bills instead of the contracts dashboard right
+  // after login — Bills is their primary workflow. This must only happen
+  // once per login (not on every visit to "/"), otherwise a Site Manager
+  // could never navigate back to "/" directly — sessionStorage remembers
+  // that this session already redirected (cleared on sign-out in
+  // AuthProvider, so a fresh login redirects again). Read once via a lazy
+  // initializer so the very first render already knows, avoiding a flash
+  // of dashboard content before the effect below can react.
+  const [smAlreadyRedirected] = useState(
+    () => typeof window !== 'undefined' && sessionStorage.getItem('sm-post-login-redirect-done') === '1'
+  )
+  // True only while we're about to bounce a Site Manager to /bills this
+  // render — false once that's already happened this session, so a Site
+  // Manager who navigates back to "/" afterward sees it normally.
+  const isRedirectingToBills = role === 'Site Manager' && !smAlreadyRedirected
+
+  useEffect(() => {
+    if (isRedirectingToBills) {
+      sessionStorage.setItem('sm-post-login-redirect-done', '1')
+      router.replace('/bills')
+    }
+  }, [isRedirectingToBills, router])
 
   const [activeFilter, setActiveFilter] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -52,12 +77,14 @@ export default function DashboardPage() {
 
   const activeStatus = STATUS_FILTERS.find((f) => f.index === activeFilter)?.status
 
-  // Metrics query
+  // Metrics query — skipped while we're about to redirect a Site Manager
+  // to Bills; still runs for a Site Manager who's already past that and is
+  // intentionally viewing "/".
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['dashboard-metrics', role],
     queryFn: () =>
       isOps ? getOpsMetrics(token!) : getDashboardMetrics(token!),
-    enabled: !!token,
+    enabled: !!token && !isRedirectingToBills,
     staleTime: 5 * 60 * 1000,
   })
 
@@ -73,7 +100,7 @@ export default function DashboardPage() {
         ? getAllClientsPaginatedForOps(token!, params)
         : getClientsPaginated(token!, params)
     },
-    enabled: !!token,
+    enabled: !!token && !isRedirectingToBills,
     staleTime: 2 * 60 * 1000,
   })
 
@@ -128,6 +155,11 @@ export default function DashboardPage() {
 
   const firstName = user?.first_name ?? (isOps ? 'Ops' : 'SM')
   const isContractsLoading = contractsLoading || isFetching || isPageChanging
+
+  // Redirecting away — render nothing rather than flashing dashboard content.
+  if (isRedirectingToBills) {
+    return null
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
