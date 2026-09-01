@@ -31,7 +31,6 @@ import {
   FileSpreadsheet,
   Loader2,
   RefreshCw,
-  KeyRound,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
@@ -39,6 +38,7 @@ import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/shared/toast'
+import { useAuthStore } from '@/lib/store'
 import {
   getBills,
   getBillDetail,
@@ -170,12 +170,10 @@ interface BillsWorkspaceProps {
 export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const canApproveBills = usePermission('bill:approve')
 
-  // Temporary: the Bills API (a separate Supabase project from the rest of
-  // this app) currently needs its own bearer token, entered manually here
-  // rather than reused from the app's own session — see
-  // lib/api/bills-fetcher.ts for why. Remove this field once real auth is
-  // wired up; every API call below reads from this, never a hardcoded value.
-  const [apiToken, setApiToken] = useState('')
+  // Bills now lives on the same Supabase project as the rest of the app
+  // (NEXT_PUBLIC_SUPABASE_URL) and accepts the app's own authenticated
+  // session token — no more manual entry.
+  const { token } = useAuthStore()
 
   const [bills, setBills] = useState<Bill[]>([])
   const [billsLoading, setBillsLoading] = useState(false)
@@ -235,7 +233,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Re-fetches whenever the token changes, or `scope` (set by which sidebar
   // route rendered this component) changes — GET /bills?scope=<value>.
   useEffect(() => {
-    if (!apiToken) return
+    if (!token) return
     let cancelled = false
 
     // Deferred a tick (not called synchronously in the effect body) per
@@ -247,7 +245,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       setBillsError(null)
     })
 
-    getBills(apiToken, scope)
+    getBills(token, scope)
       .then((json) => {
         if (cancelled) return
         const list = unwrapApiData(json) ?? []
@@ -264,7 +262,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return () => {
       cancelled = true
     }
-  }, [apiToken, scope, billsReloadKey])
+  }, [token, scope, billsReloadKey])
 
   // Search is still client-side — scoping (which view) is server-side now,
   // search within a view isn't.
@@ -290,7 +288,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // doesn't block the rest of the detail from showing.
   useEffect(() => {
     const id = selectedBill?.id
-    if (!id || !apiToken || detailLoadedIds.has(id)) return
+    if (!id || !token || detailLoadedIds.has(id)) return
     let cancelled = false
 
     // Deferred a tick — see the bills-list effect above for why.
@@ -301,8 +299,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     })
 
     Promise.all([
-      getBillDetail(apiToken, id),
-      getBillActivities(apiToken, id).catch(() => ({}) as ApiActivities),
+      getBillDetail(token, id),
+      getBillActivities(token, id).catch(() => ({}) as ApiActivities),
     ])
       .then(([billJson, activitiesJson]) => {
         if (cancelled) return
@@ -332,7 +330,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return () => {
       cancelled = true
     }
-  }, [selectedBill?.id, apiToken, detailLoadedIds])
+  }, [selectedBill?.id, token, detailLoadedIds])
 
   const activeAttachment = useMemo(() => {
     if (!selectedBill || !activeAttachmentId) return null
@@ -386,11 +384,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Activities isn't guaranteed to reflect the action immediately either.
   const handleApprove = useCallback(
     async (id: string) => {
-      if (!canApproveBills || !apiToken) return
+      if (!canApproveBills || !token) return
       setActionPendingId(id)
       const comment = approvalComment.trim()
       try {
-        await approveBill(apiToken, id, comment)
+        await approveBill(token, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -420,16 +418,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken, approvalComment]
+    [toast, canApproveBills, token, approvalComment]
   )
 
   const handleReject = useCallback(
     async (id: string) => {
-      if (!canApproveBills || !apiToken) return
+      if (!canApproveBills || !token) return
       setActionPendingId(id)
       const comment = approvalComment.trim()
       try {
-        await rejectBill(apiToken, id, comment)
+        await rejectBill(token, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -459,7 +457,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken, approvalComment]
+    [toast, canApproveBills, token, approvalComment]
   )
 
   const handleSendComment = useCallback(() => {
@@ -513,10 +511,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         return
       }
 
-      if (!apiToken) return
+      if (!token) return
       setAttachmentUrlLoading(true)
       try {
-        const json = await getBillAttachment(apiToken, selectedBill.id, file.id)
+        const json = await getBillAttachment(token, selectedBill.id, file.id)
         const apiAttachment = unwrapApiData(json)
         const resolvedUrl = apiAttachment.url ?? ''
         if (!resolvedUrl) throw new Error('No preview URL returned for this attachment')
@@ -536,7 +534,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setAttachmentUrlLoading(false)
       }
     },
-    [selectedBill, apiToken, toast]
+    [selectedBill, token, toast]
   )
 
   // Subtotal calculations
@@ -570,27 +568,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="flex-shrink-0">
         <PageHeader title={pageTitle} description={pageDescription} />
-      </div>
-
-      {/* Temporary — remove once the Bills API accepts the app's own
-          session token. Every request in this component reads from
-          `apiToken`; nothing is hardcoded. */}
-      <div className="flex-shrink-0 px-4 md:px-6 pt-4">
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <KeyRound size={14} className="text-amber-600 flex-shrink-0" />
-          <label htmlFor="bills-api-token" className="text-xs font-semibold text-amber-800 flex-shrink-0">
-            Bearer Token (temporary):
-          </label>
-          <input
-            id="bills-api-token"
-            type="password"
-            value={apiToken}
-            onChange={(e) => setApiToken(e.target.value)}
-            placeholder="Paste the Bills API bearer token to load live data..."
-            autoComplete="off"
-            className="flex-1 min-w-0 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-amber-700/50 outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400"
-          />
-        </div>
       </div>
 
       {/* Main Workspace Split Layout — left:right ratio is set via the
@@ -793,11 +770,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
             {/* List items for this category */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {!apiToken ? (
-                <div className="px-4 py-12 text-center text-xs text-slate-400">
-                  Enter a Bearer Token above to load bills.
-                </div>
-              ) : billsLoading ? (
+              {!token || billsLoading ? (
                 <div>
                   {Array.from({ length: 6 }).map((_, i) => (
                     <BillListItemSkeleton key={i} />
@@ -861,11 +834,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             'md:block flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
           )}
         >
-          {!apiToken ? (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm text-center px-6">
-              Enter a Bearer Token above to load bills.
-            </div>
-          ) : billsLoading ? (
+          {!token || billsLoading ? (
             <BillDetailSkeleton />
           ) : billsError ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">

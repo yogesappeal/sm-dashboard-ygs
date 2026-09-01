@@ -1,4 +1,4 @@
-import { billsApi } from './bills-fetcher'
+import { api } from './fetcher'
 import type {
   ApiActivities,
   ApiAttachment,
@@ -29,19 +29,19 @@ export function unwrapApiData<T>(json: MaybeWrapped<T>): T {
 // same vocabulary per the product spec for the "Requires My Approval" /
 // "All Bills" sidebar views.
 export async function getBills(token: string, scope: BillScope) {
-  return billsApi.get<MaybeWrapped<ApiBill[]>>(`/functions/v1/bills?scope=${scope}`, token)
+  return api.get<MaybeWrapped<ApiBill[]>>(`/functions/v1/bills?scope=${scope}`, token)
 }
 
 export async function getBillDetail(token: string, billId: string) {
-  return billsApi.get<MaybeWrapped<ApiBill>>(`/functions/v1/bills/${billId}?is_dummy=false`, token)
+  return api.get<MaybeWrapped<ApiBill>>(`/functions/v1/bills/${billId}?is_dummy=false`, token)
 }
 
 export async function getBillActivities(token: string, billId: string) {
-  return billsApi.get<MaybeWrapped<ApiActivities>>(`/functions/v1/bills/${billId}/activities`, token)
+  return api.get<MaybeWrapped<ApiActivities>>(`/functions/v1/bills/${billId}/activities`, token)
 }
 
 export async function getBillAttachment(token: string, billId: string, attachmentId: string) {
-  return billsApi.get<MaybeWrapped<ApiAttachment>>(
+  return api.get<MaybeWrapped<ApiAttachment>>(
     `/functions/v1/bills/${billId}/attachments/${attachmentId}`,
     token
   )
@@ -52,11 +52,11 @@ export async function getBillAttachment(token: string, billId: string, attachmen
 // pending (see bills-workspace.tsx); sent empty when left blank rather than
 // a fabricated value.
 export async function approveBill(token: string, billId: string, comment = '') {
-  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/approve`, token, { comment })
+  return api.post<unknown>(`/functions/v1/bills/${billId}/approve`, token, { comment })
 }
 
 export async function rejectBill(token: string, billId: string, comment = '') {
-  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/reject`, token, { comment })
+  return api.post<unknown>(`/functions/v1/bills/${billId}/reject`, token, { comment })
 }
 
 // ---------------------------------------------------------------------------
