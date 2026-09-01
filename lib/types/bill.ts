@@ -92,8 +92,13 @@ export interface ApiComment {
 
 export interface ApiAuditLogEntry {
   id: string
+  // Confirmed real shape: `actor` is an {id, name} object, not a plain
+  // string id — `actor_id` kept as a fallback in case some entries only
+  // send that (unconfirmed either way).
+  actor?: ApiAuthor | null
   actor_id?: string | null
   action?: string | null
+  description?: string | null
   target_type?: string | null
   target_id?: string | null
   bill_id?: string | null
@@ -146,6 +151,8 @@ export interface AuditTrailEvent {
   date: string
   user?: string
   userAvatar?: string
+  // Free-text only now — a comment's body, or an optional note attached
+  // alongside a decision (see `changes` below for the decision itself).
   notes?: string
   isMine?: boolean // set directly for locally-created comments (e.g. one just sent)
   // For comments fetched from the API — the author's id, compared against
@@ -153,6 +160,11 @@ export interface AuditTrailEvent {
   // baked into `isMine` here, since this data is cached once fetched and
   // the current user can still be loading when that fetch first happens.
   authorId?: string
+  // Structured before -> after field diffs for an action entry (e.g. a
+  // decision change, or several fields edited at once) — built from
+  // audit-log's before_value/after_value in lib/api/bills.ts, or set
+  // directly for locally-created approve/reject events.
+  changes?: { label: string; from: string; to: string }[]
 }
 
 export interface BillFile {

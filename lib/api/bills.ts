@@ -210,31 +210,103 @@ function mapApiCommentToAuditEvent(c: ApiComment): AuditTrailEvent {
   }
 }
 
-// e.g. "BILL_STATUS_CHANGED" -> "Bill Status Changed"
-function formatAuditAction(action?: string | null): string {
-  if (!action) return NO_DATA
-  return action
+// Shared by both the audit-log action title and each individual field
+// label below — e.g. "BILL_STATUS_CHANGED" -> "Bill Status Changed",
+// "due_date" -> "Due Date".
+function humanizeSnakeCase(raw?: string | null): string {
+  if (!raw) return NO_DATA
+  return raw
     .toLowerCase()
     .split('_')
     .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
     .join(' ')
 }
 
-function readStringField(value: Record<string, unknown> | null | undefined, key: string): string | undefined {
+// `before_value`/`after_value` are untyped — this stringifies whatever
+// comes back reasonably (ISO-looking date strings get the same date
+// formatting used elsewhere; everything else is printed as-is).
+function stringifyAuditValue(v: unknown): string {
+  if (v == null || v === '') return 'Not set'
+  if (typeof v === 'string') {
+    const asDate = new Date(v)
+    return !Number.isNaN(asDate.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(v) ? formatApiDate(v) : v
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return String(v)
+  }
+}
+
+// Only these fields are meaningful enough to a Site Manager reading the
+// audit trail to show as a row — anything else in before_value/after_value
+// (internal/technical fields we don't have a case for) is left out so the
+// trail stays readable rather than listing every changed key.
+const AUDIT_CHANGE_FIELD_LABELS: Record<string, string> = {
+  status: 'Status',
+  decision: 'Decision',
+  comment: 'Comment',
+  workflow_status: 'Workflow Status',
+  reference: 'Reference',
+  due_date: 'Due Date',
+  bill_date: 'Bill Date',
+  supplier_contact: 'Supplier Contact',
+  amount_total: 'Amount',
+}
+
+// Builds one row per allowlisted field present in either before/after —
+// handles a single-field change (e.g. just `decision`) the same as several
+// fields changed together (e.g. reference + due_date + supplier_contact
+// edited at once).
+function buildAuditChanges(
+  before: Record<string, unknown> | null | undefined,
+  after: Record<string, unknown> | null | undefined
+): AuditTrailEvent['changes'] {
+  const changes: NonNullable<AuditTrailEvent['changes']> = []
+  for (const [key, label] of Object.entries(AUDIT_CHANGE_FIELD_LABELS)) {
+    if (!(before && key in before) && !(after && key in after)) continue
+    const from = stringifyAuditValue(before?.[key])
+    const to = stringifyAuditValue(after?.[key])
+    if (from === to) continue
+    changes.push({ label, from, to })
+  }
+  return changes.length > 0 ? changes : undefined
+}
+
+function readOptionalString(value: Record<string, unknown> | null | undefined, key: string): string | undefined {
   const v = value?.[key]
   return typeof v === 'string' ? v : undefined
 }
 
+// `action` is often just a generic verb like "update" — not descriptive on
+// its own — so when the diff includes a `decision` change, that's used to
+// derive a clearer title instead (e.g. "approved" -> "Advanced to the next
+// approval stage"), falling back to the raw action otherwise.
+function deriveAuditTitle(a: ApiAuditLogEntry): string {
+  const beforeDecision = readOptionalString(a.before_value, 'decision')
+  const afterDecision = readOptionalString(a.after_value, 'decision')
+  if (afterDecision && afterDecision !== beforeDecision) {
+    switch (afterDecision.toLowerCase()) {
+      case 'approved':
+        return 'Advanced to the next approval stage'
+      case 'rejected':
+        return 'Bill rejected'
+      default:
+        return 'Decision updated'
+    }
+  }
+  return humanizeSnakeCase(a.action)
+}
+
 function mapApiAuditLogToAuditEvent(a: ApiAuditLogEntry): AuditTrailEvent {
-  const before = readStringField(a.before_value, 'status')
-  const after = readStringField(a.after_value, 'status')
   return {
     id: a.id,
     type: 'action',
-    title: formatAuditAction(a.action),
+    title: deriveAuditTitle(a),
     date: formatApiDateTime(a.created_at),
-    user: a.actor_id ?? undefined,
-    notes: before && after ? `${before} → ${after}` : undefined,
+    user: a.actor?.name ?? a.actor_id ?? undefined,
+    changes: buildAuditChanges(a.before_value, a.after_value),
   }
 }
 
