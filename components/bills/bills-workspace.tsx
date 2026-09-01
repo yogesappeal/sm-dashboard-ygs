@@ -915,7 +915,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     <div className="flex justify-between items-start mb-1.5">
                       <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
                         Bill {bill.billNumber}
-                        {bill.supplierName !== NO_DATA && ` from ${bill.supplierName}`}
                       </span>
                       <StatusBadge status={bill.status} size="xs" />
                     </div>
@@ -973,11 +972,19 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div className="space-y-1 max-w-xl">
                     <h2 className="text-lg font-bold text-slate-800">
                       Bill {selectedBill.billNumber}
-                      {selectedBill.supplierName !== NO_DATA && ` from ${selectedBill.supplierName}`}
                     </h2>
-                    <div className="text-xs text-slate-500 leading-relaxed">
-                      Address<br />
-                      {selectedBill.address}
+                    {/* Address is never provided by this API — the supplier
+                        name is shown here instead, so the field isn't just
+                        wasted space. Supplier comes from bill detail
+                        (contact.name), fetched lazily after selection, so
+                        this shimmers rather than flashing "No data" first. */}
+                    <div className="text-xs text-slate-600 leading-relaxed">
+                      Supplier<br />
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-32 mt-0.5" />
+                      ) : (
+                        <span className="font-semibold text-slate-800">{selectedBill.supplierName}</span>
+                      )}
                     </div>
                   </div>
 
