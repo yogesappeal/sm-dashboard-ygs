@@ -37,6 +37,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/shared/toast'
 import {
   getBills,
@@ -89,6 +90,75 @@ function getFileTypeInfo(file: BillFile) {
     badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
     canPreview: false,
   }
+}
+
+// Shimmer placeholders, matching the shapes of what they stand in for —
+// same `Skeleton` primitive (components/ui/skeleton.tsx) used on the
+// purchase-orders / contract detail pages, rather than a spinner, so Bills'
+// loading states are visually consistent with the rest of the app.
+function BillListItemSkeleton() {
+  return (
+    <div className="p-4 border-b border-slate-100">
+      <div className="flex justify-between items-start mb-1.5 gap-2">
+        <Skeleton className="h-4 flex-1" />
+        <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+      </div>
+      <Skeleton className="h-3 w-10 mb-1.5" />
+      <Skeleton className="h-4 w-24" />
+    </div>
+  )
+}
+
+function BillDetailSkeleton() {
+  return (
+    <div className="space-y-5">
+      {/* Header Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-5 w-64" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+          <div className="space-y-2 w-full md:w-40">
+            <Skeleton className="h-6 w-28 ml-auto" />
+            <Skeleton className="h-7 w-24 ml-auto rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      {/* Details Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <Skeleton className="h-4 w-20 mb-4" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Line Items Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <Skeleton className="h-4 w-24" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </div>
+      </div>
+
+      {/* Files & Attachments Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <Skeleton className="h-4 w-32" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 interface BillsWorkspaceProps {
@@ -716,9 +786,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   Enter a Bearer Token above to load bills.
                 </div>
               ) : billsLoading ? (
-                <div className="px-4 py-12 flex flex-col items-center gap-2 text-xs text-slate-400">
-                  <Loader2 size={18} className="animate-spin" />
-                  Loading bills...
+                <div>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <BillListItemSkeleton key={i} />
+                  ))}
                 </div>
               ) : billsError ? (
                 <div className="px-4 py-12 flex flex-col items-center gap-3 text-center">
@@ -783,10 +854,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
               Enter a Bearer Token above to load bills.
             </div>
           ) : billsLoading ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
-              <Loader2 size={20} className="animate-spin" />
-              Loading bills...
-            </div>
+            <BillDetailSkeleton />
           ) : billsError ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
               <AlertCircle size={28} className="text-rose-500" />
@@ -935,12 +1003,15 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {isSelectedBillDetailLoading ? (
-                        <tr>
-                          <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-slate-400">
-                            <Loader2 size={16} className="inline animate-spin mr-2" />
-                            Loading line items...
-                          </td>
-                        </tr>
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <tr key={i}>
+                            {Array.from({ length: 8 }).map((__, j) => (
+                              <td key={j} className="px-3 md:px-4 py-3">
+                                <Skeleton className="h-4 w-full" />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
                       ) : detailError ? (
                         <tr>
                           <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-rose-500">
@@ -1013,9 +1084,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 {openFilesCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
                     {isSelectedBillDetailLoading ? (
-                      <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin" />
-                        Loading attachments...
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Skeleton className="h-14 w-full rounded-xl" />
+                        <Skeleton className="h-14 w-full rounded-xl" />
                       </div>
                     ) : detailError ? (
                       <div className="text-xs text-rose-500 py-2">{detailError}</div>
@@ -1158,9 +1229,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </button>
 
                 {openAuditCard && isSelectedBillDetailLoading ? (
-                  <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" />
-                    Loading audit trail...
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3 w-1/2" />
+                          <Skeleton className="h-3 w-1/4" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : openAuditCard && detailError ? (
                   <div className="text-xs text-rose-500 py-2">{detailError}</div>
