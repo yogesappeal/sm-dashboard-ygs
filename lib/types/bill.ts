@@ -6,6 +6,13 @@
 // anything missing as absent rather than assume it exists.
 // ---------------------------------------------------------------------------
 
+export interface ApiTrackingEntry {
+  tracking_option_id?: string | null
+  tracking_category_id?: string | null
+  tracking_option_name?: string | null
+  tracking_category_name?: string | null
+}
+
 export interface ApiLineItem {
   id: string
   description?: string | null
@@ -14,14 +21,21 @@ export interface ApiLineItem {
   line_amount?: number | null
   tax_amount?: number | null
   account_code?: string | null
+  tracking?: ApiTrackingEntry[]
 }
 
 export interface ApiAttachment {
   id: string
+  bill_id?: string | null
   file_name?: string | null
   mime_type?: string | null
   content_length?: number | null
-  url?: string | null // only present (if at all) on the single-attachment endpoint, not on bill detail
+  // Confirmed real field name (only present on the single-attachment
+  // endpoint, not on bill detail's `attachments[]`) — a short-lived Supabase
+  // Storage signed URL, expiring after `signed_url_ttl_sec` seconds
+  // (observed as 120s), not something to cache/reuse past that.
+  signed_url?: string | null
+  signed_url_ttl_sec?: number | null
 }
 
 export interface ApiBill {
@@ -58,11 +72,19 @@ export interface ApiApprovalRunRef {
   status?: string | null
 }
 
+export interface ApiAuthor {
+  id: string
+  name?: string | null
+}
+
 export interface ApiComment {
   id: string
   bill_id?: string | null
-  approval_run_id?: ApiApprovalRunRef | null
-  author_user_id?: string | null
+  // Confirmed real shape: a plain string id, not the nested
+  // {id, attempt_number, status} object seen elsewhere — kept as `string`
+  // here since audit-log entries still use the nested ApiApprovalRunRef.
+  approval_run_id?: string | null
+  author?: ApiAuthor | null
   body?: string | null
   created_at?: string | null
   updated_at?: string | null
@@ -70,8 +92,13 @@ export interface ApiComment {
 
 export interface ApiAuditLogEntry {
   id: string
+  // Confirmed real shape: `actor` is an {id, name} object, not a plain
+  // string id — `actor_id` kept as a fallback in case some entries only
+  // send that (unconfirmed either way).
+  actor?: ApiAuthor | null
   actor_id?: string | null
   action?: string | null
+  description?: string | null
   target_type?: string | null
   target_id?: string | null
   bill_id?: string | null
@@ -109,6 +136,11 @@ export interface LineItem {
   account: string
   tax: string
   amount: number
+  // From line_items[].tracking[] — matched by tracking_category_name (see
+  // mapApiLineItemToLineItem in lib/api/bills.ts), not guaranteed to be
+  // present for every line item.
+  smDept: string
+  siteTag: string
 }
 
 export interface AuditTrailEvent {
@@ -119,8 +151,20 @@ export interface AuditTrailEvent {
   date: string
   user?: string
   userAvatar?: string
+  // Free-text only now — a comment's body, or an optional note attached
+  // alongside a decision (see `changes` below for the decision itself).
   notes?: string
-  isMine?: boolean // comment authored by the current user — right-aligned bubble
+  isMine?: boolean // set directly for locally-created comments (e.g. one just sent)
+  // For comments fetched from the API — the author's id, compared against
+  // the current user at render time (see bills-workspace.tsx) rather than
+  // baked into `isMine` here, since this data is cached once fetched and
+  // the current user can still be loading when that fetch first happens.
+  authorId?: string
+  // Structured before -> after field diffs for an action entry (e.g. a
+  // decision change, or several fields edited at once) — built from
+  // audit-log's before_value/after_value in lib/api/bills.ts, or set
+  // directly for locally-created approve/reject events.
+  changes?: { label: string; from: string; to: string }[]
 }
 
 export interface BillFile {

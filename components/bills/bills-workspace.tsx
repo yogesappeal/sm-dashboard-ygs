@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Search,
   Receipt,
@@ -31,27 +32,30 @@ import {
   FileSpreadsheet,
   Loader2,
   RefreshCw,
-  KeyRound,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/shared/toast'
+import { useAuthStore } from '@/lib/store'
 import {
   getBills,
   getBillDetail,
-  getBillActivities,
+  getBillComments,
+  getBillAuditLog,
+  postBillComment,
   getBillAttachment,
   approveBill,
   rejectBill,
   mapApiBillToBill,
-  mapApiActivitiesToAuditTrail,
+  mapCommentsAndAuditLogToAuditTrail,
   unwrapApiData,
   formatCurrencyAmount,
   NO_DATA,
 } from '@/lib/api'
-import type { Bill, BillFile, AuditTrailEvent, ApiActivities, BillScope } from '@/lib/types'
+import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
@@ -87,8 +91,82 @@ function getFileTypeInfo(file: BillFile) {
     icon: ext === 'XLSX' || ext === 'CSV' ? FileSpreadsheet : FileQuestion,
     colorClass: 'bg-amber-50 text-amber-700',
     badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
-    canPreview: false,
+    // Every type gets an attempted inline preview now (via <iframe> — see
+    // the "other" render branch) rather than being blocked outright; the
+    // browser renders what it natively can (PDF, images, text, CSV, HTML)
+    // and shows nothing for formats it can't (e.g. .docx/.xlsx), so the
+    // Download button next to the preview stays the fallback for those.
+    canPreview: true,
   }
+}
+
+// Shimmer placeholders, matching the shapes of what they stand in for —
+// same `Skeleton` primitive (components/ui/skeleton.tsx) used on the
+// purchase-orders / contract detail pages, rather than a spinner, so Bills'
+// loading states are visually consistent with the rest of the app.
+function BillListItemSkeleton() {
+  return (
+    <div className="p-4 border-b border-slate-100">
+      <div className="flex justify-between items-start mb-1.5 gap-2">
+        <Skeleton className="h-4 flex-1" />
+        <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+      </div>
+      <Skeleton className="h-3 w-10 mb-1.5" />
+      <Skeleton className="h-4 w-24" />
+    </div>
+  )
+}
+
+function BillDetailSkeleton() {
+  return (
+    <div className="space-y-5">
+      {/* Header Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-5 w-64" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+          <div className="space-y-2 w-full md:w-40">
+            <Skeleton className="h-6 w-28 ml-auto" />
+            <Skeleton className="h-7 w-24 ml-auto rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      {/* Details Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <Skeleton className="h-4 w-20 mb-4" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Line Items Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <Skeleton className="h-4 w-24" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </div>
+      </div>
+
+      {/* Files & Attachments Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <Skeleton className="h-4 w-32" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 interface BillsWorkspaceProps {
@@ -100,12 +178,32 @@ interface BillsWorkspaceProps {
 export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const canApproveBills = usePermission('bill:approve')
 
-  // Temporary: the Bills API (a separate Supabase project from the rest of
-  // this app) currently needs its own bearer token, entered manually here
-  // rather than reused from the app's own session — see
-  // lib/api/bills-fetcher.ts for why. Remove this field once real auth is
-  // wired up; every API call below reads from this, never a hardcoded value.
-  const [apiToken, setApiToken] = useState('')
+  // Bills now lives on the same Supabase project as the rest of the app
+  // (NEXT_PUBLIC_SUPABASE_URL) and accepts the app's own authenticated
+  // session token — no more manual entry.
+  const { token, user } = useAuthStore()
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  // Local state (not searchParams.get('bill') directly) is what drives
+  // rendering — router.push/replace triggers a real Next.js navigation
+  // (an RSC round-trip, ~200ms+ even for a same-page query change), which
+  // made clicking a bill feel laggy when this read straight from the URL.
+  // The URL is still kept in sync (selectBill / the auto-select effect
+  // below) for deep-linking, just as a background side effect that
+  // doesn't block the click from rendering instantly.
+  const [selectedBillId, setSelectedBillIdState] = useState(() => searchParams.get('bill') ?? '')
+
+  // Keeps local state in sync when the URL changes from outside a click
+  // here — browser back/forward, or a pasted/bookmarked link. Deferred a
+  // tick per react-hooks/set-state-in-effect (see the fallback-selection
+  // effect below for why).
+  useEffect(() => {
+    const urlBillId = searchParams.get('bill') ?? ''
+    Promise.resolve().then(() => {
+      setSelectedBillIdState((prev) => (urlBillId && urlBillId !== prev ? urlBillId : prev))
+    })
+  }, [searchParams])
 
   const [bills, setBills] = useState<Bill[]>([])
   const [billsLoading, setBillsLoading] = useState(false)
@@ -119,9 +217,15 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
+  const [commentSending, setCommentSending] = useState(false)
+
+  // Optional note shown under Approve/Reject while a bill is still pending
+  // — sent as the `comment` field on whichever action is taken, separate
+  // from `commentText` above (the always-visible "Leave a comment" box,
+  // which only ever posts a local audit-trail note).
+  const [approvalComment, setApprovalComment] = useState('')
 
   // Which bill currently has an approve/reject request in flight — disables
   // both buttons on that bill only, so switching to another bill isn't
@@ -159,7 +263,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Re-fetches whenever the token changes, or `scope` (set by which sidebar
   // route rendered this component) changes — GET /bills?scope=<value>.
   useEffect(() => {
-    if (!apiToken) return
+    if (!token) return
     let cancelled = false
 
     // Deferred a tick (not called synchronously in the effect body) per
@@ -171,7 +275,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       setBillsError(null)
     })
 
-    getBills(apiToken, scope)
+    getBills(token, scope)
       .then((json) => {
         if (cancelled) return
         const list = unwrapApiData(json) ?? []
@@ -188,7 +292,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return () => {
       cancelled = true
     }
-  }, [apiToken, scope, billsReloadKey])
+  }, [token, scope, billsReloadKey])
 
   // Search is still client-side — scoping (which view) is server-side now,
   // search within a view isn't.
@@ -207,14 +311,49 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return filteredBills[0] ?? null
   }, [filteredBills, selectedBillId])
 
+  // Selecting a bill updates local state immediately (instant render) and
+  // syncs the URL in the background — router.push isn't awaited or relied
+  // on for anything visible, it's purely so the URL stays
+  // shareable/bookmarkable.
+  const selectBill = useCallback(
+    (id: string) => {
+      setSelectedBillIdState(id)
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('bill', id)
+      router.push(`?${params.toString()}`, { scroll: false })
+    },
+    [searchParams, router]
+  )
 
-  // Fetch this bill's full detail (line items, attachments) and activity
-  // log the first time it's selected, then cache — getBillDetail() and
-  // getBillActivities() in parallel. Activities failing independently
-  // doesn't block the rest of the detail from showing.
+  // Once the list loads, if there's no valid selection yet, fall back to
+  // the first bill — same instant-local/background-URL split as
+  // selectBill() above.
+  useEffect(() => {
+    if (bills.length === 0) return
+    if (selectedBillId && bills.some((b) => b.id === selectedBillId)) return
+
+    const fallbackId = filteredBills[0]?.id
+    if (!fallbackId) return
+
+    // Deferred a tick (not called synchronously in the effect body) per
+    // react-hooks/set-state-in-effect — resolves before paint, so there's
+    // no visible delay before the fallback selection shows.
+    Promise.resolve().then(() => setSelectedBillIdState(fallbackId))
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('bill', fallbackId)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [bills, filteredBills, selectedBillId, searchParams, router])
+
+
+  // Fetch this bill's full detail (line items, attachments) plus its
+  // comments and audit log the first time it's selected, then cache —
+  // getBillDetail(), getBillComments(), and getBillAuditLog() in parallel.
+  // Comments/audit-log each fail independently (defaulting to []) so one
+  // failing doesn't block the rest of the detail from showing.
   useEffect(() => {
     const id = selectedBill?.id
-    if (!id || !apiToken || detailLoadedIds.has(id)) return
+    if (!id || !token || detailLoadedIds.has(id)) return
     let cancelled = false
 
     // Deferred a tick — see the bills-list effect above for why.
@@ -225,20 +364,25 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     })
 
     Promise.all([
-      getBillDetail(apiToken, id),
-      getBillActivities(apiToken, id).catch(() => ({}) as ApiActivities),
+      getBillDetail(token, id),
+      getBillComments(token, id).catch(() => [] as ApiComment[]),
+      getBillAuditLog(token, id).catch(() => [] as ApiAuditLogEntry[]),
     ])
-      .then(([billJson, activitiesJson]) => {
+      .then(([billJson, commentsJson, auditLogJson]) => {
         if (cancelled) return
         const apiBill = unwrapApiData(billJson)
-        const activities = unwrapApiData(activitiesJson) ?? {}
+        const comments = unwrapApiData(commentsJson)
+        const auditLog = unwrapApiData(auditLogJson)
 
         setBills((prev) =>
           prev.map((b) =>
             b.id === id
               ? {
                   ...mapApiBillToBill(apiBill, b),
-                  auditTrail: mapApiActivitiesToAuditTrail(activities),
+                  auditTrail: mapCommentsAndAuditLogToAuditTrail(
+                    Array.isArray(comments) ? comments : [],
+                    Array.isArray(auditLog) ? auditLog : []
+                  ),
                 }
               : b
           )
@@ -256,7 +400,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     return () => {
       cancelled = true
     }
-  }, [selectedBill?.id, apiToken, detailLoadedIds])
+  }, [selectedBill?.id, token, detailLoadedIds])
 
   const activeAttachment = useMemo(() => {
     if (!selectedBill || !activeAttachmentId) return null
@@ -310,10 +454,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Activities isn't guaranteed to reflect the action immediately either.
   const handleApprove = useCallback(
     async (id: string) => {
-      if (!canApproveBills || !apiToken) return
+      if (!canApproveBills || !token) return
       setActionPendingId(id)
+      const comment = approvalComment.trim()
       try {
-        await approveBill(apiToken, id)
+        await approveBill(token, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -327,13 +472,15 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   id: `at-${Date.now()}`,
                   type: 'action',
                   title: 'Approved for payment',
-                  user: 'Current User',
+                  user: user?.full_name || 'Current User',
                   date: `${nowStr} via Web`,
+                  changes: [{ label: 'Decision', from: 'Pending', to: 'Approved' }],
                 },
               ],
             }
           })
         )
+        setApprovalComment('')
         toast('Bill approved successfully!', 'success')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
@@ -341,15 +488,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken]
+    [toast, canApproveBills, token, approvalComment, user]
   )
 
   const handleReject = useCallback(
     async (id: string) => {
-      if (!canApproveBills || !apiToken) return
+      if (!canApproveBills || !token) return
       setActionPendingId(id)
+      const comment = approvalComment.trim()
       try {
-        await rejectBill(apiToken, id)
+        await rejectBill(token, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -363,13 +511,15 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   id: `at-${Date.now()}`,
                   type: 'action',
                   title: 'Rejected bill',
-                  user: 'Current User',
+                  user: user?.full_name || 'Current User',
                   date: `${nowStr} via Web`,
+                  changes: [{ label: 'Decision', from: 'Pending', to: 'Rejected' }],
                 },
               ],
             }
           })
         )
+        setApprovalComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to reject bill', 'error')
@@ -377,36 +527,50 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken]
+    [toast, canApproveBills, token, approvalComment, user]
   )
 
-  const handleSendComment = useCallback(() => {
-    if (!commentText.trim() || !selectedBill) return
-    const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-    const newComment: AuditTrailEvent = {
-      id: `at-${Date.now()}`,
-      type: 'comment',
-      title: 'Comment',
-      user: 'Ryan Cotter',
-      notes: commentText.trim(),
-      date: `${nowStr} via Web`,
-      isMine: true,
-    }
+  // Posts to GET/POST .../comments, then appends the comment locally on
+  // success (the endpoint's response shape for the created comment isn't
+  // confirmed, so this mirrors the approve/reject pattern of updating state
+  // from what we sent rather than parsing the response).
+  const handleSendComment = useCallback(async () => {
+    const body = commentText.trim()
+    if (!body || !selectedBill || !token) return
 
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === selectedBill.id) {
-          return {
-            ...b,
-            auditTrail: [...b.auditTrail, newComment],
+    setCommentSending(true)
+    try {
+      await postBillComment(token, selectedBill.id, body)
+      const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+      const newComment: AuditTrailEvent = {
+        id: `at-${Date.now()}`,
+        type: 'comment',
+        title: 'Comment',
+        user: 'You',
+        notes: body,
+        date: `${nowStr} via Web`,
+        isMine: true,
+      }
+
+      setBills((prev) =>
+        prev.map((b) => {
+          if (b.id === selectedBill.id) {
+            return {
+              ...b,
+              auditTrail: [...b.auditTrail, newComment],
+            }
           }
-        }
-        return b
-      })
-    )
-    setCommentText('')
-    toast('Comment added to audit trail', 'info')
-  }, [commentText, selectedBill, toast])
+          return b
+        })
+      )
+      setCommentText('')
+      toast('Comment added to audit trail', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to send comment', 'error')
+    } finally {
+      setCommentSending(false)
+    }
+  }, [commentText, selectedBill, token, toast])
 
   // Opens the preview panel immediately; if the file's URL hasn't been
   // resolved yet (bill detail only gives storage location, not a URL),
@@ -431,12 +595,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         return
       }
 
-      if (!apiToken) return
+      if (!token) return
       setAttachmentUrlLoading(true)
       try {
-        const json = await getBillAttachment(apiToken, selectedBill.id, file.id)
+        const json = await getBillAttachment(token, selectedBill.id, file.id)
         const apiAttachment = unwrapApiData(json)
-        const resolvedUrl = apiAttachment.url ?? ''
+        const resolvedUrl = apiAttachment.signed_url ?? ''
         if (!resolvedUrl) throw new Error('No preview URL returned for this attachment')
 
         setBills((prev) =>
@@ -454,7 +618,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setAttachmentUrlLoading(false)
       }
     },
-    [selectedBill, apiToken, toast]
+    [selectedBill, token, toast]
   )
 
   // Subtotal calculations
@@ -488,27 +652,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="flex-shrink-0">
         <PageHeader title={pageTitle} description={pageDescription} />
-      </div>
-
-      {/* Temporary — remove once the Bills API accepts the app's own
-          session token. Every request in this component reads from
-          `apiToken`; nothing is hardcoded. */}
-      <div className="flex-shrink-0 px-4 md:px-6 pt-4">
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <KeyRound size={14} className="text-amber-600 flex-shrink-0" />
-          <label htmlFor="bills-api-token" className="text-xs font-semibold text-amber-800 flex-shrink-0">
-            Bearer Token (temporary):
-          </label>
-          <input
-            id="bills-api-token"
-            type="password"
-            value={apiToken}
-            onChange={(e) => setApiToken(e.target.value)}
-            placeholder="Paste the Bills API bearer token to load live data..."
-            autoComplete="off"
-            className="flex-1 min-w-0 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-amber-700/50 outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400"
-          />
-        </div>
       </div>
 
       {/* Main Workspace Split Layout — left:right ratio is set via the
@@ -548,9 +691,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </span>
               </div>
 
-              {/* Zoom & Action Controls */}
+              {/* Zoom & Action Controls — only meaningful for PDF (URL zoom
+                  param) and images (width-based zoom); the generic iframe
+                  used for every other file type doesn't respond to this. */}
               <div className="flex items-center gap-1 flex-shrink-0">
-                {activeTypeInfo?.canPreview && (
+                {(activeAttachment?.type === 'pdf' || activeAttachment?.type === 'image') && (
                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
                     <button
                       type="button"
@@ -572,6 +717,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       +
                     </button>
                   </div>
+                )}
+                {activeAttachment?.url && (
+                  <a
+                    href={activeAttachment.url}
+                    download={activeAttachment.name}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </a>
                 )}
                 <button
                   type="button"
@@ -608,24 +765,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </div>
               ) : !activeAttachment || !activeTypeInfo ? (
                 <div className="m-auto text-xs text-slate-400">No document available to preview</div>
-              ) : !activeTypeInfo.canPreview ? (
-                <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 border border-amber-100">
-                    <activeTypeInfo.icon size={28} />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900 mb-1">Preview Not Available</h3>
-                  <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                    <strong className="text-slate-700 font-mono">{activeAttachment.name}</strong> can&apos;t be previewed inline. Only PDF and image files are supported.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => toast(`Downloading ${activeAttachment.name}...`, 'info')}
-                    className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
-                  >
-                    <Download size={13} />
-                    Download File
-                  </button>
-                </div>
               ) : activeTypeInfo.icon === ImageIcon ? (
                 // Zoom is a percentage of the panel's own width (not a fixed
                 // px base) so 100% always fills the available canvas exactly
@@ -646,7 +785,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     className="w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
                   />
                 </div>
-              ) : (
+              ) : activeAttachment.type === 'pdf' ? (
                 // Unlike the <img> above, resizing this iframe's CSS box
                 // doesn't make the browser's native PDF viewer re-render
                 // bigger — that viewer computes its "fit to width" once, at
@@ -664,10 +803,34 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 // keeps the previous page visible until the new one is ready.
                 <div className="w-full min-h-[780px] flex flex-col items-center">
                   <iframe
-                    src={`${activeAttachment.url}?z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
+                    // `activeAttachment.url` is a Supabase Storage signed URL
+                    // and already has its own `?token=<jwt>` query string —
+                    // appending `?z=` here (instead of `&`) would put a
+                    // second `?` in the URL, which browsers still treat as
+                    // part of the query string, corrupting the JWT (breaks
+                    // with "InvalidJWT: Failed to base64url decode the
+                    // signature"). `&` (or `?` only if there's no existing
+                    // query string) is required.
+                    src={`${activeAttachment.url}${activeAttachment.url.includes('?') ? '&' : '?'}z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
                     className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
                     title={activeAttachment.name}
                   />
+                </div>
+              ) : (
+                // Any other file type — the browser renders whatever it
+                // natively can inline (text, CSV, HTML, ...) and shows a
+                // blank frame for formats it can't (e.g. .docx/.xlsx); the
+                // Download button in the toolbar above is the fallback for
+                // those rather than blocking the attempt outright.
+                <div className="w-full h-full flex flex-col items-center gap-2">
+                  <iframe
+                    src={activeAttachment.url}
+                    className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
+                    title={activeAttachment.name}
+                  />
+                  <p className="text-[10px] text-slate-400 flex-shrink-0">
+                    Nothing showing? Use Download in the toolbar above — this file type may not be viewable in-browser.
+                  </p>
                 </div>
               )}
             </div>
@@ -711,14 +874,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
             {/* List items for this category */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {!apiToken ? (
-                <div className="px-4 py-12 text-center text-xs text-slate-400">
-                  Enter a Bearer Token above to load bills.
-                </div>
-              ) : billsLoading ? (
-                <div className="px-4 py-12 flex flex-col items-center gap-2 text-xs text-slate-400">
-                  <Loader2 size={18} className="animate-spin" />
-                  Loading bills...
+              {!token || billsLoading ? (
+                <div>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <BillListItemSkeleton key={i} />
+                  ))}
                 </div>
               ) : billsError ? (
                 <div className="px-4 py-12 flex flex-col items-center gap-3 text-center">
@@ -742,7 +902,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div
                     key={bill.id}
                     onClick={() => {
-                      setSelectedBillId(bill.id)
+                      selectBill(bill.id)
                       setMobileDetailOpen(true)
                     }}
                     className={cn(
@@ -778,15 +938,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             'md:block flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
           )}
         >
-          {!apiToken ? (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm text-center px-6">
-              Enter a Bearer Token above to load bills.
-            </div>
-          ) : billsLoading ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
-              <Loader2 size={20} className="animate-spin" />
-              Loading bills...
-            </div>
+          {!token || billsLoading ? (
+            <BillDetailSkeleton />
           ) : billsError ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
               <AlertCircle size={28} className="text-rose-500" />
@@ -844,23 +997,43 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedBill.status === 'Pending Approval' && (
                         <PermissionGuard action="bill:approve">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleApprove(selectedBill.id)}
-                              disabled={actionPendingId === selectedBill.id}
-                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
-                            >
-                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(selectedBill.id)}
-                              disabled={actionPendingId === selectedBill.id}
-                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                            >
-                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                              Reject
-                            </button>
+                          <div className="flex flex-col items-end gap-2 w-full md:w-80">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleApprove(selectedBill.id)}
+                                disabled={actionPendingId === selectedBill.id}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+                              >
+                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleReject(selectedBill.id)}
+                                disabled={actionPendingId === selectedBill.id}
+                                className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                              >
+                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                                Reject
+                              </button>
+                            </div>
+
+                            {/* Optional note sent as the `comment` field on
+                                whichever action is taken, and added to the
+                                audit trail — only shown while the bill is
+                                still awaiting a decision. */}
+                            <div className="w-full text-left">
+                              <textarea
+                                value={approvalComment}
+                                onChange={(e) => setApprovalComment(e.target.value)}
+                                disabled={actionPendingId === selectedBill.id}
+                                placeholder="Add an optional comment..."
+                                rows={2}
+                                className="w-full text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Sent with your decision and added to this bill&apos;s audit trail. Leave blank to approve or reject without a comment.
+                              </p>
+                            </div>
                           </div>
                         </PermissionGuard>
                       )}
@@ -935,12 +1108,15 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {isSelectedBillDetailLoading ? (
-                        <tr>
-                          <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-slate-400">
-                            <Loader2 size={16} className="inline animate-spin mr-2" />
-                            Loading line items...
-                          </td>
-                        </tr>
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <tr key={i}>
+                            {Array.from({ length: 8 }).map((__, j) => (
+                              <td key={j} className="px-3 md:px-4 py-3">
+                                <Skeleton className="h-4 w-full" />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
                       ) : detailError ? (
                         <tr>
                           <td colSpan={8} className="px-3 md:px-4 py-6 text-center text-rose-500">
@@ -963,8 +1139,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             </td>
                             <td className="px-3 md:px-4 py-3">{item.account}</td>
                             <td className="px-3 md:px-4 py-3">{item.tax}</td>
-                            <td className="px-3 md:px-4 py-3">* SM - Ryan Cotter</td>
-                            <td className="px-3 md:px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
+                            <td className="px-3 md:px-4 py-3">{item.smDept}</td>
+                            <td className="px-3 md:px-4 py-3">{item.siteTag}</td>
                             <td className="px-3 md:px-4 py-3 text-right font-semibold text-slate-800">
                               {formatCurrency(item.amount, selectedBill.currencyCode)}
                             </td>
@@ -1013,9 +1189,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 {openFilesCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
                     {isSelectedBillDetailLoading ? (
-                      <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin" />
-                        Loading attachments...
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Skeleton className="h-14 w-full rounded-xl" />
+                        <Skeleton className="h-14 w-full rounded-xl" />
                       </div>
                     ) : detailError ? (
                       <div className="text-xs text-rose-500 py-2">{detailError}</div>
@@ -1045,23 +1221,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                                   <p className="text-[10px] text-slate-400">{file.sizeMb} MB &middot; {fInfo.label}</p>
                                 </div>
                               </div>
-                              {fInfo.canPreview ? (
-                                <button
-                                  type="button"
-                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
-                                >
-                                  <Eye size={12} />
-                                  Preview
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-400 group-hover:border-amber-400 group-hover:text-amber-700 rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
-                                >
-                                  <Download size={12} />
-                                  Download
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
+                              >
+                                <Eye size={12} />
+                                Preview
+                              </button>
                             </div>
                           )
                         })}
@@ -1158,9 +1324,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </button>
 
                 {openAuditCard && isSelectedBillDetailLoading ? (
-                  <div className="text-xs text-slate-400 py-2 flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" />
-                    Loading audit trail...
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3 w-1/2" />
+                          <Skeleton className="h-3 w-1/4" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : openAuditCard && detailError ? (
                   <div className="text-xs text-rose-500 py-2">{detailError}</div>
@@ -1168,7 +1341,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div className="text-xs text-slate-400 py-2 italic">No activity recorded for this bill.</div>
                 ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
-                    {selectedBill.auditTrail.map((ev) => (
+                    {selectedBill.auditTrail.map((ev) => {
+                      // Comments fetched from the API carry `authorId`,
+                      // compared here (at render time) against the current
+                      // user rather than baked in at fetch time — the fetch
+                      // is cached per bill, and `user` can still be loading
+                      // when it first runs, so a comparison done then could
+                      // go stale. Locally-created comments (one you just
+                      // sent) set `isMine` directly instead, with no
+                      // `authorId` to compare.
+                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === user?.reference_id)
+
+                      return (
                       <div key={ev.id} className="relative group">
                         {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
                         <div
@@ -1184,7 +1368,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           <div
                             className={cn(
                               'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
-                              ev.isMine
+                              isMine
                                 ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
                                 : 'bg-slate-50 border-slate-100'
                             )}
@@ -1192,7 +1376,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             <div
                               className={cn(
                                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                ev.isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
+                                isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
                               )}
                             >
                               {ev.user?.[0] ?? 'U'}
@@ -1201,7 +1385,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                               <div
                                 className={cn(
                                   'flex items-center justify-between mb-1',
-                                  ev.isMine && 'flex-row-reverse'
+                                  isMine && 'flex-row-reverse'
                                 )}
                               >
                                 <span className="font-semibold text-slate-800">{ev.user}</span>
@@ -1211,21 +1395,47 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             </div>
                           </div>
                         ) : (
-                          <div className="text-xs space-y-0.5">
-                            <div className="font-medium text-slate-800">
-                              {ev.user && <span className="font-semibold text-slate-900">{ev.user}: </span>}
-                              {ev.title}
+                          // Action/system entries — a bordered card (matching
+                          // the comment bubbles' card treatment, rather than
+                          // floating unstyled text) with an optional
+                          // before -> after "changes" table and an optional
+                          // comment callout, both collapsible sections since
+                          // not every entry has either.
+                          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                            <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2">
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold text-slate-800">{ev.title}</div>
+                                {ev.user && (
+                                  <div className="text-[10px] text-slate-400 mt-0.5">By {ev.user}</div>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-400 flex-shrink-0 whitespace-nowrap">
+                                {ev.date}
+                              </span>
                             </div>
-                            <div className="text-[10px] text-slate-400">{ev.date}</div>
-                            {ev.notes && (
-                              <div className="text-slate-500 bg-slate-50 border border-slate-100 p-2 rounded-lg mt-1 italic">
-                                "{ev.notes}"
+
+                            {ev.changes && ev.changes.length > 0 && (
+                              <div className="border-t border-slate-100 divide-y divide-slate-100">
+                                {ev.changes.map((change, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center justify-between gap-3 px-3 py-2 text-[11px]"
+                                  >
+                                    <span className="text-slate-400 flex-shrink-0">{change.label}</span>
+                                    <span className="flex items-center gap-1.5 min-w-0 text-right">
+                                      <span className="text-slate-400 line-through truncate">{change.from}</span>
+                                      <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
+                                      <span className="text-slate-800 font-semibold truncate">{change.to}</span>
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : null}
               </div>
@@ -1239,21 +1449,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
                     placeholder="Leave a comment..."
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
+                    disabled={commentSending}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] disabled:opacity-60"
                   />
                   <button
                     type="button"
-                    onClick={() => toast('Attachment feature available soon', 'info')}
-                    className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <Paperclip size={18} />
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleSendComment}
-                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+                    disabled={commentSending || !commentText.trim()}
+                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
                   >
-                    <Send size={13} />
+                    {commentSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                     Send
                   </button>
                 </div>
