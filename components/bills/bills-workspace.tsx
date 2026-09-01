@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Search,
   Receipt,
@@ -177,6 +178,28 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // session token — no more manual entry.
   const { token, user } = useAuthStore()
 
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  // Local state (not searchParams.get('bill') directly) is what drives
+  // rendering — router.push/replace triggers a real Next.js navigation
+  // (an RSC round-trip, ~200ms+ even for a same-page query change), which
+  // made clicking a bill feel laggy when this read straight from the URL.
+  // The URL is still kept in sync (selectBill / the auto-select effect
+  // below) for deep-linking, just as a background side effect that
+  // doesn't block the click from rendering instantly.
+  const [selectedBillId, setSelectedBillIdState] = useState(() => searchParams.get('bill') ?? '')
+
+  // Keeps local state in sync when the URL changes from outside a click
+  // here — browser back/forward, or a pasted/bookmarked link. Deferred a
+  // tick per react-hooks/set-state-in-effect (see the fallback-selection
+  // effect below for why).
+  useEffect(() => {
+    const urlBillId = searchParams.get('bill') ?? ''
+    Promise.resolve().then(() => {
+      setSelectedBillIdState((prev) => (urlBillId && urlBillId !== prev ? urlBillId : prev))
+    })
+  }, [searchParams])
+
   const [bills, setBills] = useState<Bill[]>([])
   const [billsLoading, setBillsLoading] = useState(false)
   const [billsError, setBillsError] = useState<string | null>(null)
@@ -189,7 +212,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
   const [commentSending, setCommentSending] = useState(false)
@@ -283,6 +305,40 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     if (found) return found
     return filteredBills[0] ?? null
   }, [filteredBills, selectedBillId])
+
+  // Selecting a bill updates local state immediately (instant render) and
+  // syncs the URL in the background — router.push isn't awaited or relied
+  // on for anything visible, it's purely so the URL stays
+  // shareable/bookmarkable.
+  const selectBill = useCallback(
+    (id: string) => {
+      setSelectedBillIdState(id)
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('bill', id)
+      router.push(`?${params.toString()}`, { scroll: false })
+    },
+    [searchParams, router]
+  )
+
+  // Once the list loads, if there's no valid selection yet, fall back to
+  // the first bill — same instant-local/background-URL split as
+  // selectBill() above.
+  useEffect(() => {
+    if (bills.length === 0) return
+    if (selectedBillId && bills.some((b) => b.id === selectedBillId)) return
+
+    const fallbackId = filteredBills[0]?.id
+    if (!fallbackId) return
+
+    // Deferred a tick (not called synchronously in the effect body) per
+    // react-hooks/set-state-in-effect — resolves before paint, so there's
+    // no visible delay before the fallback selection shows.
+    Promise.resolve().then(() => setSelectedBillIdState(fallbackId))
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('bill', fallbackId)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [bills, filteredBills, selectedBillId, searchParams, router])
 
 
   // Fetch this bill's full detail (line items, attachments) plus its
@@ -821,7 +877,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div
                     key={bill.id}
                     onClick={() => {
-                      setSelectedBillId(bill.id)
+                      selectBill(bill.id)
                       setMobileDetailOpen(true)
                     }}
                     className={cn(
@@ -1356,13 +1412,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     disabled={commentSending}
                     className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] disabled:opacity-60"
                   />
-                  <button
-                    type="button"
-                    onClick={() => toast('Attachment feature available soon', 'info')}
-                    className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <Paperclip size={18} />
-                  </button>
                   <button
                     type="button"
                     onClick={handleSendComment}
