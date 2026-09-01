@@ -26,10 +26,16 @@ export interface ApiLineItem {
 
 export interface ApiAttachment {
   id: string
+  bill_id?: string | null
   file_name?: string | null
   mime_type?: string | null
   content_length?: number | null
-  url?: string | null // only present (if at all) on the single-attachment endpoint, not on bill detail
+  // Confirmed real field name (only present on the single-attachment
+  // endpoint, not on bill detail's `attachments[]`) — a short-lived Supabase
+  // Storage signed URL, expiring after `signed_url_ttl_sec` seconds
+  // (observed as 120s), not something to cache/reuse past that.
+  signed_url?: string | null
+  signed_url_ttl_sec?: number | null
 }
 
 export interface ApiBill {

@@ -142,7 +142,7 @@ export function mapApiAttachmentToFile(a: ApiAttachment): BillFile {
     type,
     // Bill detail only gives storage location, not a usable URL — resolved
     // lazily via getBillAttachment() when the user clicks Preview.
-    url: a.url ?? '',
+    url: a.signed_url ?? '',
   }
 }
 

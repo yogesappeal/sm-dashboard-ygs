@@ -91,7 +91,12 @@ function getFileTypeInfo(file: BillFile) {
     icon: ext === 'XLSX' || ext === 'CSV' ? FileSpreadsheet : FileQuestion,
     colorClass: 'bg-amber-50 text-amber-700',
     badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
-    canPreview: false,
+    // Every type gets an attempted inline preview now (via <iframe> — see
+    // the "other" render branch) rather than being blocked outright; the
+    // browser renders what it natively can (PDF, images, text, CSV, HTML)
+    // and shows nothing for formats it can't (e.g. .docx/.xlsx), so the
+    // Download button next to the preview stays the fallback for those.
+    canPreview: true,
   }
 }
 
@@ -595,7 +600,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       try {
         const json = await getBillAttachment(token, selectedBill.id, file.id)
         const apiAttachment = unwrapApiData(json)
-        const resolvedUrl = apiAttachment.url ?? ''
+        const resolvedUrl = apiAttachment.signed_url ?? ''
         if (!resolvedUrl) throw new Error('No preview URL returned for this attachment')
 
         setBills((prev) =>
@@ -686,9 +691,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </span>
               </div>
 
-              {/* Zoom & Action Controls */}
+              {/* Zoom & Action Controls — only meaningful for PDF (URL zoom
+                  param) and images (width-based zoom); the generic iframe
+                  used for every other file type doesn't respond to this. */}
               <div className="flex items-center gap-1 flex-shrink-0">
-                {activeTypeInfo?.canPreview && (
+                {(activeAttachment?.type === 'pdf' || activeAttachment?.type === 'image') && (
                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
                     <button
                       type="button"
@@ -710,6 +717,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       +
                     </button>
                   </div>
+                )}
+                {activeAttachment?.url && (
+                  <a
+                    href={activeAttachment.url}
+                    download={activeAttachment.name}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </a>
                 )}
                 <button
                   type="button"
@@ -746,24 +765,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </div>
               ) : !activeAttachment || !activeTypeInfo ? (
                 <div className="m-auto text-xs text-slate-400">No document available to preview</div>
-              ) : !activeTypeInfo.canPreview ? (
-                <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 border border-amber-100">
-                    <activeTypeInfo.icon size={28} />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900 mb-1">Preview Not Available</h3>
-                  <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                    <strong className="text-slate-700 font-mono">{activeAttachment.name}</strong> can&apos;t be previewed inline. Only PDF and image files are supported.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => toast(`Downloading ${activeAttachment.name}...`, 'info')}
-                    className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
-                  >
-                    <Download size={13} />
-                    Download File
-                  </button>
-                </div>
               ) : activeTypeInfo.icon === ImageIcon ? (
                 // Zoom is a percentage of the panel's own width (not a fixed
                 // px base) so 100% always fills the available canvas exactly
@@ -784,7 +785,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     className="w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
                   />
                 </div>
-              ) : (
+              ) : activeAttachment.type === 'pdf' ? (
                 // Unlike the <img> above, resizing this iframe's CSS box
                 // doesn't make the browser's native PDF viewer re-render
                 // bigger — that viewer computes its "fit to width" once, at
@@ -802,10 +803,34 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 // keeps the previous page visible until the new one is ready.
                 <div className="w-full min-h-[780px] flex flex-col items-center">
                   <iframe
-                    src={`${activeAttachment.url}?z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
+                    // `activeAttachment.url` is a Supabase Storage signed URL
+                    // and already has its own `?token=<jwt>` query string —
+                    // appending `?z=` here (instead of `&`) would put a
+                    // second `?` in the URL, which browsers still treat as
+                    // part of the query string, corrupting the JWT (breaks
+                    // with "InvalidJWT: Failed to base64url decode the
+                    // signature"). `&` (or `?` only if there's no existing
+                    // query string) is required.
+                    src={`${activeAttachment.url}${activeAttachment.url.includes('?') ? '&' : '?'}z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
                     className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
                     title={activeAttachment.name}
                   />
+                </div>
+              ) : (
+                // Any other file type — the browser renders whatever it
+                // natively can inline (text, CSV, HTML, ...) and shows a
+                // blank frame for formats it can't (e.g. .docx/.xlsx); the
+                // Download button in the toolbar above is the fallback for
+                // those rather than blocking the attempt outright.
+                <div className="w-full h-full flex flex-col items-center gap-2">
+                  <iframe
+                    src={activeAttachment.url}
+                    className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
+                    title={activeAttachment.name}
+                  />
+                  <p className="text-[10px] text-slate-400 flex-shrink-0">
+                    Nothing showing? Use Download in the toolbar above — this file type may not be viewable in-browser.
+                  </p>
                 </div>
               )}
             </div>
@@ -1196,23 +1221,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                                   <p className="text-[10px] text-slate-400">{file.sizeMb} MB &middot; {fInfo.label}</p>
                                 </div>
                               </div>
-                              {fInfo.canPreview ? (
-                                <button
-                                  type="button"
-                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
-                                >
-                                  <Eye size={12} />
-                                  Preview
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-400 group-hover:border-amber-400 group-hover:text-amber-700 rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
-                                >
-                                  <Download size={12} />
-                                  Download
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
+                              >
+                                <Eye size={12} />
+                                Preview
+                              </button>
                             </div>
                           )
                         })}
