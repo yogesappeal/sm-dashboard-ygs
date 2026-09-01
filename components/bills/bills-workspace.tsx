@@ -1035,8 +1035,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             </td>
                             <td className="px-3 md:px-4 py-3">{item.account}</td>
                             <td className="px-3 md:px-4 py-3">{item.tax}</td>
-                            <td className="px-3 md:px-4 py-3">* SM - Ryan Cotter</td>
-                            <td className="px-3 md:px-4 py-3">{selectedBill.supplierName} ({selectedBill.address})</td>
+                            <td className="px-3 md:px-4 py-3">{item.smDept}</td>
+                            <td className="px-3 md:px-4 py-3">{item.siteTag}</td>
                             <td className="px-3 md:px-4 py-3 text-right font-semibold text-slate-800">
                               {formatCurrency(item.amount, selectedBill.currencyCode)}
                             </td>

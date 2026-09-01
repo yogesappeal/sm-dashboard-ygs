@@ -6,6 +6,13 @@
 // anything missing as absent rather than assume it exists.
 // ---------------------------------------------------------------------------
 
+export interface ApiTrackingEntry {
+  tracking_option_id?: string | null
+  tracking_category_id?: string | null
+  tracking_option_name?: string | null
+  tracking_category_name?: string | null
+}
+
 export interface ApiLineItem {
   id: string
   description?: string | null
@@ -14,6 +21,7 @@ export interface ApiLineItem {
   line_amount?: number | null
   tax_amount?: number | null
   account_code?: string | null
+  tracking?: ApiTrackingEntry[]
 }
 
 export interface ApiAttachment {
@@ -109,6 +117,11 @@ export interface LineItem {
   account: string
   tax: string
   amount: number
+  // From line_items[].tracking[] — matched by tracking_category_name (see
+  // mapApiLineItemToLineItem in lib/api/bills.ts), not guaranteed to be
+  // present for every line item.
+  smDept: string
+  siteTag: string
 }
 
 export interface AuditTrailEvent {

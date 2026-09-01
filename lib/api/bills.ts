@@ -5,6 +5,7 @@ import type {
   ApiAuditLogEntry,
   ApiBill,
   ApiComment,
+  ApiLineItem,
   AuditTrailEvent,
   Bill,
   BillFile,
@@ -138,6 +139,17 @@ export function mapApiAttachmentToFile(a: ApiAttachment): BillFile {
   }
 }
 
+// tracking_category_name has been observed as both "SM Dept"/"Site Tag" and
+// "SM/Dept"/"Site/Tag" across samples — normalized (strip spaces & slashes,
+// lowercase) before matching so either form resolves correctly.
+function findTrackingOptionName(tracking: ApiLineItem['tracking'], categoryKeyword: string): string {
+  const match = (tracking ?? []).find((t) => {
+    const normalized = (t.tracking_category_name ?? '').toLowerCase().replace(/[\s/]/g, '')
+    return normalized.includes(categoryKeyword)
+  })
+  return match?.tracking_option_name ?? NO_DATA
+}
+
 // `existing` carries over anything this mapper can't derive from an
 // ApiBill alone (approvers and auditTrail — neither is part of this API;
 // auditTrail is populated separately from getBillActivities()).
@@ -159,6 +171,8 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
       account: li.account_code ?? NO_DATA,
       tax: li.tax_amount != null ? formatCurrencyAmount(li.tax_amount, api.currency_code) : NO_DATA,
       amount: li.line_amount ?? 0,
+      smDept: findTrackingOptionName(li.tracking, 'smdept'),
+      siteTag: findTrackingOptionName(li.tracking, 'sitetag'),
     })),
     files: (api.attachments ?? []).map(mapApiAttachmentToFile),
     approvers: existing?.approvers ?? [], // not provided by this API
