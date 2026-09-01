@@ -38,10 +38,20 @@ export interface ApiAttachment {
   signed_url_ttl_sec?: number | null
 }
 
+export interface ApiContact {
+  id: string
+  name?: string | null
+  email?: string | null
+  contact_status?: string | null
+}
+
 export interface ApiBill {
   id: string
+  // Confirmed real shape: a nested `contact` object, not a flat
+  // `contact_name` string — `contact_id` kept as a fallback in case some
+  // responses only send that.
+  contact?: ApiContact | null
   contact_id?: string | null
-  contact_name?: string | null
   external_bill_number?: string | null
   reference?: string | null
   external_status?: string | null

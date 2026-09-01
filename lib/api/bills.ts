@@ -164,7 +164,7 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   return {
     id: api.id,
     billNumber: api.external_bill_number ?? api.reference ?? NO_DATA,
-    supplierName: api.contact_name ?? NO_DATA,
+    supplierName: api.contact?.name ?? NO_DATA,
     address: NO_DATA, // never provided by this API — would need a separate Contacts lookup by contact_id
     issueDate: formatApiDate(api.bill_date),
     dueDate: formatApiDate(api.due_date),
