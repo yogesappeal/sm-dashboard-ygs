@@ -47,15 +47,16 @@ export async function getBillAttachment(token: string, billId: string, attachmen
   )
 }
 
-// The API requires a `comment` field on both endpoints, but the UI doesn't
-// collect one for approve/reject (the "Leave a comment" box is a separate,
-// local-only audit-trail note) — sent empty rather than a fabricated value.
-export async function approveBill(token: string, billId: string) {
-  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/approve`, token, { comment: '' })
+// The API requires a `comment` field on both endpoints — collected from the
+// optional comment box shown under Approve/Reject while a bill is still
+// pending (see bills-workspace.tsx); sent empty when left blank rather than
+// a fabricated value.
+export async function approveBill(token: string, billId: string, comment = '') {
+  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/approve`, token, { comment })
 }
 
-export async function rejectBill(token: string, billId: string) {
-  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/reject`, token, { comment: '' })
+export async function rejectBill(token: string, billId: string, comment = '') {
+  return billsApi.post<unknown>(`/functions/v1/bills/${billId}/reject`, token, { comment })
 }
 
 // ---------------------------------------------------------------------------

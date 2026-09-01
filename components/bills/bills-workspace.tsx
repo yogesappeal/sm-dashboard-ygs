@@ -193,6 +193,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
 
+  // Optional note shown under Approve/Reject while a bill is still pending
+  // — sent as the `comment` field on whichever action is taken, separate
+  // from `commentText` above (the always-visible "Leave a comment" box,
+  // which only ever posts a local audit-trail note).
+  const [approvalComment, setApprovalComment] = useState('')
+
   // Which bill currently has an approve/reject request in flight — disables
   // both buttons on that bill only, so switching to another bill isn't
   // blocked by an unrelated pending action.
@@ -382,8 +388,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     async (id: string) => {
       if (!canApproveBills || !apiToken) return
       setActionPendingId(id)
+      const comment = approvalComment.trim()
       try {
-        await approveBill(apiToken, id)
+        await approveBill(apiToken, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -399,11 +406,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   title: 'Approved for payment',
                   user: 'Current User',
                   date: `${nowStr} via Web`,
+                  notes: comment || undefined,
                 },
               ],
             }
           })
         )
+        setApprovalComment('')
         toast('Bill approved successfully!', 'success')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
@@ -411,15 +420,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken]
+    [toast, canApproveBills, apiToken, approvalComment]
   )
 
   const handleReject = useCallback(
     async (id: string) => {
       if (!canApproveBills || !apiToken) return
       setActionPendingId(id)
+      const comment = approvalComment.trim()
       try {
-        await rejectBill(apiToken, id)
+        await rejectBill(apiToken, id, comment)
         setBills((prev) =>
           prev.map((b) => {
             if (b.id !== id) return b
@@ -435,11 +445,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   title: 'Rejected bill',
                   user: 'Current User',
                   date: `${nowStr} via Web`,
+                  notes: comment || undefined,
                 },
               ],
             }
           })
         )
+        setApprovalComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to reject bill', 'error')
@@ -447,7 +459,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, apiToken]
+    [toast, canApproveBills, apiToken, approvalComment]
   )
 
   const handleSendComment = useCallback(() => {
@@ -912,23 +924,43 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedBill.status === 'Pending Approval' && (
                         <PermissionGuard action="bill:approve">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleApprove(selectedBill.id)}
-                              disabled={actionPendingId === selectedBill.id}
-                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
-                            >
-                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(selectedBill.id)}
-                              disabled={actionPendingId === selectedBill.id}
-                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                            >
-                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                              Reject
-                            </button>
+                          <div className="flex flex-col items-end gap-2 w-full md:w-80">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleApprove(selectedBill.id)}
+                                disabled={actionPendingId === selectedBill.id}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+                              >
+                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleReject(selectedBill.id)}
+                                disabled={actionPendingId === selectedBill.id}
+                                className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                              >
+                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                                Reject
+                              </button>
+                            </div>
+
+                            {/* Optional note sent as the `comment` field on
+                                whichever action is taken, and added to the
+                                audit trail — only shown while the bill is
+                                still awaiting a decision. */}
+                            <div className="w-full text-left">
+                              <textarea
+                                value={approvalComment}
+                                onChange={(e) => setApprovalComment(e.target.value)}
+                                disabled={actionPendingId === selectedBill.id}
+                                placeholder="Add an optional comment..."
+                                rows={2}
+                                className="w-full text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Sent with your decision and added to this bill&apos;s audit trail. Leave blank to approve or reject without a comment.
+                              </p>
+                            </div>
                           </div>
                         </PermissionGuard>
                       )}
