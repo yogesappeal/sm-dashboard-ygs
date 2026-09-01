@@ -66,11 +66,19 @@ export interface ApiApprovalRunRef {
   status?: string | null
 }
 
+export interface ApiAuthor {
+  id: string
+  name?: string | null
+}
+
 export interface ApiComment {
   id: string
   bill_id?: string | null
-  approval_run_id?: ApiApprovalRunRef | null
-  author_user_id?: string | null
+  // Confirmed real shape: a plain string id, not the nested
+  // {id, attempt_number, status} object seen elsewhere — kept as `string`
+  // here since audit-log entries still use the nested ApiApprovalRunRef.
+  approval_run_id?: string | null
+  author?: ApiAuthor | null
   body?: string | null
   created_at?: string | null
   updated_at?: string | null
@@ -133,7 +141,12 @@ export interface AuditTrailEvent {
   user?: string
   userAvatar?: string
   notes?: string
-  isMine?: boolean // comment authored by the current user — right-aligned bubble
+  isMine?: boolean // set directly for locally-created comments (e.g. one just sent)
+  // For comments fetched from the API — the author's id, compared against
+  // the current user at render time (see bills-workspace.tsx) rather than
+  // baked into `isMine` here, since this data is cached once fetched and
+  // the current user can still be loading when that fetch first happens.
+  authorId?: string
 }
 
 export interface BillFile {

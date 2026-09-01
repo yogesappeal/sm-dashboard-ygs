@@ -1,6 +1,5 @@
 import { api } from './fetcher'
 import type {
-  ApiActivities,
   ApiAttachment,
   ApiAuditLogEntry,
   ApiBill,
@@ -37,8 +36,16 @@ export async function getBillDetail(token: string, billId: string) {
   return api.get<MaybeWrapped<ApiBill>>(`/functions/v1/bills/${billId}?is_dummy=false`, token)
 }
 
-export async function getBillActivities(token: string, billId: string) {
-  return api.get<MaybeWrapped<ApiActivities>>(`/functions/v1/bills/${billId}/activities`, token)
+export async function getBillComments(token: string, billId: string) {
+  return api.get<MaybeWrapped<ApiComment[]>>(`/functions/v1/bills/${billId}/comments`, token)
+}
+
+export async function postBillComment(token: string, billId: string, body: string) {
+  return api.post<unknown>(`/functions/v1/bills/${billId}/comments`, token, { body })
+}
+
+export async function getBillAuditLog(token: string, billId: string) {
+  return api.get<MaybeWrapped<ApiAuditLogEntry[]>>(`/functions/v1/bills/${billId}/audit-log`, token)
 }
 
 export async function getBillAttachment(token: string, billId: string, attachmentId: string) {
@@ -152,7 +159,7 @@ function findTrackingOptionName(tracking: ApiLineItem['tracking'], categoryKeywo
 
 // `existing` carries over anything this mapper can't derive from an
 // ApiBill alone (approvers and auditTrail — neither is part of this API;
-// auditTrail is populated separately from getBillActivities()).
+// auditTrail is populated separately from getBillComments()/getBillAuditLog()).
 export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   return {
     id: api.id,
@@ -187,14 +194,19 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   }
 }
 
+// `authorId` is compared against the current user at render time (see
+// bills-workspace.tsx) rather than resolved to `isMine` here — this data
+// gets cached once fetched, and the current user can still be loading when
+// that fetch first happens, so baking in a stale comparison would stick.
 function mapApiCommentToAuditEvent(c: ApiComment): AuditTrailEvent {
   return {
     id: c.id,
     type: 'comment',
     title: NO_DATA, // unused for the 'comment' branch in the audit trail UI
     date: formatApiDateTime(c.created_at),
-    user: c.author_user_id ?? undefined,
+    user: c.author?.name ?? undefined,
     notes: c.body ?? NO_DATA,
+    authorId: c.author?.id ?? undefined,
   }
 }
 
@@ -226,16 +238,19 @@ function mapApiAuditLogToAuditEvent(a: ApiAuditLogEntry): AuditTrailEvent {
   }
 }
 
-// Comments and audit-log entries are separate lists in the API response —
-// merged here into the single chronological feed the Audit Trail card
-// renders, sorted oldest-first by raw timestamp (not the formatted date
-// string, since formatting loses sort order).
-export function mapApiActivitiesToAuditTrail(activities: ApiActivities): AuditTrailEvent[] {
-  const commentEntries = (activities.comments ?? []).map((c) => ({
+// Comments (GET .../comments) and audit-log entries (GET .../audit-log) are
+// two separate endpoints — merged here into the single chronological feed
+// the Audit Trail card renders, sorted oldest-first by raw timestamp (not
+// the formatted date string, since formatting loses sort order).
+export function mapCommentsAndAuditLogToAuditTrail(
+  comments: ApiComment[],
+  auditLog: ApiAuditLogEntry[]
+): AuditTrailEvent[] {
+  const commentEntries = comments.map((c) => ({
     raw: c.created_at,
     event: mapApiCommentToAuditEvent(c),
   }))
-  const auditLogEntries = (activities.audit_log ?? []).map((a) => ({
+  const auditLogEntries = auditLog.map((a) => ({
     raw: a.created_at,
     event: mapApiAuditLogToAuditEvent(a),
   }))

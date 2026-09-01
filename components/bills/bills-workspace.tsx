@@ -42,17 +42,19 @@ import { useAuthStore } from '@/lib/store'
 import {
   getBills,
   getBillDetail,
-  getBillActivities,
+  getBillComments,
+  getBillAuditLog,
+  postBillComment,
   getBillAttachment,
   approveBill,
   rejectBill,
   mapApiBillToBill,
-  mapApiActivitiesToAuditTrail,
+  mapCommentsAndAuditLogToAuditTrail,
   unwrapApiData,
   formatCurrencyAmount,
   NO_DATA,
 } from '@/lib/api'
-import type { Bill, BillFile, AuditTrailEvent, ApiActivities, BillScope } from '@/lib/types'
+import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
@@ -173,7 +175,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Bills now lives on the same Supabase project as the rest of the app
   // (NEXT_PUBLIC_SUPABASE_URL) and accepts the app's own authenticated
   // session token — no more manual entry.
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
 
   const [bills, setBills] = useState<Bill[]>([])
   const [billsLoading, setBillsLoading] = useState(false)
@@ -190,6 +192,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [selectedBillId, setSelectedBillId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [commentText, setCommentText] = useState('')
+  const [commentSending, setCommentSending] = useState(false)
 
   // Optional note shown under Approve/Reject while a bill is still pending
   // — sent as the `comment` field on whichever action is taken, separate
@@ -282,10 +285,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   }, [filteredBills, selectedBillId])
 
 
-  // Fetch this bill's full detail (line items, attachments) and activity
-  // log the first time it's selected, then cache — getBillDetail() and
-  // getBillActivities() in parallel. Activities failing independently
-  // doesn't block the rest of the detail from showing.
+  // Fetch this bill's full detail (line items, attachments) plus its
+  // comments and audit log the first time it's selected, then cache —
+  // getBillDetail(), getBillComments(), and getBillAuditLog() in parallel.
+  // Comments/audit-log each fail independently (defaulting to []) so one
+  // failing doesn't block the rest of the detail from showing.
   useEffect(() => {
     const id = selectedBill?.id
     if (!id || !token || detailLoadedIds.has(id)) return
@@ -300,19 +304,24 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
     Promise.all([
       getBillDetail(token, id),
-      getBillActivities(token, id).catch(() => ({}) as ApiActivities),
+      getBillComments(token, id).catch(() => [] as ApiComment[]),
+      getBillAuditLog(token, id).catch(() => [] as ApiAuditLogEntry[]),
     ])
-      .then(([billJson, activitiesJson]) => {
+      .then(([billJson, commentsJson, auditLogJson]) => {
         if (cancelled) return
         const apiBill = unwrapApiData(billJson)
-        const activities = unwrapApiData(activitiesJson) ?? {}
+        const comments = unwrapApiData(commentsJson)
+        const auditLog = unwrapApiData(auditLogJson)
 
         setBills((prev) =>
           prev.map((b) =>
             b.id === id
               ? {
                   ...mapApiBillToBill(apiBill, b),
-                  auditTrail: mapApiActivitiesToAuditTrail(activities),
+                  auditTrail: mapCommentsAndAuditLogToAuditTrail(
+                    Array.isArray(comments) ? comments : [],
+                    Array.isArray(auditLog) ? auditLog : []
+                  ),
                 }
               : b
           )
@@ -460,33 +469,47 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     [toast, canApproveBills, token, approvalComment]
   )
 
-  const handleSendComment = useCallback(() => {
-    if (!commentText.trim() || !selectedBill) return
-    const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-    const newComment: AuditTrailEvent = {
-      id: `at-${Date.now()}`,
-      type: 'comment',
-      title: 'Comment',
-      user: 'Ryan Cotter',
-      notes: commentText.trim(),
-      date: `${nowStr} via Web`,
-      isMine: true,
-    }
+  // Posts to GET/POST .../comments, then appends the comment locally on
+  // success (the endpoint's response shape for the created comment isn't
+  // confirmed, so this mirrors the approve/reject pattern of updating state
+  // from what we sent rather than parsing the response).
+  const handleSendComment = useCallback(async () => {
+    const body = commentText.trim()
+    if (!body || !selectedBill || !token) return
 
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === selectedBill.id) {
-          return {
-            ...b,
-            auditTrail: [...b.auditTrail, newComment],
+    setCommentSending(true)
+    try {
+      await postBillComment(token, selectedBill.id, body)
+      const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+      const newComment: AuditTrailEvent = {
+        id: `at-${Date.now()}`,
+        type: 'comment',
+        title: 'Comment',
+        user: 'You',
+        notes: body,
+        date: `${nowStr} via Web`,
+        isMine: true,
+      }
+
+      setBills((prev) =>
+        prev.map((b) => {
+          if (b.id === selectedBill.id) {
+            return {
+              ...b,
+              auditTrail: [...b.auditTrail, newComment],
+            }
           }
-        }
-        return b
-      })
-    )
-    setCommentText('')
-    toast('Comment added to audit trail', 'info')
-  }, [commentText, selectedBill, toast])
+          return b
+        })
+      )
+      setCommentText('')
+      toast('Comment added to audit trail', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to send comment', 'error')
+    } finally {
+      setCommentSending(false)
+    }
+  }, [commentText, selectedBill, token, toast])
 
   // Opens the preview panel immediately; if the file's URL hasn't been
   // resolved yet (bill detail only gives storage location, not a URL),
@@ -1247,7 +1270,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div className="text-xs text-slate-400 py-2 italic">No activity recorded for this bill.</div>
                 ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
-                    {selectedBill.auditTrail.map((ev) => (
+                    {selectedBill.auditTrail.map((ev) => {
+                      // Comments fetched from the API carry `authorId`,
+                      // compared here (at render time) against the current
+                      // user rather than baked in at fetch time — the fetch
+                      // is cached per bill, and `user` can still be loading
+                      // when it first runs, so a comparison done then could
+                      // go stale. Locally-created comments (one you just
+                      // sent) set `isMine` directly instead, with no
+                      // `authorId` to compare.
+                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === user?.reference_id)
+
+                      return (
                       <div key={ev.id} className="relative group">
                         {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
                         <div
@@ -1263,7 +1297,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           <div
                             className={cn(
                               'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
-                              ev.isMine
+                              isMine
                                 ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
                                 : 'bg-slate-50 border-slate-100'
                             )}
@@ -1271,7 +1305,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             <div
                               className={cn(
                                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                ev.isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
+                                isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
                               )}
                             >
                               {ev.user?.[0] ?? 'U'}
@@ -1280,7 +1314,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                               <div
                                 className={cn(
                                   'flex items-center justify-between mb-1',
-                                  ev.isMine && 'flex-row-reverse'
+                                  isMine && 'flex-row-reverse'
                                 )}
                               >
                                 <span className="font-semibold text-slate-800">{ev.user}</span>
@@ -1304,7 +1338,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : null}
               </div>
@@ -1318,7 +1353,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
                     placeholder="Leave a comment..."
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
+                    disabled={commentSending}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -1330,9 +1366,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <button
                     type="button"
                     onClick={handleSendComment}
-                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+                    disabled={commentSending || !commentText.trim()}
+                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
                   >
-                    <Send size={13} />
+                    {commentSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                     Send
                   </button>
                 </div>
