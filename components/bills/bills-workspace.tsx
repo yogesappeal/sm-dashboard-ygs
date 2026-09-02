@@ -55,9 +55,43 @@ import {
   unwrapApiData,
   formatCurrencyAmount,
   NO_DATA,
+  ApiError,
 } from '@/lib/api'
 import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope, Assignment } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+// Every failed API call in this file surfaces its error via `err.message` —
+// for an ApiError (see lib/api/fetcher.ts) that's the raw HTTP response
+// body (a Postgres/edge-function error string, a JSON blob, sometimes an
+// HTML error page), never meant for a Site Manager to read. This maps the
+// handful of statuses worth distinguishing to plain-language copy, and
+// falls back to the caller's own generic message (e.g. "Failed to load
+// bills") for anything else — never the raw body.
+function getFriendlyErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    switch (err.status) {
+      case 401:
+      case 403:
+        return 'Your session has expired or you don’t have permission to do this. Please log in again.'
+      case 404:
+        return 'This bill could not be found — it may have been removed.'
+      case 408:
+        return 'The request took too long. Please try again.'
+      case 429:
+        return 'Too many requests — please wait a moment and try again.'
+      default:
+        return err.status >= 500
+          ? 'Something went wrong on our end. Please try again shortly.'
+          : fallback
+    }
+  }
+  if (err instanceof TypeError) {
+    // fetch() rejects with a plain TypeError on a network failure (offline,
+    // DNS, CORS) — its message ("Failed to fetch") is just as unhelpful.
+    return 'Network error — please check your connection and try again.'
+  }
+  return fallback
+}
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
 // the icon + colors the Files & Attachments card renders it with, and
@@ -291,7 +325,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       })
       .catch((err) => {
         if (cancelled) return
-        setBillsError(err instanceof Error ? err.message : 'Failed to load bills')
+        setBillsError(getFriendlyErrorMessage(err, 'Failed to load bills'))
       })
       .finally(() => {
         if (!cancelled) setBillsLoading(false)
@@ -380,7 +414,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       })
       .catch((err) => {
         if (cancelled) return
-        setDetailError(err instanceof Error ? err.message : 'Failed to load bill details')
+        setDetailError(getFriendlyErrorMessage(err, 'Failed to load bill details'))
       })
       .finally(() => {
         if (!cancelled) setDetailLoading(false)
@@ -470,7 +504,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         )
         toast('Bill approved successfully!', 'success')
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
+        toast(getFriendlyErrorMessage(err, 'Failed to approve bill'), 'error')
       } finally {
         setActionPendingId(null)
       }
@@ -508,7 +542,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setRejectDialogComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Failed to reject bill', 'error')
+        toast(getFriendlyErrorMessage(err, 'Failed to reject bill'), 'error')
       } finally {
         setActionPendingId(null)
       }
@@ -552,7 +586,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       setCommentText('')
       toast('Comment added to audit trail', 'info')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to send comment', 'error')
+      toast(getFriendlyErrorMessage(err, 'Failed to send comment'), 'error')
     } finally {
       setCommentSending(false)
     }
@@ -598,7 +632,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         )
         toast(`Loaded ${file.name} on left side`, 'info')
       } catch (err) {
-        setAttachmentUrlError(err instanceof Error ? err.message : 'Failed to load attachment')
+        setAttachmentUrlError(getFriendlyErrorMessage(err, 'Failed to load attachment'))
         toast(`Couldn't load ${file.name}`, 'error')
       } finally {
         setAttachmentUrlLoading(false)
