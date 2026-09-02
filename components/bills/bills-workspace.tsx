@@ -229,12 +229,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
   // Approve/Reject now confirm via ConfirmDialog (components/ui/confirm-dialog.tsx
   // — the same one purchase-orders/suppliers/tasks already use) instead of
-  // acting immediately on click. Each dialog has its own comment field
-  // (sent as the `comment` field on the mutation, separate from
-  // `commentText` below, the always-visible "Leave a comment" box, which
-  // only ever posts a local audit-trail note).
+  // acting immediately on click. Approve is a plain yes/no — only Reject
+  // requires a comment (sent as the `comment` field on the mutation,
+  // separate from `commentText` below, the always-visible "Leave a comment"
+  // box, which only ever posts a local audit-trail note).
   const [confirmDialog, setConfirmDialog] = useState<{ type: 'approve' | 'reject'; billId: string } | null>(null)
-  const [approveDialogComment, setApproveDialogComment] = useState('')
   const [rejectDialogComment, setRejectDialogComment] = useState('')
 
   // Accordion state for Right Detail sections
@@ -1057,20 +1056,11 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
                 onConfirm={async () => {
                   if (!confirmDialog) return
-                  await handleApprove(confirmDialog.billId, approveDialogComment.trim())
-                  setApproveDialogComment('')
+                  await handleApprove(confirmDialog.billId, '')
                   setConfirmDialog(null)
                 }}
                 onCancel={() => setConfirmDialog(null)}
-              >
-                <textarea
-                  value={approveDialogComment}
-                  onChange={(e) => setApproveDialogComment(e.target.value)}
-                  placeholder="Add an optional comment..."
-                  rows={3}
-                  className="w-full text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none"
-                />
-              </ConfirmDialog>
+              />
 
               <ConfirmDialog
                 open={confirmDialog?.type === 'reject'}
