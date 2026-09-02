@@ -27,10 +27,9 @@ import {
   Receipt,
 } from 'lucide-react'
 import type { UserDetails } from '@/lib/types'
+import { LOGO_MINI_URL, COMPANY_ALT_TEXT } from '@/lib/branding'
 
 const FEATURE_TASK = process.env.NEXT_PUBLIC_FEATURE_TASK === 'true'
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-const LOGO_URL = `${SUPABASE_URL}/storage/v1/object/public/assets/company-logos/mini_logo_ah.png`
 
 interface NavSubItem {
   label: string
@@ -238,8 +237,8 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
               isParentActive
-                ? 'bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20'
-                : 'text-[#667085] hover:text-slate-800 hover:bg-slate-100',
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-sidebar-text hover:text-slate-800 hover:bg-slate-100',
               collapsed && 'justify-center px-2'
             )}
           >
@@ -356,11 +355,11 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
       >
         {avatarUrl ? (
           <div className="relative w-8 h-8 flex-shrink-0">
-            <Image src={avatarUrl} alt={displayName} fill sizes="32px" className="rounded-full object-cover ring-2 ring-[#6692C5]/30" />
+            <Image src={avatarUrl} alt={displayName} fill sizes="32px" className="rounded-full object-cover ring-2 ring-primary/30" />
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-[#6692C5] text-xs font-semibold">{initials}</span>
+          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-primary text-xs font-semibold">{initials}</span>
           </div>
         )}
         {!collapsed && (
@@ -395,8 +394,8 @@ export function Sidebar() {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-            <span className="text-slate-800 font-semibold text-sm">SM Approval</span>
+            <Image src={LOGO_MINI_URL} alt={COMPANY_ALT_TEXT} width={32} height={32} className="rounded-lg flex-shrink-0" />
+            <span className="text-slate-800 font-semibold text-sm">SM Dashboard</span>
           </div>
           <button onClick={closeMobile} className="p-1 text-slate-400 hover:text-slate-700 transition-colors">
             <X size={18} />
@@ -417,11 +416,11 @@ export function Sidebar() {
         <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5">
-              <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-              <span className="text-slate-800 font-semibold text-sm truncate">SM Approval</span>
+              <Image src={LOGO_MINI_URL} alt={COMPANY_ALT_TEXT} width={32} height={32} className="rounded-lg flex-shrink-0" />
+              <span className="text-slate-800 font-semibold text-sm truncate">SM Dashboard</span>
             </div>
           ) : (
-            <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg mx-auto" />
+            <Image src={LOGO_MINI_URL} alt={COMPANY_ALT_TEXT} width={32} height={32} className="rounded-lg mx-auto" />
           )}
           {sidebarOpen && (
             <button onClick={toggleSidebar} className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">

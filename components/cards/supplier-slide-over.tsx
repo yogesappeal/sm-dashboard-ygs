@@ -8,6 +8,7 @@ import { X, Building2, Mail, Phone, MapPin, FileText, Edit2, Check, Loader2 } fr
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { updateSupplierStatus, updateSupplierData } from '@/lib/api'
+import { COMPANY_NAME } from '@/lib/branding'
 import { supplierSchema } from '@/lib/utils/validation'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
@@ -51,7 +52,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
 
   const updateMutation = useMutation({
     mutationFn: (data: SupplierForm) =>
-      updateSupplierData(token, { supplier: supplier!.id, ...data, company: supplier!.company || 'AusHail' }),
+      updateSupplierData(token, { supplier: supplier!.id, ...data, company: supplier!.company || COMPANY_NAME }),
     onSuccess: () => {
       toast(messages.supplier.updateSuccess, 'success')
       setIsEditing(false)
@@ -104,7 +105,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
             <PermissionGuard action="supplier:edit">
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6692C5] border border-[#6692C5] rounded-lg hover:bg-[#6692C5]/5 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
               >
                 <Edit2 size={14} />
                 Edit
@@ -165,7 +166,7 @@ export function SupplierSlideOver({ supplier, token, onClose, queryKey }: Suppli
                 <button
                   type="submit"
                   disabled={isSubmitting || updateMutation.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {(isSubmitting || updateMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
                   Save Changes
@@ -278,7 +279,7 @@ function Field({
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

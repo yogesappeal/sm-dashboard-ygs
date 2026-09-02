@@ -133,7 +133,7 @@ function ChipInput({
         type="button"
         onClick={commit}
         disabled={!text.trim()}
-        className="flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg border border-slate-200 text-slate-400 hover:text-[#6692C5] hover:border-[#6692C5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg border border-slate-200 text-slate-400 hover:text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <Plus size={14} />
       </button>
@@ -199,7 +199,7 @@ function TradeBlock({
               key={b}
               type="button"
               onClick={() => onAddBuilding(b)}
-              className="inline-flex items-center gap-1 border border-dashed border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-400 hover:text-[#6692C5] hover:border-[#6692C5] transition-colors"
+              className="inline-flex items-center gap-1 border border-dashed border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-400 hover:text-primary hover:border-primary transition-colors"
             >
               <Plus size={10} /> {b}
             </button>
@@ -213,7 +213,7 @@ function TradeBlock({
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

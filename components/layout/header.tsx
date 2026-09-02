@@ -128,12 +128,12 @@ export function Header() {
                 alt={user?.full_name ?? 'avatar'}
                 fill
                 sizes="36px"
-                className="rounded-full object-cover ring-2 ring-[#6692C5]/20"
+                className="rounded-full object-cover ring-2 ring-primary/20"
               />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-[#6692C5]/10 border border-[#6692C5]/20 flex items-center justify-center shrink-0">
-              <span className="text-[#6692C5] text-sm font-semibold">{initials}</span>
+            <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <span className="text-primary text-sm font-semibold">{initials}</span>
             </div>
           )}
         </div>

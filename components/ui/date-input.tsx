@@ -21,7 +21,7 @@ export function DateInput({
   hasError?: boolean
 }) {
   return (
-    <div className={cn('relative', !value && 'rounded-lg focus-within:ring-2 focus-within:ring-[#6692C5]/30')}>
+    <div className={cn('relative', !value && 'rounded-lg focus-within:ring-2 focus-within:ring-primary/30')}>
       {!value && (
         <div
           className={cn(

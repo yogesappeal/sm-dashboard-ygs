@@ -131,7 +131,7 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
             value={pending}
             min={today}
             onChange={setPending}
-            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           {isPastDate ? (
             <p className="text-xs text-red-500 mt-2">Planned start can&apos;t be a past date.</p>
@@ -153,7 +153,7 @@ function PlannedStartField({ projectId, value }: { projectId?: string; value: st
             <button
               onClick={() => mutation.mutate()}
               disabled={!pending || pending === value || !projectId || mutation.isPending || isPastDate}
-              className="px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#5a82b3] text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-xs bg-primary hover:bg-primary-hover text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? 'Saving...' : 'Confirm'}
             </button>
@@ -211,7 +211,7 @@ function ProjectSwitcher({ contract, projects, currentProjectId }: {
     <div ref={wrapperRef} className="relative min-w-0">
       <button
         onClick={() => setOpen(p => !p)}
-        className="flex items-center gap-1 max-w-full text-left hover:text-[#6692C5] transition-colors"
+        className="flex items-center gap-1 max-w-full text-left hover:text-primary transition-colors"
         title={fullLabel}
       >
         <span className="text-sm font-semibold text-slate-800 truncate">{label}</span>
@@ -229,7 +229,7 @@ function ProjectSwitcher({ contract, projects, currentProjectId }: {
                 title={itemFullLabel}
                 className={cn(
                   'w-full flex items-center px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors',
-                  p.id === selectedProject?.id ? 'bg-[#6692C5]/5 text-[#6692C5] font-medium' : 'text-slate-600'
+                  p.id === selectedProject?.id ? 'bg-primary/5 text-primary font-medium' : 'text-slate-600'
                 )}
               >
                 <span className="truncate">{truncateLabel(itemFullLabel)}</span>
@@ -280,7 +280,7 @@ function TopBar({ contract, projects, currentProjectId, projectId }: {
         <span className="px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 text-xs font-medium whitespace-nowrap">
           Remaining SUM: <span className="font-bold">${contract.remainingBalance.toLocaleString()}</span>
         </span>
-        <span className="px-3 py-1.5 rounded-full bg-blue-50 text-[#6692C5] text-xs font-medium whitespace-nowrap">
+        <span className="px-3 py-1.5 rounded-full bg-blue-50 text-primary text-xs font-medium whitespace-nowrap">
           In ADS: <span className="font-bold">${contract.adsBalance.toLocaleString()}</span>
         </span>
       </div>

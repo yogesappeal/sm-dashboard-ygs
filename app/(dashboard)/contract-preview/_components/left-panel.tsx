@@ -345,7 +345,7 @@ function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; curr
         onClick={() => setOpen(p => !p)}
         disabled={!projectId}
         title={projectId ? 'Add / edit crew' : 'No project selected'}
-        className="flex items-center justify-center w-6 h-6 rounded-lg text-slate-400 hover:text-[#6692C5] hover:bg-[#6692C5]/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-6 h-6 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <UserPlus size={14} />
       </button>
@@ -371,7 +371,7 @@ function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; curr
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="Search crew..."
-            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+            className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           {mutation.isError && (
             <p className="text-xs text-red-500 mt-2">Failed to assign crew. Try again.</p>
@@ -393,8 +393,8 @@ function CrewAssignPicker({ projectId, currentCrew }: { projectId?: string; curr
                 disabled={mutation.isPending}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
               >
-                <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[#6692C5] text-[10px] font-bold">{m.name?.[0]?.toUpperCase() ?? '?'}</span>
+                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  <span className="text-primary text-[10px] font-bold">{m.name?.[0]?.toUpperCase() ?? '?'}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-slate-700 truncate">{m.name}</p>
@@ -525,7 +525,7 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
             className={cn(
               'flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2',
               tab === t.key
-                ? 'border-[#6692C5] text-[#6692C5]'
+                ? 'border-primary text-primary'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             )}
           >
@@ -541,8 +541,8 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
             {contract.googleDriveUrl ? (
               <>
                 <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                  <Info size={16} className="text-[#6692C5] flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-[#6692C5] font-medium leading-snug">
+                  <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-primary font-medium leading-snug">
                     You can view customer folder in Google Drive
                   </p>
                 </div>
@@ -551,7 +551,7 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
                   href={contract.googleDriveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#6692C5] text-white text-sm font-semibold hover:bg-[#5a82b3] transition-colors"
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
                 >
                   <GoogleDriveIcon size={16} />
                   Open Google Drive
@@ -601,8 +601,8 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
                 <div className="grid grid-cols-2 gap-2">
                   {crew.map((member, i) => (
                     <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#6692C5] text-[10px] font-bold">{member.name[0]}</span>
+                      <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-primary text-[10px] font-bold">{member.name[0]}</span>
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] text-slate-400 truncate">{member.role}</p>
@@ -627,8 +627,8 @@ export function LeftPanel({ contract, crew, pod, projectId }: LeftPanelProps) {
                   { label: 'AM', name: pod.am },
                 ].map((member, i) => (
                   <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
-                    <div className="w-6 h-6 rounded-full bg-[#6692C5]/15 flex items-center justify-center flex-shrink-0">
-                      <Handshake size={12} className="text-[#6692C5]" />
+                    <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                      <Handshake size={12} className="text-primary" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-400 truncate">{member.label}</p>

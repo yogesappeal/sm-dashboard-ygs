@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Loader2 } from 'lucide-react'
 import { createSupplierData } from '@/lib/api'
+import { COMPANY_NAME } from '@/lib/branding'
 import { supplierCreateSchema } from '@/lib/utils/validation'
 import { useToast } from '@/components/shared/toast'
 import { messages } from '@/lib/messages'
@@ -33,7 +34,7 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: SupplierForm) => createSupplierData(token, { ...data, company: 'AusHail' }),
+    mutationFn: (data: SupplierForm) => createSupplierData(token, { ...data, company: COMPANY_NAME }),
     onSuccess: () => {
       toast(messages.supplier.createSuccess, 'success')
       onClose()
@@ -126,7 +127,7 @@ export function SupplierCreateModal({ token, onClose, queryKey }: SupplierCreate
             <button
               type="submit"
               disabled={isSubmitting || createMutation.isPending}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
             >
               {(isSubmitting || createMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
               Add Supplier
@@ -171,7 +172,7 @@ function Field({
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

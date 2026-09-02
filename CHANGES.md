@@ -10,7 +10,7 @@ Commit: `9de563c`
 - Buat file `.env.local` dengan variabel berikut:
   ```
   NEXT_PUBLIC_SUPABASE_URL=https://<project-id>.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
   NEXT_PUBLIC_FEATURE_TASK=true
   ```
 - `.env.local` di-ignore oleh git (tidak boleh di-commit)

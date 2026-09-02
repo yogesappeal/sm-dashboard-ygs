@@ -473,10 +473,11 @@ File: `proxy.ts` (root of project — Next.js 16 convention, NOT `middleware.ts`
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://exlknzxmmqnehvximbyj.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 NEXT_PUBLIC_COMPANY=AusHail
-NEXT_PUBLIC_BASE_IMAGE_URL=https://exlknzxmmqnehvximbyj.supabase.co/storage/v1/object/public
-NEXT_PUBLIC_PRIMARY_COLOR=#C66EEB
+NEXT_PUBLIC_PRIMARY_COLOR=#6692C5
+NEXT_PUBLIC_LOGO_FULL_PATH=/assets/company-logos/logo_ah.png
+NEXT_PUBLIC_LOGO_MINI_PATH=/assets/company-logos/mini_logo_ah.png
 
 # Feature flags (mirrors environment.json)
 NEXT_PUBLIC_FEATURE_TASK=true

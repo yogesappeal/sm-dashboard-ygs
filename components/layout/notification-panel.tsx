@@ -102,7 +102,7 @@ export function NotificationPanel({ open, onClose }: Props) {
             <Bell size={15} className="text-slate-500" />
             <p className="text-sm font-semibold text-slate-800">Notifications</p>
             {unreadCount > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#6692C5] text-white text-[10px] font-bold">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
                 {unreadCount}
               </span>
             )}
@@ -110,7 +110,7 @@ export function NotificationPanel({ open, onClose }: Props) {
           <button
             onClick={() => markAllRead.mutate()}
             disabled={unreadCount === 0 || markAllRead.isPending}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-[#6692C5] transition-colors disabled:opacity-40 disabled:hover:text-slate-400"
+            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-slate-400"
           >
             <CheckCheck size={12} />
             Mark all read
@@ -130,7 +130,7 @@ export function NotificationPanel({ open, onClose }: Props) {
                 <li key={n.id}>
                   <button
                     onClick={() => handleNotificationClick(n)}
-                    className={`w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-slate-50 transition-colors ${!n.is_read ? 'bg-[#6692C5]/5' : ''}`}
+                    className={`w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-slate-50 transition-colors ${!n.is_read ? 'bg-primary/5' : ''}`}
                   >
                     <div className={`mt-0.5 p-2 rounded-xl shrink-0 ${bg}`}>
                       <Icon size={14} className={color} />
@@ -140,7 +140,7 @@ export function NotificationPanel({ open, onClose }: Props) {
                         <p className={`text-sm leading-snug ${n.is_read ? 'text-slate-700 font-normal' : 'text-slate-800 font-semibold'}`}>
                           {n.title}
                         </p>
-                        {!n.is_read && <span className="mt-1 w-2 h-2 rounded-full bg-[#6692C5] shrink-0" />}
+                        {!n.is_read && <span className="mt-1 w-2 h-2 rounded-full bg-primary shrink-0" />}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5 leading-snug">{n.message}</p>
                       <p className="text-[10px] text-slate-400 mt-1">{timeAgo(n.created_at)}</p>
@@ -156,7 +156,7 @@ export function NotificationPanel({ open, onClose }: Props) {
         <div className="px-4 py-3 border-t border-slate-50 text-center">
           <button
             onClick={handleViewAll}
-            className="text-xs text-[#6692C5] hover:text-[#4F7CB3] font-medium transition-colors"
+            className="text-xs text-primary hover:text-primary-dark font-medium transition-colors"
           >
             View all notifications →
           </button>

@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 pr-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/40 focus:border-[#6692C5] transition-colors text-sm"
+              className="w-full px-4 py-2.5 pr-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors text-sm"
             />
             <button
               type="button"
@@ -76,7 +76,7 @@ export default function ResetPasswordPage() {
               {...register('confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 pr-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/40 focus:border-[#6692C5] transition-colors text-sm"
+              className="w-full px-4 py-2.5 pr-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors text-sm"
             />
             <button
               type="button"
@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-2.5 px-4 rounded-xl bg-[#6692C5] hover:bg-[#4F7CB3] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-[#6692C5]/20"
+          className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-primary/20"
         >
           {isSubmitting ? 'Updating…' : 'Update password'}
         </button>

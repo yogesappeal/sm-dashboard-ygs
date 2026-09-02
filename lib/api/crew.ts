@@ -1,5 +1,6 @@
 import { api } from './fetcher'
 import type { Pagination } from '../types'
+import { COMPANY_NAME } from '../branding'
 
 // NOTE: exact response field names are an assumption (id/name/role/company) —
 // adjust CrewMember once the real get-crew-paginated response shape is confirmed.
@@ -29,7 +30,7 @@ export async function getCrewPaginated(token: string, params: GetCrewPaginatedPa
     limit: String(params.limit ?? 50),
     order_dir: params.orderDir ?? 'asc',
     search: params.search ?? '',
-    company: params.company ?? 'AusHail',
+    company: params.company ?? COMPANY_NAME,
   })
   return api.get<CrewPaginatedModel>(`/functions/v1/get-crew-paginated?${q}`, token)
 }

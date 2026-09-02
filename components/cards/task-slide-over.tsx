@@ -242,7 +242,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 px-6 pt-5 text-xs font-medium text-slate-400 hover:text-[#6692C5] transition-colors"
+            className="flex items-center gap-1.5 px-6 pt-5 text-xs font-medium text-slate-400 hover:text-primary transition-colors"
           >
             <ArrowLeft size={12} />
             <span className="truncate">Back to {backLabel ?? 'parent task'}</span>
@@ -431,7 +431,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
                     className={cn(
                       'pb-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
                       activeTab === t.value
-                        ? 'text-[#6692C5] border-[#6692C5]'
+                        ? 'text-primary border-primary'
                         : 'text-slate-400 border-transparent hover:text-slate-600'
                     )}
                   >
@@ -486,7 +486,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
                         <button
                           type="button"
                           onClick={() => setHistoryLimit((n) => n + HISTORY_PAGE_SIZE)}
-                          className="w-full text-center py-2.5 text-xs font-medium text-[#6692C5] hover:bg-[#6692C5]/5 transition-colors"
+                          className="w-full text-center py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
                         >
                           Load more
                         </button>
@@ -509,7 +509,7 @@ export function TaskSlideOver({ token, task, onClose, queryKey, subtasks = [], o
           <button
             type="submit"
             disabled={isSubmitting || mutation.isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {(isSubmitting || mutation.isPending) && <Loader2 size={14} className="animate-spin" />}
             {isEditing ? 'Save Changes' : 'Create Task'}
@@ -569,9 +569,9 @@ function SubtaskListItem({ task, token, queryKey, onOpen }: { task: TaskModel; t
         aria-checked={isCompleted}
         className={cn(
           'mt-0.5 w-4 h-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors',
-          isCompleted            ? 'bg-[#6692C5] border-[#6692C5]'
+          isCompleted            ? 'bg-primary border-primary'
           : optimisticStatus === 'in_progress' ? 'border-blue-400 bg-blue-50'
-          : 'border-slate-300 hover:border-[#6692C5]',
+          : 'border-slate-300 hover:border-primary',
         )}
       >
         {isCompleted ? (
@@ -587,7 +587,7 @@ function SubtaskListItem({ task, token, queryKey, onOpen }: { task: TaskModel; t
         className={cn('flex-1 min-w-0', onOpen && 'cursor-pointer')}
         onClick={onOpen ? () => onOpen(task) : undefined}
       >
-        <p className={cn('text-sm text-slate-700 truncate', isCompleted && 'line-through text-slate-400', onOpen && 'hover:text-[#6692C5] transition-colors')}>
+        <p className={cn('text-sm text-slate-700 truncate', isCompleted && 'line-through text-slate-400', onOpen && 'hover:text-primary transition-colors')}>
           {task.title}
         </p>
         {task.description && (
@@ -667,7 +667,7 @@ function FieldRow({
 function fieldCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }

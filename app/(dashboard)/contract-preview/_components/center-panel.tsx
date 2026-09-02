@@ -19,6 +19,7 @@ import type { ScopeData } from '@/lib/types'
 import type { CanvasContext, CanvasAction } from './canvas-state'
 import type { PurchaseOrder } from './types'
 import { useContractId } from './contract-id-context'
+import { LOGO_FULL_URL, COMPANY_LOGO_ALT_TEXT } from '@/lib/branding'
 
 // ─── Activity Canvas ──────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ function POStatsRow({ pos, onCanvas }: { pos: PurchaseOrder[]; onCanvas: (a: Can
 
 const ACTIVITIES = [
   { id: 1, Icon: Package, color: 'bg-blue-100 text-blue-500', label: 'PO-2026-003 created', sub: 'Plumbing Mate · Subcontractor PO · $3,200', date: '12 Feb 2026, 2:00 PM' },
-  { id: 2, Icon: Send, color: 'bg-[#6692C5]/10 text-[#6692C5]', label: 'PO-2026-002 submitted to Elec Sub', sub: 'Status changed: PO Draft → PO Submitted', date: '11 Feb 2026, 11:30 AM' },
+  { id: 2, Icon: Send, color: 'bg-primary/10 text-primary', label: 'PO-2026-002 submitted to Elec Sub', sub: 'Status changed: PO Draft → PO Submitted', date: '11 Feb 2026, 11:30 AM' },
   { id: 3, Icon: Package, color: 'bg-blue-100 text-blue-500', label: 'PO-2026-001 created', sub: 'Roofing Co. · Supplier PO · $12,500', date: '10 Feb 2026, 9:00 AM' },
   { id: 4, Icon: CheckCircle2, color: 'bg-green-100 text-green-500', label: 'Scope SC-2026-00001 updated', sub: 'House · Electrical status changed to In Progress', date: '8 Feb 2026, 3:15 PM' },
   { id: 5, Icon: AlertCircle, color: 'bg-red-100 text-red-500', label: 'Plumbing flagged as Urgent', sub: 'House · Plumbing — immediate action required', date: '7 Feb 2026, 10:00 AM' },
@@ -250,7 +251,7 @@ function SupplierEmailBody({
         <p className="text-slate-600">Kind Regards,</p>
         <p className="font-bold text-slate-700">{smName || '—'} | Site Manager</p>
         <div style={{ marginTop: '10px' }}>
-          <img src="https://exlknzxmmqnehvximbyj.supabase.co/storage/v1/object/public/assets/company-logos/logo_ah.png" alt="AusHail Construction" style={{ height: '50px', width: 'auto', display: 'block' }} />
+          <img src={LOGO_FULL_URL} alt={COMPANY_LOGO_ALT_TEXT} style={{ height: '50px', width: 'auto', display: 'block' }} />
         </div>
       </div>
     </div>
@@ -328,7 +329,7 @@ function SubsEmailBody({
           <hr className="border-slate-200" />
           <div className="flex items-baseline justify-between">
             <span className="font-bold text-slate-800">Total Price</span>
-            <span className="text-lg font-bold text-[#5b7db1]">{formattedPrice} AUD</span>
+            <span className="text-lg font-bold text-primary">{formattedPrice} AUD</span>
           </div>
         </>
       )}
@@ -359,7 +360,7 @@ function SubsEmailBody({
         <p className="text-slate-600">Kind Regards,</p>
         <p className="font-bold text-slate-700">{smName || '—'} | Site Manager</p>
         <div style={{ marginTop: '10px' }}>
-          <img src="https://exlknzxmmqnehvximbyj.supabase.co/storage/v1/object/public/assets/company-logos/logo_ah.png" alt="AusHail Construction" style={{ height: '50px', width: 'auto', display: 'block' }} />
+          <img src={LOGO_FULL_URL} alt={COMPANY_LOGO_ALT_TEXT} style={{ height: '50px', width: 'auto', display: 'block' }} />
         </div>
       </div>
     </div>
@@ -411,7 +412,7 @@ function ScopeSelector({
           {scopeData?.scope_number && <p className="text-xs text-slate-400 font-mono mt-0.5">{scopeData.scope_number}</p>}
         </div>
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-3',
-          checkedCount > 0 ? 'bg-[#6692C5]/10 text-[#6692C5]' : 'bg-slate-100 text-slate-400')}>
+          checkedCount > 0 ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400')}>
           {checkedCount}/{trades.length} trades
         </span>
       </div>
@@ -419,11 +420,11 @@ function ScopeSelector({
       <div>
         {trades.map((trade) => (
           <div key={trade.tradeId} className="border-b border-slate-100 last:border-0">
-            <div className={cn('flex items-center gap-3 px-4 py-3 transition-colors', trade.checked ? 'bg-[#6692C5]/5' : 'hover:bg-slate-50')}>
+            <div className={cn('flex items-center gap-3 px-4 py-3 transition-colors', trade.checked ? 'bg-primary/5' : 'hover:bg-slate-50')}>
               <input
                 type="checkbox" checked={trade.checked}
                 onChange={() => onToggleTradeChecked(trade.tradeId)}
-                className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
+                className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-primary flex-shrink-0"
               />
               <span className={cn('text-sm font-medium flex-1', trade.checked ? 'text-slate-700' : 'text-slate-500')}>
                 {trade.tradeName}
@@ -447,7 +448,7 @@ function ScopeSelector({
                       <input
                         type="checkbox" checked={building.checked}
                         onChange={() => onToggleBuildingChecked(trade.tradeId, building.buildingId)}
-                        className="w-3 h-3 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
+                        className="w-3 h-3 rounded border-slate-300 cursor-pointer accent-primary flex-shrink-0"
                       />
                       <span className={cn('text-xs font-semibold flex-1 uppercase tracking-wide', building.checked ? 'text-slate-600' : 'text-slate-400')}>
                         {building.buildingName}
@@ -534,7 +535,7 @@ function EmailPreviewModal({
             Send Later
           </button>
           <button onClick={onSendNow} disabled={isPending}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors disabled:opacity-50">
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50">
             {isPending ? 'Sending…' : 'Send Now'}
           </button>
         </div>
@@ -619,7 +620,7 @@ function CreatePOCanvas({
   }, [form.trades, editId])
 
   const fieldCls = (k: string) =>
-    cn('w-full text-sm border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
+    cn('w-full text-sm border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30',
       form.errors[k] ? 'border-red-300' : 'border-slate-200')
 
   const smName = user?.full_name ?? ''
@@ -653,7 +654,7 @@ function CreatePOCanvas({
           {/* Type toggle — only shows types this scope allows, locked once editing */}
           {editId ? (
             <div className="flex items-center gap-2">
-              <span className="px-5 py-2 text-sm font-medium rounded-lg bg-[#6692C5] text-white shadow-sm capitalize w-fit">
+              <span className="px-5 py-2 text-sm font-medium rounded-lg bg-primary text-white shadow-sm capitalize w-fit">
                 {type}
               </span>
             </div>
@@ -662,7 +663,7 @@ function CreatePOCanvas({
               {allowedTypes.map((t) => (
                 <button key={t} onClick={() => { setType(t); form.selectVendor('') }}
                   className={cn('px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize',
-                    type === t ? 'bg-[#6692C5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                    type === t ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                   {t}
                 </button>
               ))}
@@ -715,7 +716,7 @@ function CreatePOCanvas({
                           name="deliveryMethod"
                           checked={form.deliveryMethod === method}
                           onChange={() => form.setDeliveryMethod(method)}
-                          className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                          className="w-3.5 h-3.5 accent-primary cursor-pointer"
                         />
                         {method}
                       </label>
@@ -728,7 +729,7 @@ function CreatePOCanvas({
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
                 <textarea value={form.siteInfo} onChange={(e) => form.setSiteInfo(e.target.value)} rows={2}
                   placeholder="Enter site information..."
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
               </div>
             </div>
           </div>
@@ -793,7 +794,7 @@ function CreatePOCanvas({
           Save as Draft
         </button>
         <button onClick={() => { if (form.validate()) setShowEmailPreview(true) }} disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-lg transition-colors disabled:opacity-50">
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50">
           {form.attachmentsUploading ? 'Uploading attachments…' : 'Send PO'}
         </button>
       </div>
@@ -949,7 +950,7 @@ function PODetailCanvas({
             <>
               <button
                 onClick={() => setSendEmailDialog(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#6692C5] hover:bg-[#4F7CB3] text-white font-medium rounded-lg transition-colors">
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors">
                 <Send size={12} /> Send PO
               </button>
               <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors">

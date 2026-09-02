@@ -83,7 +83,7 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
     return (
       <button
         onClick={() => setIsAdding(true)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-[#6692C5] hover:bg-[#6692C5]/5 transition-colors border-t border-slate-100"
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors border-t border-slate-100"
       >
         <Plus size={14} className="flex-shrink-0" />
         <span className="text-xs font-medium">{addLabel}</span>
@@ -92,7 +92,7 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
   }
 
   return (
-    <div className="flex items-start gap-3 px-4 py-3 border-t border-[#6692C5]/20 bg-[#6692C5]/5">
+    <div className="flex items-start gap-3 px-4 py-3 border-t border-primary/20 bg-primary/5">
       {/* Dimmed checkbox placeholder */}
       <div className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-2 border-slate-200 bg-white" />
 
@@ -120,7 +120,7 @@ export function TaskQuickAdd({ token, status, queryKey, parentTaskId, category, 
 
       {/* Loading / save indicator */}
       <div className={cn('flex-shrink-0 mt-0.5', !mutation.isPending && 'invisible')}>
-        <Loader2 size={14} className="animate-spin text-[#6692C5]" />
+        <Loader2 size={14} className="animate-spin text-primary" />
       </div>
     </div>
   )

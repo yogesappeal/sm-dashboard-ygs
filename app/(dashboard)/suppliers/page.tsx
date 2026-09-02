@@ -120,7 +120,7 @@ export default function SuppliersPage() {
             <PermissionGuard action="supplier:create">
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
               >
                 + Add Supplier
               </button>
@@ -137,7 +137,7 @@ export default function SuppliersPage() {
               value={searchInput}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search name, code, company…"
-              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]"
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
             {searchInput && (
               <button onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">

@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
         </p>
         <a
           href="/login"
-          className="mt-6 inline-block text-sm text-[#6692C5] hover:text-[#4F7CB3]"
+          className="mt-6 inline-block text-sm text-primary hover:text-primary-dark"
         >
           Back to sign in
         </a>
@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
             {...register('email')}
             type="email"
             placeholder="you@example.com"
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/40 focus:border-[#6692C5] transition-colors text-sm"
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors text-sm"
           />
           {errors.email && (
             <p className="mt-1.5 text-xs text-red-500">{errors.email.message}</p>
@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-2.5 px-4 rounded-xl bg-[#6692C5] hover:bg-[#4F7CB3] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-[#6692C5]/20"
+          className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-primary/20"
         >
           {isSubmitting ? 'Sending…' : 'Send reset link'}
         </button>

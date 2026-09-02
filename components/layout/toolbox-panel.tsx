@@ -100,10 +100,10 @@ export function ToolboxPanel({ open, onClose }: Props) {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={onClose}
-                        className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-slate-100 hover:border-[#6692C5]/30 hover:bg-[#6692C5]/5 transition-colors group"
+                        className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 transition-colors group"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-[#6692C5]/10 flex items-center justify-center group-hover:bg-[#6692C5]/20 transition-colors">
-                          <Icon size={16} className="text-[#6692C5]" />
+                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                          <Icon size={16} className="text-primary" />
                         </div>
                         <span className="text-[10px] text-slate-600 font-medium text-center leading-tight line-clamp-2">
                           {app.name}

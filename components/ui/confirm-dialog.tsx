@@ -52,7 +52,7 @@ export function ConfirmDialog({
   const confirmBtnClass = {
     danger: 'bg-red-500 hover:bg-red-600 text-white',
     warning: 'bg-yellow-500 hover:bg-yellow-600 text-white',
-    default: 'bg-[#6692C5] hover:bg-[#4F7CB3] text-white',
+    default: 'bg-primary hover:bg-primary-dark text-white',
   }[variant]
 
   // Portal to <body> — a fixed-position modal nested inside an ancestor that

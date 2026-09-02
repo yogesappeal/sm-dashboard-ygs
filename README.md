@@ -49,7 +49,7 @@ npm install
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
 
 NEXT_PUBLIC_COMPANY=AusHail
 NEXT_PUBLIC_BASE_IMAGE_URL=https://<your-project>.supabase.co/storage/v1/object/public

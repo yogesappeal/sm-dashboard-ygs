@@ -12,6 +12,7 @@ import { AccessRestrictedNotice } from '@/components/shared/access-restricted-no
 import { usePermission } from '@/lib/hooks/use-permission'
 import { usePurchaseOrderForm, usePOEditIdParam, type POFormTradeSection } from '@/lib/hooks/use-purchase-order-form'
 import type { ScopeData } from '@/lib/types'
+import { LOGO_FULL_URL, COMPANY_LOGO_ALT_TEXT } from '@/lib/branding'
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ function POSupplierFormInner() {
   }
 
   const fieldCls = (k: string) =>
-    cn('w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30',
+    cn('w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30',
       form.errors[k] ? 'border-red-300' : 'border-slate-200')
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ function POSupplierFormInner() {
                       name="deliveryMethod"
                       checked={form.deliveryMethod === method}
                       onChange={() => form.setDeliveryMethod(method)}
-                      className="w-3.5 h-3.5 accent-[#6692C5] cursor-pointer"
+                      className="w-3.5 h-3.5 accent-primary cursor-pointer"
                     />
                     {method}
                   </label>
@@ -146,7 +147,7 @@ function POSupplierFormInner() {
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Site Information</label>
               <textarea value={form.siteInfo} onChange={(e) => form.setSiteInfo(e.target.value)} rows={2}
                 placeholder="Enter site information..."
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30 resize-none" />
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
             </div>
           </FormCard>
 
@@ -221,7 +222,7 @@ function POSupplierFormInner() {
           <div className="space-y-2">
             <button onClick={() => form.handleSubmit(false)}
               disabled={form.isPending || form.attachmentsUploading || (!!editId && form.poDetailLoading)}
-              className="w-full py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+              className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               {form.attachmentsUploading ? 'Uploading attachments...' : form.isPending ? 'Sending...' : 'Send PO'}
             </button>
             <button onClick={() => form.handleSubmit(true)}
@@ -265,7 +266,7 @@ function TradeList({
           <span className="text-xs text-slate-400 font-mono flex-shrink-0">{scopeData.scope_number}</span>
         )}
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0',
-          checkedCount > 0 ? 'bg-[#6692C5]/10 text-[#6692C5]' : 'bg-slate-100 text-slate-400')}>
+          checkedCount > 0 ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400')}>
           {checkedCount}/{trades.length} trades
         </span>
       </div>
@@ -278,13 +279,13 @@ function TradeList({
             {/* Trade row */}
             <div className={cn(
               'flex items-center gap-3 px-4 py-3 transition-colors',
-              trade.checked ? 'bg-[#6692C5]/5' : 'hover:bg-slate-50',
+              trade.checked ? 'bg-primary/5' : 'hover:bg-slate-50',
             )}>
               <input
                 type="checkbox"
                 checked={trade.checked}
                 onChange={() => onToggleTradeChecked(trade.tradeId)}
-                className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
+                className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-primary flex-shrink-0"
               />
               <span className={cn('text-sm font-medium flex-1', trade.checked ? 'text-slate-700' : 'text-slate-500')}>
                 {trade.tradeName}
@@ -316,7 +317,7 @@ function TradeList({
                         type="checkbox"
                         checked={building.checked}
                         onChange={() => onToggleBuildingChecked(trade.tradeId, building.buildingId)}
-                        className="w-3 h-3 rounded border-slate-300 cursor-pointer accent-[#6692C5] flex-shrink-0"
+                        className="w-3 h-3 rounded border-slate-300 cursor-pointer accent-primary flex-shrink-0"
                       />
                       <span className={cn('text-xs font-semibold flex-1 uppercase tracking-wide',
                         building.checked ? 'text-slate-600' : 'text-slate-400')}>
@@ -511,8 +512,8 @@ function EmailPreview({
           <p className="text-slate-600">Kind Regards,</p>
           <p className="font-bold text-slate-700">{smName || '—'} | Site Manager</p>
           <div style={{ marginTop: '10px' }}>
-            <img src="https://exlknzxmmqnehvximbyj.supabase.co/storage/v1/object/public/assets/company-logos/logo_ah.png"
-              alt="AusHail Construction" style={{ height: '50px', width: 'auto', display: 'block' }} />
+            <img src={LOGO_FULL_URL}
+              alt={COMPANY_LOGO_ALT_TEXT} style={{ height: '50px', width: 'auto', display: 'block' }} />
           </div>
         </div>
       </div>

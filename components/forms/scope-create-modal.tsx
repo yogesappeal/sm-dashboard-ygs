@@ -174,7 +174,7 @@ export function ScopeCreateModal({ token, onClose, queryKey }: ScopeCreateModalP
             <button
               type="submit"
               disabled={isSubmitting || createMutation.isPending}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
             >
               {(isSubmitting || createMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
               Create Scope
@@ -255,7 +255,7 @@ function ContractSearchSelect({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search contract..."
-              className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#6692C5]/30"
+              className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
           <div className="max-h-56 overflow-y-auto">
@@ -291,7 +291,7 @@ function ContractOptionGroup({ label, contracts, value, onSelect }: {
           onClick={() => onSelect(c.id)}
           className={cn(
             'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors truncate',
-            c.id === value ? 'text-[#6692C5] font-medium bg-[#6692C5]/5' : 'text-slate-700'
+            c.id === value ? 'text-primary font-medium bg-primary/5' : 'text-slate-700'
           )}
         >
           {c.dropdown_label}
@@ -316,7 +316,7 @@ function Field({ label, required, error, children }: { label: string; required?:
 function inputCls(hasError: boolean) {
   return cn(
     'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors',
-    'focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5]',
+    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
     hasError ? 'border-red-300' : 'border-slate-200'
   )
 }
