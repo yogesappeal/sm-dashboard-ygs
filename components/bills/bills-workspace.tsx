@@ -242,6 +242,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [openFilesCard, setOpenFilesCard] = useState(true)
   const [openWorkflowCard, setOpenWorkflowCard] = useState(true)
   const [openAuditCard, setOpenAuditCard] = useState(true)
+  // "All" shows the merged feed (audit-log + comments) already fetched
+  // together — no separate request per tab, just a client-side filter of
+  // what's already in selectedBill.auditTrail.
+  const [auditTab, setAuditTab] = useState<'all' | 'comments'>('all')
 
   // Attachment preview — ported from Resource/BillWorkspace2.tsx: clicking a
   // file in Files & Attachments swaps the left list pane for a document
@@ -630,6 +634,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     if (!selectedBill || selectedBill.approvers.length === 0) return 'No assigned approvers'
     return selectedBill.approvers.map((a) => a.name).join(', ')
   }, [selectedBill])
+
+  const visibleAuditTrail = useMemo(() => {
+    if (!selectedBill) return []
+    if (auditTab === 'comments') return selectedBill.auditTrail.filter((ev) => ev.type === 'comment')
+    return selectedBill.auditTrail
+  }, [selectedBill, auditTab])
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
@@ -1351,6 +1361,26 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   {openAuditCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
+                {openAuditCard && (
+                  <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1 mb-4">
+                    {(['all', 'comments'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setAuditTab(tab)}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                          auditTab === tab
+                            ? 'bg-white text-[#6692C5] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        )}
+                      >
+                        {tab === 'all' ? 'All' : 'Comments'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {openAuditCard && isSelectedBillDetailLoading ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
@@ -1365,11 +1395,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   </div>
                 ) : openAuditCard && detailError ? (
                   <div className="text-xs text-rose-500 py-2">{detailError}</div>
-                ) : openAuditCard && selectedBill.auditTrail.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-2 italic">No activity recorded for this bill.</div>
+                ) : openAuditCard && visibleAuditTrail.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 italic">
+                    {auditTab === 'comments' ? 'No comments yet.' : 'No activity recorded for this bill.'}
+                  </div>
                 ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
-                    {selectedBill.auditTrail.map((ev) => {
+                    {visibleAuditTrail.map((ev) => {
                       // Comments fetched from the API carry `authorId`,
                       // compared here (at render time) against the current
                       // user rather than baked in at fetch time — the fetch
