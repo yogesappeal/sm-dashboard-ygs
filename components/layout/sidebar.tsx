@@ -61,8 +61,8 @@ function getNavItems(role: UserRole): NavItem[] {
           href: '/bills',
           icon: Receipt,
           children: [
-            { label: 'All Bills', href: '/bills' },
             { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
+            { label: 'All Bills', href: '/bills' },
             { label: 'Approved by Me', href: '/bills/approved-by-me' },
           ],
         }]
