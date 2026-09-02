@@ -222,12 +222,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [commentText, setCommentText] = useState('')
   const [commentSending, setCommentSending] = useState(false)
 
-  // Optional note shown under Approve/Reject while a bill is still pending
-  // — sent as the `comment` field on whichever action is taken, separate
-  // from `commentText` above (the always-visible "Leave a comment" box,
-  // which only ever posts a local audit-trail note).
-  const [approvalComment, setApprovalComment] = useState('')
-
   // Which bill currently has an approve/reject request in flight — disables
   // both buttons on that bill only, so switching to another bill isn't
   // blocked by an unrelated pending action.
@@ -235,10 +229,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
   // Approve/Reject now confirm via ConfirmDialog (components/ui/confirm-dialog.tsx
   // — the same one purchase-orders/suppliers/tasks already use) instead of
-  // acting immediately on click. Reject's dialog carries its own comment
-  // field, pre-filled from `approvalComment` (the inline field above) each
-  // time it opens, since the user may have already typed a reason there.
+  // acting immediately on click. Each dialog has its own comment field
+  // (sent as the `comment` field on the mutation, separate from
+  // `commentText` below, the always-visible "Leave a comment" box, which
+  // only ever posts a local audit-trail note).
   const [confirmDialog, setConfirmDialog] = useState<{ type: 'approve' | 'reject'; billId: string } | null>(null)
+  const [approveDialogComment, setApproveDialogComment] = useState('')
   const [rejectDialogComment, setRejectDialogComment] = useState('')
 
   // Accordion state for Right Detail sections
@@ -488,7 +484,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             }
           })
         )
-        setApprovalComment('')
         toast('Bill approved successfully!', 'success')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
@@ -526,7 +521,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             }
           })
         )
-        setApprovalComment('')
         setRejectDialogComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
@@ -1012,46 +1006,23 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedBill.status === 'Pending Approval' && (
                         <PermissionGuard action="bill:approve">
-                          <div className="flex flex-col items-end gap-2 w-full md:w-80">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
-                                disabled={actionPendingId === selectedBill.id}
-                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
-                              >
-                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRejectDialogComment(approvalComment)
-                                  setConfirmDialog({ type: 'reject', billId: selectedBill.id })
-                                }}
-                                disabled={actionPendingId === selectedBill.id}
-                                className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                              >
-                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                                Reject
-                              </button>
-                            </div>
-
-                            {/* Optional note sent as the `comment` field on
-                                whichever action is taken, and added to the
-                                audit trail — only shown while the bill is
-                                still awaiting a decision. */}
-                            <div className="w-full text-left">
-                              <textarea
-                                value={approvalComment}
-                                onChange={(e) => setApprovalComment(e.target.value)}
-                                disabled={actionPendingId === selectedBill.id}
-                                placeholder="Add an optional comment..."
-                                rows={2}
-                                className="w-full text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                              <p className="text-[10px] text-slate-400 mt-1">
-                                Sent with your decision and added to this bill&apos;s audit trail. Leave blank to approve or reject without a comment.
-                              </p>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+                            >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => setConfirmDialog({ type: 'reject', billId: selectedBill.id })}
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                            >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                              Reject
+                            </button>
                           </div>
                         </PermissionGuard>
                       )}
@@ -1076,11 +1047,20 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
                 onConfirm={async () => {
                   if (!confirmDialog) return
-                  await handleApprove(confirmDialog.billId, approvalComment.trim())
+                  await handleApprove(confirmDialog.billId, approveDialogComment.trim())
+                  setApproveDialogComment('')
                   setConfirmDialog(null)
                 }}
                 onCancel={() => setConfirmDialog(null)}
-              />
+              >
+                <textarea
+                  value={approveDialogComment}
+                  onChange={(e) => setApproveDialogComment(e.target.value)}
+                  placeholder="Add an optional comment..."
+                  rows={3}
+                  className="w-full text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none"
+                />
+              </ConfirmDialog>
 
               <ConfirmDialog
                 open={confirmDialog?.type === 'reject'}
@@ -1089,17 +1069,21 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 confirmLabel="Reject"
                 variant="danger"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
+                confirmDisabled={!rejectDialogComment.trim()}
                 onConfirm={async () => {
-                  if (!confirmDialog) return
+                  if (!confirmDialog || !rejectDialogComment.trim()) return
                   await handleReject(confirmDialog.billId, rejectDialogComment.trim())
                   setConfirmDialog(null)
                 }}
                 onCancel={() => setConfirmDialog(null)}
               >
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Comment <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   value={rejectDialogComment}
                   onChange={(e) => setRejectDialogComment(e.target.value)}
-                  placeholder="Add an optional comment..."
+                  placeholder="Explain why this bill is being rejected..."
                   rows={3}
                   className="w-full text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-300 focus:border-red-300 resize-none"
                 />
