@@ -11,6 +11,8 @@ import { loginSchema } from '@/lib/utils/validation'
 
 type LoginForm = z.infer<typeof loginSchema>
 
+const ALLOWED_LOGIN_DOMAIN = process.env.NEXT_PUBLIC_ALLOWED_LOGIN_DOMAIN
+
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -27,6 +29,10 @@ export function LoginForm() {
 
   async function onSubmit(data: LoginForm) {
     setServerError('')
+    if (ALLOWED_LOGIN_DOMAIN && !data.email.toLowerCase().endsWith(`@${ALLOWED_LOGIN_DOMAIN.toLowerCase()}`)) {
+      setServerError(`Only @${ALLOWED_LOGIN_DOMAIN} email addresses can sign in.`)
+      return
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
