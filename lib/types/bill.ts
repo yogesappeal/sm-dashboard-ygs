@@ -67,10 +67,14 @@ export interface ApiBill {
   // Xero and may still say e.g. "SUBMITTED" after we've already approved
   // it), so `decision` takes priority when mapping to the UI's `status`.
   approval_run_id?: string | null
-  stage?: number | null
-  step_name?: string | null
+  // Confirmed real field names — the bill's overall progress through its
+  // approval run, distinct from each individual assignment's own `stage`/
+  // `decision` in `assignments[]` below.
+  current_stage?: number | null
+  current_step_name?: string | null
   decision?: string | null
   decided_at?: string | null
+  assignments?: ApiAssignment[]
 }
 
 // GET /bills/{id}/activities — confirmed shape (see lib/api/bills.ts).
@@ -85,6 +89,21 @@ export interface ApiApprovalRunRef {
 export interface ApiAuthor {
   id: string
   name?: string | null
+}
+
+// One approver's slot in the approval run — confirmed real shape (bill
+// detail's `assignments[]`). Multiple entries can share the same `stage`
+// (more than one approver assigned to that stage); `decision` is this
+// specific approver's own status ("pending"/"approved"/"rejected"), not the
+// bill's overall status.
+export interface ApiAssignment {
+  stage: number
+  step_name?: string | null
+  comment?: string | null
+  approver?: ApiAuthor | null
+  decision?: string | null
+  decided_at?: string | null
+  decided_by?: ApiAuthor | null
 }
 
 export interface ApiComment {
@@ -185,6 +204,19 @@ export interface BillFile {
   url: string
 }
 
+// One approver's slot in the approval run, mapped from ApiAssignment —
+// `decision` is this specific approver's own status, not the bill's overall
+// status (see `decision`/`decidedDate` on Bill below for that).
+export interface Assignment {
+  stage: number
+  stepName: string
+  approverId?: string
+  approverName: string
+  decision: string
+  decidedAt?: string
+  comment?: string
+}
+
 export interface Bill {
   id: string
   billNumber: string
@@ -195,7 +227,7 @@ export interface Bill {
   amount: number
   status: 'Pending Approval' | 'Approved' | 'Rejected'
   lineItems: LineItem[]
-  approvers: { name: string; role: string; avatar?: string }[]
+  assignments: Assignment[]
   auditTrail: AuditTrailEvent[]
   files: BillFile[]
   // Additive fields the API provides that weren't in the original mock

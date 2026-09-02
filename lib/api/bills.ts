@@ -1,10 +1,12 @@
 import { api } from './fetcher'
 import type {
+  ApiAssignment,
   ApiAttachment,
   ApiAuditLogEntry,
   ApiBill,
   ApiComment,
   ApiLineItem,
+  Assignment,
   AuditTrailEvent,
   Bill,
   BillFile,
@@ -157,9 +159,34 @@ function findTrackingOptionName(tracking: ApiLineItem['tracking'], categoryKeywo
   return match?.tracking_option_name ?? NO_DATA
 }
 
+// Real payloads have been observed sending the exact same assignment row
+// more than once (e.g. two identical stage-2/Andi/pending entries) — likely
+// a join fanning out elsewhere upstream, not two distinct approvers.
+// Deduped by (stage, approver, decision, decided_at) so a genuine second
+// approver on the same stage is still kept as its own row.
+function mapApiAssignmentsToAssignments(assignments: ApiAssignment[] | undefined): Assignment[] {
+  const seen = new Set<string>()
+  const result: Assignment[] = []
+  for (const a of assignments ?? []) {
+    const key = [a.stage, a.approver?.id, a.decision, a.decided_at].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push({
+      stage: a.stage,
+      stepName: a.step_name ?? NO_DATA,
+      approverId: a.approver?.id,
+      approverName: a.approver?.name ?? NO_DATA,
+      decision: (a.decision ?? 'pending').toLowerCase(),
+      decidedAt: a.decided_at ? formatApiDateTime(a.decided_at) : undefined,
+      comment: a.comment || undefined,
+    })
+  }
+  return result
+}
+
 // `existing` carries over anything this mapper can't derive from an
-// ApiBill alone (approvers and auditTrail — neither is part of this API;
-// auditTrail is populated separately from getBillComments()/getBillAuditLog()).
+// ApiBill alone (auditTrail — not part of this API; populated separately
+// from getBillComments()/getBillAuditLog()).
 export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   return {
     id: api.id,
@@ -182,13 +209,13 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
       siteTag: findTrackingOptionName(li.tracking, 'sitetag'),
     })),
     files: (api.attachments ?? []).map(mapApiAttachmentToFile),
-    approvers: existing?.approvers ?? [], // not provided by this API
+    assignments: api.assignments ? mapApiAssignmentsToAssignments(api.assignments) : existing?.assignments ?? [],
     auditTrail: existing?.auditTrail ?? [],
     reference: api.reference ?? existing?.reference,
     currencyCode: api.currency_code ?? existing?.currencyCode,
     externalStatus: api.external_status ?? existing?.externalStatus,
-    approvalStage: api.stage ?? existing?.approvalStage,
-    approvalStepName: api.step_name ?? existing?.approvalStepName,
+    approvalStage: api.current_stage ?? existing?.approvalStage,
+    approvalStepName: api.current_step_name ?? existing?.approvalStepName,
     decision: api.decision ?? existing?.decision,
     decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : existing?.decidedDate,
   }

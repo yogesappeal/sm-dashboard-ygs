@@ -56,7 +56,7 @@ import {
   formatCurrencyAmount,
   NO_DATA,
 } from '@/lib/api'
-import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope } from '@/lib/types'
+import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope, Assignment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
@@ -617,22 +617,41 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const gstTax = useMemo(() => subtotal * 0.1, [subtotal])
   const totalAmount = useMemo(() => subtotal + gstTax, [subtotal, gstTax])
 
-  // Approval workflow steps derived from the bill's status
-  const workflowSteps = useMemo(() => {
+  // Approval workflow stages derived from the bill's real assignments[] —
+  // grouped by stage number since more than one approver can share a stage.
+  // A stage's own status comes from its approvers' decisions, not from
+  // comparing against approvalStage, since a stage can be reached and still
+  // have some approvers pending.
+  const workflowStages = useMemo(() => {
     if (!selectedBill) return []
-    // Bills only ever reach this workspace once they're past review (Bills
-    // is approve/reject only now — see bill:approve), so Review is always done.
-    const approvalStatus = selectedBill.status === 'Approved' ? 'completed' : 'active'
-
-    return [
-      { id: 'review', label: 'Review', status: 'completed' as const },
-      { id: 'approval', label: 'Approval', status: approvalStatus },
-    ]
+    const byStage = new Map<number, Assignment[]>()
+    for (const a of selectedBill.assignments) {
+      if (!byStage.has(a.stage)) byStage.set(a.stage, [])
+      byStage.get(a.stage)!.push(a)
+    }
+    return Array.from(byStage.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([stage, approvers]) => {
+        const status: 'completed' | 'rejected' | 'active' | 'pending' = approvers.some((a) => a.decision === 'rejected')
+          ? 'rejected'
+          : approvers.every((a) => a.decision === 'approved')
+            ? 'completed'
+            : selectedBill.approvalStage === stage
+              ? 'active'
+              : 'pending'
+        return { stage, stepName: approvers[0]?.stepName ?? NO_DATA, status, approvers }
+      })
   }, [selectedBill])
 
+  // The current stage's approver names — shown as the "Any of ..." condition
+  // beneath the stage pills, deduped since the same approver can appear more
+  // than once for the same stage in real data.
   const approvalCondition = useMemo(() => {
-    if (!selectedBill || selectedBill.approvers.length === 0) return 'No assigned approvers'
-    return selectedBill.approvers.map((a) => a.name).join(', ')
+    if (!selectedBill) return NO_DATA
+    const currentStageApprovers = selectedBill.assignments.filter((a) => a.stage === selectedBill.approvalStage)
+    if (currentStageApprovers.length === 0) return 'No assigned approvers'
+    const names = Array.from(new Set(currentStageApprovers.map((a) => a.approverName)))
+    return names.join(', ')
   }, [selectedBill])
 
   const visibleAuditTrail = useMemo(() => {
@@ -1291,27 +1310,32 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 {openWorkflowCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
                     <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                      {workflowSteps.map((step, idx) => (
-                        <div key={step.id} className="flex items-center gap-2 flex-shrink-0">
+                      {workflowStages.map((stage, idx) => (
+                        <div key={stage.stage} className="flex items-center gap-2 flex-shrink-0">
                           <span
                             className={cn(
                               'px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border',
-                              step.status === 'active'
+                              stage.status === 'active'
                                 ? 'bg-[#6692C5] text-white border-[#6692C5] shadow-sm'
-                                : step.status === 'completed'
+                                : stage.status === 'completed'
                                   ? 'bg-slate-100 text-slate-600 border-slate-200'
-                                  : 'bg-white text-slate-400 border-slate-200 opacity-60'
+                                  : stage.status === 'rejected'
+                                    ? 'bg-red-50 text-red-600 border-red-200'
+                                    : 'bg-white text-slate-400 border-slate-200 opacity-60'
                             )}
                           >
-                            {step.status === 'completed' && (
+                            {stage.status === 'completed' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-[#6692C5]" />
                             )}
-                            {step.status === 'active' && (
+                            {stage.status === 'active' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-white" />
                             )}
-                            {step.label}
+                            {stage.status === 'rejected' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            )}
+                            Stage {stage.stage} · {stage.stepName}
                           </span>
-                          {idx < workflowSteps.length - 1 && (
+                          {idx < workflowStages.length - 1 && (
                             <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
                           )}
                         </div>
@@ -1321,27 +1345,57 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       Approval condition: Any of{' '}
                       <span className="font-semibold text-slate-600">{approvalCondition}</span>
                     </p>
-                    {(selectedBill.approvalStepName || selectedBill.decision) && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {selectedBill.approvalStepName && (
-                          <>
-                            Current step:{' '}
-                            <span className="font-semibold text-slate-600">
-                              {selectedBill.approvalStepName}
-                              {selectedBill.approvalStage != null && ` (stage ${selectedBill.approvalStage})`}
-                            </span>
-                          </>
-                        )}
-                        {selectedBill.decision && (
-                          <>
-                            {selectedBill.approvalStepName && ' — '}
-                            Decision:{' '}
-                            <span className="font-semibold text-slate-600 capitalize">
-                              {selectedBill.decision}
-                            </span>
-                            {selectedBill.decidedDate && ` on ${selectedBill.decidedDate}`}
-                          </>
-                        )}
+
+                    <div className="mt-4 space-y-3">
+                      {workflowStages.map((stage) => (
+                        <div key={stage.stage} className="border border-slate-100 rounded-xl p-3">
+                          <div className="text-xs font-semibold text-slate-600 mb-2">
+                            Stage {stage.stage} · {stage.stepName}
+                          </div>
+                          <div className="space-y-2">
+                            {stage.approvers.map((a, i) => (
+                              <div key={`${a.approverId ?? a.approverName}-${i}`} className="flex items-start gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <User size={12} className="text-slate-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-medium text-slate-700">{a.approverName}</span>
+                                    {a.decision === 'approved' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                                        <CheckCircle2 size={12} /> Approved
+                                      </span>
+                                    )}
+                                    {a.decision === 'rejected' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-red-500">
+                                        <XCircle size={12} /> Rejected
+                                      </span>
+                                    )}
+                                    {a.decision !== 'approved' && a.decision !== 'rejected' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                        <HelpCircle size={12} /> Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                  {a.decidedAt && (
+                                    <div className="text-[11px] text-slate-400 mt-0.5">{a.decidedAt}</div>
+                                  )}
+                                  {a.comment && (
+                                    <div className="text-xs text-slate-500 mt-1 italic">&quot;{a.comment}&quot;</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedBill.decision && (
+                      <p className="text-xs text-slate-400 mt-3">
+                        Overall decision:{' '}
+                        <span className="font-semibold text-slate-600 capitalize">{selectedBill.decision}</span>
+                        {selectedBill.decidedDate && ` on ${selectedBill.decidedDate}`}
                       </p>
                     )}
                   </div>
