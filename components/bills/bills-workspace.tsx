@@ -38,6 +38,7 @@ import { PermissionGuard } from '@/components/shared/permission-guard'
 import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/shared/toast'
 import { useAuthStore } from '@/lib/store'
 import {
@@ -231,6 +232,14 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // both buttons on that bill only, so switching to another bill isn't
   // blocked by an unrelated pending action.
   const [actionPendingId, setActionPendingId] = useState<string | null>(null)
+
+  // Approve/Reject now confirm via ConfirmDialog (components/ui/confirm-dialog.tsx
+  // — the same one purchase-orders/suppliers/tasks already use) instead of
+  // acting immediately on click. Reject's dialog carries its own comment
+  // field, pre-filled from `approvalComment` (the inline field above) each
+  // time it opens, since the user may have already typed a reason there.
+  const [confirmDialog, setConfirmDialog] = useState<{ type: 'approve' | 'reject'; billId: string } | null>(null)
+  const [rejectDialogComment, setRejectDialogComment] = useState('')
 
   // Accordion state for Right Detail sections
   const [openDetailsCard, setOpenDetailsCard] = useState(true)
@@ -453,10 +462,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // audit-trail entry, which is likewise appended locally since Get Bill
   // Activities isn't guaranteed to reflect the action immediately either.
   const handleApprove = useCallback(
-    async (id: string) => {
+    async (id: string, comment: string) => {
       if (!canApproveBills || !token) return
       setActionPendingId(id)
-      const comment = approvalComment.trim()
       try {
         await approveBill(token, id, comment)
         setBills((prev) =>
@@ -488,14 +496,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, token, approvalComment, user]
+    [toast, canApproveBills, token, user]
   )
 
   const handleReject = useCallback(
-    async (id: string) => {
+    async (id: string, comment: string) => {
       if (!canApproveBills || !token) return
       setActionPendingId(id)
-      const comment = approvalComment.trim()
       try {
         await rejectBill(token, id, comment)
         setBills((prev) =>
@@ -520,6 +527,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           })
         )
         setApprovalComment('')
+        setRejectDialogComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to reject bill', 'error')
@@ -527,7 +535,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, token, approvalComment, user]
+    [toast, canApproveBills, token, user]
   )
 
   // Posts to GET/POST .../comments, then appends the comment locally on
@@ -1007,7 +1015,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           <div className="flex flex-col items-end gap-2 w-full md:w-80">
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleApprove(selectedBill.id)}
+                                onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
                                 disabled={actionPendingId === selectedBill.id}
                                 className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
                               >
@@ -1015,7 +1023,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                                 Approve
                               </button>
                               <button
-                                onClick={() => handleReject(selectedBill.id)}
+                                onClick={() => {
+                                  setRejectDialogComment(approvalComment)
+                                  setConfirmDialog({ type: 'reject', billId: selectedBill.id })
+                                }}
                                 disabled={actionPendingId === selectedBill.id}
                                 className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
                               >
@@ -1048,6 +1059,51 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Approve/Reject confirmation — components/ui/confirm-dialog.tsx,
+                  the same shared ConfirmDialog used across purchase-orders,
+                  suppliers, and tasks. Rendered here rather than gated on
+                  selectedBill.status === 'Pending Approval' like the buttons
+                  above, so a dialog that's already open stays visible through
+                  the brief window where the mutation's own success handler
+                  flips the bill's status before this closes it. */}
+              <ConfirmDialog
+                open={confirmDialog?.type === 'approve'}
+                title="Approve Bill"
+                description={`Are you sure you want to approve Bill ${selectedBill.billNumber}?`}
+                confirmLabel="Approve"
+                variant="default"
+                isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
+                onConfirm={async () => {
+                  if (!confirmDialog) return
+                  await handleApprove(confirmDialog.billId, approvalComment.trim())
+                  setConfirmDialog(null)
+                }}
+                onCancel={() => setConfirmDialog(null)}
+              />
+
+              <ConfirmDialog
+                open={confirmDialog?.type === 'reject'}
+                title="Reject Bill"
+                description={`Are you sure you want to reject Bill ${selectedBill.billNumber}?`}
+                confirmLabel="Reject"
+                variant="danger"
+                isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
+                onConfirm={async () => {
+                  if (!confirmDialog) return
+                  await handleReject(confirmDialog.billId, rejectDialogComment.trim())
+                  setConfirmDialog(null)
+                }}
+                onCancel={() => setConfirmDialog(null)}
+              >
+                <textarea
+                  value={rejectDialogComment}
+                  onChange={(e) => setRejectDialogComment(e.target.value)}
+                  placeholder="Add an optional comment..."
+                  rows={3}
+                  className="w-full text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-300 focus:border-red-300 resize-none"
+                />
+              </ConfirmDialog>
 
               {/* Details Card Accordion */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
