@@ -396,7 +396,7 @@ export function Sidebar() {
         <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-            <span className="text-slate-800 font-semibold text-sm">SM Dashboard</span>
+            <span className="text-slate-800 font-semibold text-sm">SM Approval</span>
           </div>
           <button onClick={closeMobile} className="p-1 text-slate-400 hover:text-slate-700 transition-colors">
             <X size={18} />
@@ -418,7 +418,7 @@ export function Sidebar() {
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5">
               <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg flex-shrink-0" />
-              <span className="text-slate-800 font-semibold text-sm truncate">SM Dashboard</span>
+              <span className="text-slate-800 font-semibold text-sm truncate">SM Approval</span>
             </div>
           ) : (
             <Image src={LOGO_URL} alt="AusHail" width={32} height={32} className="rounded-lg mx-auto" />
