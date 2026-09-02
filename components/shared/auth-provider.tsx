@@ -55,6 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     }
 
+    // `isLoading` lives in a module-level zustand store, not component
+    // state — it survives this component unmounting. AuthProvider only
+    // wraps the (dashboard) route group, so signing out (which unmounts it
+    // by navigating to /login) and logging back in remounts it fresh, but
+    // the store still has isLoading=false left over from the previous
+    // session. Without resetting it here, this mount's very first render
+    // sees isLoading=false and role=null (cleared on sign-out) and renders
+    // children immediately — flashing role-gated content like
+    // BillsAccessGuard's "you don't have access" until init() below
+    // resolves. Deferred a tick (react-hooks/set-state-in-effect) so it
+    // still lands before getSession()'s actual I/O resolves.
+    Promise.resolve().then(() => setLoading(true))
+
     init()
 
     // Only the initial SIGNED_IN carries the first-login check — later
@@ -64,8 +77,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.access_token) {
+          // A fresh interactive login navigates here client-side right
+          // after signInWithPassword resolves, into a tree where isLoading
+          // is already false from the earlier unauthenticated init() run —
+          // without gating it here too, role-gated content (e.g.
+          // BillsAccessGuard) briefly renders with role still null and
+          // flashes a bogus "you don't have access" until loadProfile's
+          // getUserDetails resolves. Scoped to SIGNED_IN only —
+          // TOKEN_REFRESHED fires silently in the background every ~hour
+          // and would otherwise blank the whole app on every refresh.
+          const isFreshSignIn = event === 'SIGNED_IN' && !sawInitialSignIn
+          if (isFreshSignIn) setLoading(true)
           await loadProfile(session.access_token)
-          if (event === 'SIGNED_IN' && !sawInitialSignIn) {
+          if (isFreshSignIn) {
+            setLoading(false)
             sawInitialSignIn = true
             setShowWelcome(!session.user.user_metadata?.has_seen_welcome)
           }

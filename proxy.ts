@@ -71,7 +71,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/bills/')
   if (user && !isAuthRoute && !isPublicRoute && !isBillsRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/bills'
+    url.pathname = '/bills/requires-my-approval'
     return NextResponse.redirect(url)
   }
 

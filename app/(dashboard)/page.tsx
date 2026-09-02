@@ -54,7 +54,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isRedirectingToBills) {
       sessionStorage.setItem('sm-post-login-redirect-done', '1')
-      router.replace('/bills')
+      router.replace('/bills/requires-my-approval')
     }
   }, [isRedirectingToBills, router])
 
