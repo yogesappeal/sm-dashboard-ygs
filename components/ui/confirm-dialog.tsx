@@ -13,6 +13,10 @@ interface ConfirmDialogProps {
   cancelLabel?: string
   variant?: 'danger' | 'warning' | 'default'
   isLoading?: boolean
+  // Disables just the confirm button (e.g. a required field in `children`
+  // hasn't been filled in yet) — Cancel and the Escape/backdrop-close paths
+  // stay active either way.
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
   children?: React.ReactNode
@@ -26,6 +30,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   variant = 'default',
   isLoading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -103,7 +108,7 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
             className={cn(
               'px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
               confirmBtnClass

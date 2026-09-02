@@ -56,7 +56,7 @@ import {
   formatCurrencyAmount,
   NO_DATA,
 } from '@/lib/api'
-import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope } from '@/lib/types'
+import type { Bill, BillFile, AuditTrailEvent, ApiComment, ApiAuditLogEntry, BillScope, Assignment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // Ported from Resource/BillWorkspace2.tsx — maps a file's type/extension to
@@ -222,12 +222,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [commentText, setCommentText] = useState('')
   const [commentSending, setCommentSending] = useState(false)
 
-  // Optional note shown under Approve/Reject while a bill is still pending
-  // — sent as the `comment` field on whichever action is taken, separate
-  // from `commentText` above (the always-visible "Leave a comment" box,
-  // which only ever posts a local audit-trail note).
-  const [approvalComment, setApprovalComment] = useState('')
-
   // Which bill currently has an approve/reject request in flight — disables
   // both buttons on that bill only, so switching to another bill isn't
   // blocked by an unrelated pending action.
@@ -235,9 +229,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
   // Approve/Reject now confirm via ConfirmDialog (components/ui/confirm-dialog.tsx
   // — the same one purchase-orders/suppliers/tasks already use) instead of
-  // acting immediately on click. Reject's dialog carries its own comment
-  // field, pre-filled from `approvalComment` (the inline field above) each
-  // time it opens, since the user may have already typed a reason there.
+  // acting immediately on click. Approve is a plain yes/no — only Reject
+  // requires a comment (sent as the `comment` field on the mutation,
+  // separate from `commentText` below, the always-visible "Leave a comment"
+  // box, which only ever posts a local audit-trail note).
   const [confirmDialog, setConfirmDialog] = useState<{ type: 'approve' | 'reject'; billId: string } | null>(null)
   const [rejectDialogComment, setRejectDialogComment] = useState('')
 
@@ -246,6 +241,10 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [openFilesCard, setOpenFilesCard] = useState(true)
   const [openWorkflowCard, setOpenWorkflowCard] = useState(true)
   const [openAuditCard, setOpenAuditCard] = useState(true)
+  // "All" shows the merged feed (audit-log + comments) already fetched
+  // together — no separate request per tab, just a client-side filter of
+  // what's already in selectedBill.auditTrail.
+  const [auditTab, setAuditTab] = useState<'all' | 'comments'>('all')
 
   // Attachment preview — ported from Resource/BillWorkspace2.tsx: clicking a
   // file in Files & Attachments swaps the left list pane for a document
@@ -313,11 +312,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     )
   }, [bills, searchQuery])
 
-  // Select first bill in list if current selection is invalid
+  // No auto-select — until the user actually clicks a bill (or a
+  // ?bill=<id> deep link resolves to one), nothing is selected and the
+  // Right Detail Workspace shows a "select a bill" prompt instead of
+  // silently opening whichever bill happened to be first in the list.
   const selectedBill = useMemo(() => {
-    const found = filteredBills.find((b) => b.id === selectedBillId)
-    if (found) return found
-    return filteredBills[0] ?? null
+    return filteredBills.find((b) => b.id === selectedBillId) ?? null
   }, [filteredBills, selectedBillId])
 
   // Selecting a bill updates local state immediately (instant render) and
@@ -333,26 +333,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     },
     [searchParams, router]
   )
-
-  // Once the list loads, if there's no valid selection yet, fall back to
-  // the first bill — same instant-local/background-URL split as
-  // selectBill() above.
-  useEffect(() => {
-    if (bills.length === 0) return
-    if (selectedBillId && bills.some((b) => b.id === selectedBillId)) return
-
-    const fallbackId = filteredBills[0]?.id
-    if (!fallbackId) return
-
-    // Deferred a tick (not called synchronously in the effect body) per
-    // react-hooks/set-state-in-effect — resolves before paint, so there's
-    // no visible delay before the fallback selection shows.
-    Promise.resolve().then(() => setSelectedBillIdState(fallbackId))
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('bill', fallbackId)
-    router.replace(`?${params.toString()}`, { scroll: false })
-  }, [bills, filteredBills, selectedBillId, searchParams, router])
 
 
   // Fetch this bill's full detail (line items, attachments) plus its
@@ -488,7 +468,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             }
           })
         )
-        setApprovalComment('')
         toast('Bill approved successfully!', 'success')
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to approve bill', 'error')
@@ -526,7 +505,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             }
           })
         )
-        setApprovalComment('')
         setRejectDialogComment('')
         toast('Bill rejected', 'error')
       } catch (err) {
@@ -638,23 +616,48 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const gstTax = useMemo(() => subtotal * 0.1, [subtotal])
   const totalAmount = useMemo(() => subtotal + gstTax, [subtotal, gstTax])
 
-  // Approval workflow steps derived from the bill's status
-  const workflowSteps = useMemo(() => {
+  // Approval workflow stages derived from the bill's real assignments[] —
+  // grouped by stage number since more than one approver can share a stage.
+  // A stage's own status comes from its approvers' decisions, not from
+  // comparing against approvalStage, since a stage can be reached and still
+  // have some approvers pending.
+  const workflowStages = useMemo(() => {
     if (!selectedBill) return []
-    // Bills only ever reach this workspace once they're past review (Bills
-    // is approve/reject only now — see bill:approve), so Review is always done.
-    const approvalStatus = selectedBill.status === 'Approved' ? 'completed' : 'active'
-
-    return [
-      { id: 'review', label: 'Review', status: 'completed' as const },
-      { id: 'approval', label: 'Approval', status: approvalStatus },
-    ]
+    const byStage = new Map<number, Assignment[]>()
+    for (const a of selectedBill.assignments) {
+      if (!byStage.has(a.stage)) byStage.set(a.stage, [])
+      byStage.get(a.stage)!.push(a)
+    }
+    return Array.from(byStage.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([stage, approvers]) => {
+        const status: 'completed' | 'rejected' | 'active' | 'pending' = approvers.some((a) => a.decision === 'rejected')
+          ? 'rejected'
+          : approvers.every((a) => a.decision === 'approved')
+            ? 'completed'
+            : selectedBill.approvalStage === stage
+              ? 'active'
+              : 'pending'
+        return { stage, stepName: approvers[0]?.stepName ?? NO_DATA, status, approvers }
+      })
   }, [selectedBill])
 
+  // The current stage's approver names — shown as the "Any of ..." condition
+  // beneath the stage pills, deduped since the same approver can appear more
+  // than once for the same stage in real data.
   const approvalCondition = useMemo(() => {
-    if (!selectedBill || selectedBill.approvers.length === 0) return 'No assigned approvers'
-    return selectedBill.approvers.map((a) => a.name).join(', ')
+    if (!selectedBill) return NO_DATA
+    const currentStageApprovers = selectedBill.assignments.filter((a) => a.stage === selectedBill.approvalStage)
+    if (currentStageApprovers.length === 0) return 'No assigned approvers'
+    const names = Array.from(new Set(currentStageApprovers.map((a) => a.approverName)))
+    return names.join(', ')
   }, [selectedBill])
+
+  const visibleAuditTrail = useMemo(() => {
+    if (!selectedBill) return []
+    if (auditTab === 'comments') return selectedBill.auditTrail.filter((ev) => ev.type === 'comment')
+    return selectedBill.auditTrail
+  }, [selectedBill, auditTab])
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
@@ -1012,46 +1015,23 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedBill.status === 'Pending Approval' && (
                         <PermissionGuard action="bill:approve">
-                          <div className="flex flex-col items-end gap-2 w-full md:w-80">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
-                                disabled={actionPendingId === selectedBill.id}
-                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
-                              >
-                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRejectDialogComment(approvalComment)
-                                  setConfirmDialog({ type: 'reject', billId: selectedBill.id })
-                                }}
-                                disabled={actionPendingId === selectedBill.id}
-                                className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                              >
-                                {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
-                                Reject
-                              </button>
-                            </div>
-
-                            {/* Optional note sent as the `comment` field on
-                                whichever action is taken, and added to the
-                                audit trail — only shown while the bill is
-                                still awaiting a decision. */}
-                            <div className="w-full text-left">
-                              <textarea
-                                value={approvalComment}
-                                onChange={(e) => setApprovalComment(e.target.value)}
-                                disabled={actionPendingId === selectedBill.id}
-                                placeholder="Add an optional comment..."
-                                rows={2}
-                                className="w-full text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                              <p className="text-[10px] text-slate-400 mt-1">
-                                Sent with your decision and added to this bill&apos;s audit trail. Leave blank to approve or reject without a comment.
-                              </p>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+                            >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => setConfirmDialog({ type: 'reject', billId: selectedBill.id })}
+                              disabled={actionPendingId === selectedBill.id}
+                              className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                            >
+                              {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
+                              Reject
+                            </button>
                           </div>
                         </PermissionGuard>
                       )}
@@ -1076,7 +1056,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
                 onConfirm={async () => {
                   if (!confirmDialog) return
-                  await handleApprove(confirmDialog.billId, approvalComment.trim())
+                  await handleApprove(confirmDialog.billId, '')
                   setConfirmDialog(null)
                 }}
                 onCancel={() => setConfirmDialog(null)}
@@ -1089,17 +1069,21 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 confirmLabel="Reject"
                 variant="danger"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
+                confirmDisabled={!rejectDialogComment.trim()}
                 onConfirm={async () => {
-                  if (!confirmDialog) return
+                  if (!confirmDialog || !rejectDialogComment.trim()) return
                   await handleReject(confirmDialog.billId, rejectDialogComment.trim())
                   setConfirmDialog(null)
                 }}
                 onCancel={() => setConfirmDialog(null)}
               >
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Comment <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   value={rejectDialogComment}
                   onChange={(e) => setRejectDialogComment(e.target.value)}
-                  placeholder="Add an optional comment..."
+                  placeholder="Explain why this bill is being rejected..."
                   rows={3}
                   className="w-full text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-300 focus:border-red-300 resize-none"
                 />
@@ -1316,27 +1300,32 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 {openWorkflowCard && (
                   <div className="pt-3 border-t border-slate-100 mt-2">
                     <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                      {workflowSteps.map((step, idx) => (
-                        <div key={step.id} className="flex items-center gap-2 flex-shrink-0">
+                      {workflowStages.map((stage, idx) => (
+                        <div key={stage.stage} className="flex items-center gap-2 flex-shrink-0">
                           <span
                             className={cn(
                               'px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border',
-                              step.status === 'active'
+                              stage.status === 'active'
                                 ? 'bg-[#6692C5] text-white border-[#6692C5] shadow-sm'
-                                : step.status === 'completed'
+                                : stage.status === 'completed'
                                   ? 'bg-slate-100 text-slate-600 border-slate-200'
-                                  : 'bg-white text-slate-400 border-slate-200 opacity-60'
+                                  : stage.status === 'rejected'
+                                    ? 'bg-red-50 text-red-600 border-red-200'
+                                    : 'bg-white text-slate-400 border-slate-200 opacity-60'
                             )}
                           >
-                            {step.status === 'completed' && (
+                            {stage.status === 'completed' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-[#6692C5]" />
                             )}
-                            {step.status === 'active' && (
+                            {stage.status === 'active' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-white" />
                             )}
-                            {step.label}
+                            {stage.status === 'rejected' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            )}
+                            Stage {stage.stage} · {stage.stepName}
                           </span>
-                          {idx < workflowSteps.length - 1 && (
+                          {idx < workflowStages.length - 1 && (
                             <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
                           )}
                         </div>
@@ -1346,27 +1335,57 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       Approval condition: Any of{' '}
                       <span className="font-semibold text-slate-600">{approvalCondition}</span>
                     </p>
-                    {(selectedBill.approvalStepName || selectedBill.decision) && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {selectedBill.approvalStepName && (
-                          <>
-                            Current step:{' '}
-                            <span className="font-semibold text-slate-600">
-                              {selectedBill.approvalStepName}
-                              {selectedBill.approvalStage != null && ` (stage ${selectedBill.approvalStage})`}
-                            </span>
-                          </>
-                        )}
-                        {selectedBill.decision && (
-                          <>
-                            {selectedBill.approvalStepName && ' — '}
-                            Decision:{' '}
-                            <span className="font-semibold text-slate-600 capitalize">
-                              {selectedBill.decision}
-                            </span>
-                            {selectedBill.decidedDate && ` on ${selectedBill.decidedDate}`}
-                          </>
-                        )}
+
+                    <div className="mt-4 space-y-3">
+                      {workflowStages.map((stage) => (
+                        <div key={stage.stage} className="border border-slate-100 rounded-xl p-3">
+                          <div className="text-xs font-semibold text-slate-600 mb-2">
+                            Stage {stage.stage} · {stage.stepName}
+                          </div>
+                          <div className="space-y-2">
+                            {stage.approvers.map((a, i) => (
+                              <div key={`${a.approverId ?? a.approverName}-${i}`} className="flex items-start gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <User size={12} className="text-slate-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-medium text-slate-700">{a.approverName}</span>
+                                    {a.decision === 'approved' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                                        <CheckCircle2 size={12} /> Approved
+                                      </span>
+                                    )}
+                                    {a.decision === 'rejected' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-red-500">
+                                        <XCircle size={12} /> Rejected
+                                      </span>
+                                    )}
+                                    {a.decision !== 'approved' && a.decision !== 'rejected' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                        <HelpCircle size={12} /> Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                  {a.decidedAt && (
+                                    <div className="text-[11px] text-slate-400 mt-0.5">{a.decidedAt}</div>
+                                  )}
+                                  {a.comment && (
+                                    <div className="text-xs text-slate-500 mt-1 italic">&quot;{a.comment}&quot;</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedBill.decision && (
+                      <p className="text-xs text-slate-400 mt-3">
+                        Overall decision:{' '}
+                        <span className="font-semibold text-slate-600 capitalize">{selectedBill.decision}</span>
+                        {selectedBill.decidedDate && ` on ${selectedBill.decidedDate}`}
                       </p>
                     )}
                   </div>
@@ -1386,6 +1405,26 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   {openAuditCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
+                {openAuditCard && (
+                  <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1 mb-4">
+                    {(['all', 'comments'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setAuditTab(tab)}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                          auditTab === tab
+                            ? 'bg-white text-[#6692C5] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        )}
+                      >
+                        {tab === 'all' ? 'All' : 'Comments'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {openAuditCard && isSelectedBillDetailLoading ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
@@ -1400,11 +1439,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   </div>
                 ) : openAuditCard && detailError ? (
                   <div className="text-xs text-rose-500 py-2">{detailError}</div>
-                ) : openAuditCard && selectedBill.auditTrail.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-2 italic">No activity recorded for this bill.</div>
+                ) : openAuditCard && visibleAuditTrail.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 italic">
+                    {auditTab === 'comments' ? 'No comments yet.' : 'No activity recorded for this bill.'}
+                  </div>
                 ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
-                    {selectedBill.auditTrail.map((ev) => {
+                    {visibleAuditTrail.map((ev) => {
                       // Comments fetched from the API carry `authorId`,
                       // compared here (at render time) against the current
                       // user rather than baked in at fetch time — the fetch
@@ -1528,8 +1569,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-              {bills.length === 0 ? 'No bills found.' : 'Select a bill from the left list to view details.'}
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm text-center px-6">
+              <Receipt size={28} className="text-slate-300" />
+              {bills.length === 0 ? 'No bills found.' : 'Please select a bill from the list to view details.'}
             </div>
           )}
         </div>

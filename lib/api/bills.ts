@@ -1,10 +1,12 @@
 import { api } from './fetcher'
 import type {
+  ApiAssignment,
   ApiAttachment,
   ApiAuditLogEntry,
   ApiBill,
   ApiComment,
   ApiLineItem,
+  Assignment,
   AuditTrailEvent,
   Bill,
   BillFile,
@@ -157,9 +159,34 @@ function findTrackingOptionName(tracking: ApiLineItem['tracking'], categoryKeywo
   return match?.tracking_option_name ?? NO_DATA
 }
 
+// Real payloads have been observed sending the exact same assignment row
+// more than once (e.g. two identical stage-2/Andi/pending entries) — likely
+// a join fanning out elsewhere upstream, not two distinct approvers.
+// Deduped by (stage, approver, decision, decided_at) so a genuine second
+// approver on the same stage is still kept as its own row.
+function mapApiAssignmentsToAssignments(assignments: ApiAssignment[] | undefined): Assignment[] {
+  const seen = new Set<string>()
+  const result: Assignment[] = []
+  for (const a of assignments ?? []) {
+    const key = [a.stage, a.approver?.id, a.decision, a.decided_at].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push({
+      stage: a.stage,
+      stepName: a.step_name ?? NO_DATA,
+      approverId: a.approver?.id,
+      approverName: a.approver?.name ?? NO_DATA,
+      decision: (a.decision ?? 'pending').toLowerCase(),
+      decidedAt: a.decided_at ? formatApiDateTime(a.decided_at) : undefined,
+      comment: a.comment || undefined,
+    })
+  }
+  return result
+}
+
 // `existing` carries over anything this mapper can't derive from an
-// ApiBill alone (approvers and auditTrail — neither is part of this API;
-// auditTrail is populated separately from getBillComments()/getBillAuditLog()).
+// ApiBill alone (auditTrail — not part of this API; populated separately
+// from getBillComments()/getBillAuditLog()).
 export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   return {
     id: api.id,
@@ -182,13 +209,13 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
       siteTag: findTrackingOptionName(li.tracking, 'sitetag'),
     })),
     files: (api.attachments ?? []).map(mapApiAttachmentToFile),
-    approvers: existing?.approvers ?? [], // not provided by this API
+    assignments: api.assignments ? mapApiAssignmentsToAssignments(api.assignments) : existing?.assignments ?? [],
     auditTrail: existing?.auditTrail ?? [],
     reference: api.reference ?? existing?.reference,
     currencyCode: api.currency_code ?? existing?.currencyCode,
     externalStatus: api.external_status ?? existing?.externalStatus,
-    approvalStage: api.stage ?? existing?.approvalStage,
-    approvalStepName: api.step_name ?? existing?.approvalStepName,
+    approvalStage: api.current_stage ?? existing?.approvalStage,
+    approvalStepName: api.current_step_name ?? existing?.approvalStepName,
     decision: api.decision ?? existing?.decision,
     decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : existing?.decidedDate,
   }
@@ -253,6 +280,8 @@ const AUDIT_CHANGE_FIELD_LABELS: Record<string, string> = {
   bill_date: 'Bill Date',
   supplier_contact: 'Supplier Contact',
   amount_total: 'Amount',
+  stage: 'Stage',
+  current_stage: 'Stage',
 }
 
 // Builds one row per allowlisted field present in either before/after —
@@ -279,53 +308,181 @@ function readOptionalString(value: Record<string, unknown> | null | undefined, k
   return typeof v === 'string' ? v : undefined
 }
 
-// `action` is often just a generic verb like "update" — not descriptive on
-// its own — so when the diff includes a `decision` change, that's used to
-// derive a clearer title instead (e.g. "approved" -> "Advanced to the next
-// approval stage"), falling back to the raw action otherwise.
-function deriveAuditTitle(a: ApiAuditLogEntry): string {
+function readAny(value: Record<string, unknown> | null | undefined, key: string): unknown {
+  return value?.[key]
+}
+
+// The verbs the API's own change-tracking uses for *every* row mutation —
+// carry no meaning on their own (a real row like an approval decision and a
+// throwaway internal one are both just "update"). Meaning comes entirely
+// from what before_value/after_value actually contain, never from this
+// verb — see classifyAuditLogEntry, which is why it doesn't gate on this
+// set except as a last-resort fallback.
+const GENERIC_AUDIT_VERBS = new Set(['insert', 'update', 'delete', 'create', 'remove', 'upsert'])
+
+// A comment-table row has a `body` field — distinct from `comment`, the
+// short note an approver can attach alongside their own decision (seen on
+// approval-run rows), which is intentionally not treated as a comment
+// record here.
+function isCommentRecord(a: ApiAuditLogEntry): boolean {
+  const targetType = (a.target_type ?? '').toLowerCase()
+  return (
+    targetType.includes('comment') ||
+    typeof readAny(a.after_value, 'body') === 'string' ||
+    typeof readAny(a.before_value, 'body') === 'string'
+  )
+}
+
+interface AuditClassification {
+  hidden: boolean
+  title?: string
+  changes?: AuditTrailEvent['changes']
+}
+
+// Decides whether a raw audit-log row is worth showing at all, and if so,
+// what it should say — "who -> what -> when -> what changed" — based on
+// what before_value/after_value actually contain, not the row's own
+// `action` (a generic CRUD verb in real data, never descriptive on its
+// own). Comments are handled separately via getBillComments(), so an
+// insert here would just duplicate that; only a delete is unique
+// information worth surfacing. Anything else with no recognizable
+// user-facing diff is hidden — a bare technical insert/update with
+// nothing meaningful in it.
+function classifyAuditLogEntry(a: ApiAuditLogEntry): AuditClassification {
+  const action = (a.action ?? '').toLowerCase()
+
+  if (isCommentRecord(a)) {
+    if (action === 'delete' || action === 'remove') {
+      const deletedBody = readOptionalString(a.before_value, 'body')
+      return {
+        hidden: false,
+        title: 'Comment Deleted',
+        changes: deletedBody ? [{ label: 'Comment', from: deletedBody, to: 'Deleted' }] : undefined,
+      }
+    }
+    return { hidden: true }
+  }
+
+  const changes = buildAuditChanges(a.before_value, a.after_value)
+
   const beforeDecision = readOptionalString(a.before_value, 'decision')
   const afterDecision = readOptionalString(a.after_value, 'decision')
   if (afterDecision && afterDecision !== beforeDecision) {
-    switch (afterDecision.toLowerCase()) {
-      case 'approved':
-        return 'Advanced to the next approval stage'
-      case 'rejected':
-        return 'Bill rejected'
-      default:
-        return 'Decision updated'
-    }
+    const title =
+      afterDecision.toLowerCase() === 'approved'
+        ? 'Approved'
+        : afterDecision.toLowerCase() === 'rejected'
+          ? 'Rejected'
+          : 'Decision Updated'
+    return { hidden: false, title, changes }
   }
-  return humanizeSnakeCase(a.action)
+
+  const beforeStage = readAny(a.before_value, 'current_stage') ?? readAny(a.before_value, 'stage')
+  const afterStage = readAny(a.after_value, 'current_stage') ?? readAny(a.after_value, 'stage')
+  if (afterStage != null && afterStage !== beforeStage) {
+    return { hidden: false, title: 'Stage Advanced', changes }
+  }
+
+  if (changes && changes.length > 0) {
+    return { hidden: false, title: 'Bill Details Changed', changes }
+  }
+
+  // No recognizable diff — but if the API ever does send a genuinely
+  // descriptive action name (not one of the generic CRUD verbs), that's
+  // kept as a fallback title instead of hiding it outright.
+  if (a.action && !GENERIC_AUDIT_VERBS.has(action)) {
+    return { hidden: false, title: humanizeSnakeCase(a.action) }
+  }
+
+  return { hidden: true }
 }
 
-function mapApiAuditLogToAuditEvent(a: ApiAuditLogEntry): AuditTrailEvent {
+function mapApiAuditLogToAuditEvent(a: ApiAuditLogEntry): AuditTrailEvent | null {
+  const classified = classifyAuditLogEntry(a)
+  if (classified.hidden) return null
   return {
     id: a.id,
     type: 'action',
-    title: deriveAuditTitle(a),
+    title: classified.title ?? NO_DATA,
     date: formatApiDateTime(a.created_at),
     user: a.actor?.name ?? a.actor_id ?? undefined,
-    changes: buildAuditChanges(a.before_value, a.after_value),
+    changes: classified.changes,
   }
+}
+
+interface RawAuditEntry {
+  raw?: string | null
+  event: AuditTrailEvent
+}
+
+// A single real-world action (e.g. approving) commonly writes more than
+// one audit-log row for the same moment (e.g. an approval-run row and the
+// bill's own status row) — those two rows can end up classified with
+// *different* titles (e.g. "Approved" vs. "Bill Details Changed" from the
+// status-field side effect), so merging can't require a title match; same
+// actor within a few seconds is treated as "the same action" instead. The
+// window is kept tight (not, say, a full minute) specifically to avoid
+// folding in a genuinely separate action the same person happens to take
+// shortly after.
+const AUDIT_DEDUPE_WINDOW_MS = 5_000
+
+// When two rows for the same moment get different titles, the more
+// decision-like one wins — "Approved"/"Rejected" says more than a
+// secondary "Bill Details Changed" side effect of that same approval.
+const AUDIT_TITLE_PRIORITY: Record<string, number> = {
+  Approved: 3,
+  Rejected: 3,
+  'Comment Deleted': 2,
+  'Stage Advanced': 2,
+  'Decision Updated': 2,
+  'Bill Details Changed': 1,
+}
+
+function dedupeAdjacentAuditLogEntries(entries: RawAuditEntry[]): RawAuditEntry[] {
+  const result: RawAuditEntry[] = []
+  for (const entry of entries) {
+    const prev = result[result.length - 1]
+    const sameMoment =
+      prev &&
+      prev.event.user === entry.event.user &&
+      Math.abs(new Date(prev.raw ?? 0).getTime() - new Date(entry.raw ?? 0).getTime()) < AUDIT_DEDUPE_WINDOW_MS
+    if (sameMoment) {
+      if ((AUDIT_TITLE_PRIORITY[entry.event.title] ?? 0) > (AUDIT_TITLE_PRIORITY[prev.event.title] ?? 0)) {
+        prev.event.title = entry.event.title
+      }
+      const mergedChanges = [...(prev.event.changes ?? [])]
+      for (const change of entry.event.changes ?? []) {
+        if (!mergedChanges.some((existing) => existing.label === change.label)) mergedChanges.push(change)
+      }
+      prev.event.changes = mergedChanges.length > 0 ? mergedChanges : undefined
+      continue
+    }
+    result.push(entry)
+  }
+  return result
 }
 
 // Comments (GET .../comments) and audit-log entries (GET .../audit-log) are
 // two separate endpoints — merged here into the single chronological feed
 // the Audit Trail card renders, sorted oldest-first by raw timestamp (not
-// the formatted date string, since formatting loses sort order).
+// the formatted date string, since formatting loses sort order). Audit-log
+// rows are filtered down to meaningful events first (see
+// classifyAuditLogEntry) and deduped before merging with comments.
 export function mapCommentsAndAuditLogToAuditTrail(
   comments: ApiComment[],
   auditLog: ApiAuditLogEntry[]
 ): AuditTrailEvent[] {
-  const commentEntries = comments.map((c) => ({
+  const commentEntries: RawAuditEntry[] = comments.map((c) => ({
     raw: c.created_at,
     event: mapApiCommentToAuditEvent(c),
   }))
-  const auditLogEntries = auditLog.map((a) => ({
-    raw: a.created_at,
-    event: mapApiAuditLogToAuditEvent(a),
-  }))
+
+  const auditLogEntries = dedupeAdjacentAuditLogEntries(
+    auditLog
+      .map((a) => ({ raw: a.created_at, event: mapApiAuditLogToAuditEvent(a) }))
+      .filter((entry): entry is { raw: string | null | undefined; event: AuditTrailEvent } => entry.event !== null)
+      .sort((x, y) => new Date(x.raw ?? 0).getTime() - new Date(y.raw ?? 0).getTime())
+  )
 
   return [...commentEntries, ...auditLogEntries]
     .sort((x, y) => new Date(x.raw ?? 0).getTime() - new Date(y.raw ?? 0).getTime())
