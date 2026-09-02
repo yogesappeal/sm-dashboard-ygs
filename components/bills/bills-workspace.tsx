@@ -309,11 +309,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     )
   }, [bills, searchQuery])
 
-  // Select first bill in list if current selection is invalid
+  // No auto-select — until the user actually clicks a bill (or a
+  // ?bill=<id> deep link resolves to one), nothing is selected and the
+  // Right Detail Workspace shows a "select a bill" prompt instead of
+  // silently opening whichever bill happened to be first in the list.
   const selectedBill = useMemo(() => {
-    const found = filteredBills.find((b) => b.id === selectedBillId)
-    if (found) return found
-    return filteredBills[0] ?? null
+    return filteredBills.find((b) => b.id === selectedBillId) ?? null
   }, [filteredBills, selectedBillId])
 
   // Selecting a bill updates local state immediately (instant render) and
@@ -329,26 +330,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     },
     [searchParams, router]
   )
-
-  // Once the list loads, if there's no valid selection yet, fall back to
-  // the first bill — same instant-local/background-URL split as
-  // selectBill() above.
-  useEffect(() => {
-    if (bills.length === 0) return
-    if (selectedBillId && bills.some((b) => b.id === selectedBillId)) return
-
-    const fallbackId = filteredBills[0]?.id
-    if (!fallbackId) return
-
-    // Deferred a tick (not called synchronously in the effect body) per
-    // react-hooks/set-state-in-effect — resolves before paint, so there's
-    // no visible delay before the fallback selection shows.
-    Promise.resolve().then(() => setSelectedBillIdState(fallbackId))
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('bill', fallbackId)
-    router.replace(`?${params.toString()}`, { scroll: false })
-  }, [bills, filteredBills, selectedBillId, searchParams, router])
 
 
   // Fetch this bill's full detail (line items, attachments) plus its
@@ -1512,8 +1493,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-              {bills.length === 0 ? 'No bills found.' : 'Select a bill from the left list to view details.'}
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm text-center px-6">
+              <Receipt size={28} className="text-slate-300" />
+              {bills.length === 0 ? 'No bills found.' : 'Please select a bill from the list to view details.'}
             </div>
           )}
         </div>
