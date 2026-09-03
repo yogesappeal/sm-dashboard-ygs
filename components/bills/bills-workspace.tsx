@@ -288,7 +288,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // "All" shows the merged feed (audit-log + comments) already fetched
   // together — no separate request per tab, just a client-side filter of
   // what's already in selectedBill.auditTrail.
-  const [auditTab, setAuditTab] = useState<'all' | 'comments'>('all')
+  const [auditTab, setAuditTab] = useState<'all' | 'comments'>('comments')
 
   // Attachment preview — ported from Resource/BillWorkspace2.tsx: clicking a
   // file in Files & Attachments swaps the left list pane for a document
@@ -1263,6 +1263,187 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </div>
               </div>
 
+              {/* Audit Trail Card Accordion */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <button
+                  onClick={() => setOpenAuditCard((v) => !v)}
+                  className="w-full flex items-center justify-between text-slate-800 font-semibold text-sm mb-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <History size={16} className="text-slate-400" />
+                    <span>Audit Trail</span>
+                  </div>
+                  {openAuditCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                {openAuditCard && (
+                  <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1 mb-4">
+                    {(['comments', 'all'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setAuditTab(tab)}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                          auditTab === tab
+                            ? 'bg-white text-[#6692C5] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        )}
+                      >
+                        {tab === 'all' ? 'All' : 'Comments'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {openAuditCard && isSelectedBillDetailLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3 w-1/2" />
+                          <Skeleton className="h-3 w-1/4" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : openAuditCard && detailError ? (
+                  <div className="text-xs text-rose-500 py-2">{detailError}</div>
+                ) : openAuditCard && visibleAuditTrail.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 italic">
+                    {auditTab === 'comments' ? 'No comments yet.' : 'No activity recorded for this bill.'}
+                  </div>
+                ) : openAuditCard ? (
+                  <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
+                    {visibleAuditTrail.map((ev) => {
+                      // Comments/audit-log entries fetched from the API
+                      // carry `authorId`, compared here (at render time)
+                      // against `authUserId` — the Supabase Auth id, which
+                      // is what the backend actually stamps authors/actors
+                      // with (author_user_id/approver_user_id), NOT
+                      // `user.reference_id` (a separate internal id from
+                      // the app's own /user profile endpoint — comparing
+                      // against that always came out false). Computed at
+                      // render time rather than baked in at fetch time
+                      // since the fetch is cached per bill and `authUserId`
+                      // can still be loading when it first runs. Locally-
+                      // created comments (one you just sent) set `isMine`
+                      // directly instead, with no `authorId` to compare.
+                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === authUserId)
+
+                      return (
+                      <div key={ev.id} className="relative group">
+                        {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
+                        <div
+                          className={cn(
+                            'absolute -left-[31px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                            ev.type === 'comment' ? 'bg-slate-300' : 'bg-emerald-500 text-white'
+                          )}
+                        >
+                          {ev.type !== 'comment' && '✓'}
+                        </div>
+
+                        {ev.type === 'comment' ? (
+                          <div
+                            className={cn(
+                              'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
+                              isMine
+                                ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
+                                : 'bg-slate-50 border-slate-100'
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                                isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
+                              )}
+                            >
+                              {ev.user?.[0] ?? 'U'}
+                            </div>
+                            <div className="flex-1 text-xs">
+                              <div
+                                className={cn(
+                                  'flex items-center justify-between mb-1',
+                                  isMine && 'flex-row-reverse'
+                                )}
+                              >
+                                <span className="font-semibold text-slate-800">{ev.user}</span>
+                                <span className="text-[10px] text-slate-400">{ev.date}</span>
+                              </div>
+                              <p className="text-slate-700 font-medium">"{ev.notes}"</p>
+                            </div>
+                          </div>
+                        ) : (
+                          // Action/system entries — a bordered card (matching
+                          // the comment bubbles' card treatment, rather than
+                          // floating unstyled text) with an optional
+                          // before -> after "changes" table and an optional
+                          // comment callout, both collapsible sections since
+                          // not every entry has either.
+                          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden max-w-[85%]">
+                            <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-slate-800">{ev.title}</div>
+                                {ev.user && (
+                                  <div className="text-[10px] text-slate-400 mt-0.5">By {ev.user}</div>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-400 flex-shrink-0 whitespace-nowrap">
+                                {ev.date}
+                              </span>
+                            </div>
+
+                            {ev.changes && ev.changes.length > 0 && (
+                              <div className="border-t border-slate-100 divide-y divide-slate-100">
+                                {ev.changes.map((change, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                                  >
+                                    <span className="text-slate-400 flex-shrink-0">{change.label}</span>
+                                    <span className="flex items-center gap-1.5 min-w-0 text-right">
+                                      <span className="text-slate-400 line-through truncate">{change.from}</span>
+                                      <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
+                                      <span className="text-slate-800 font-semibold truncate">{change.to}</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Comment Input Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                    placeholder="Leave a comment..."
+                    disabled={commentSending}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendComment}
+                    disabled={commentSending || !commentText.trim()}
+                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    {commentSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                    Send
+                  </button>
+                </div>
+              </div>
+
               {/* Files & Attachments Card Accordion */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                 <button
@@ -1437,187 +1618,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                     )}
                   </div>
                 )}
-              </div>
-
-              {/* Audit Trail Card Accordion */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <button
-                  onClick={() => setOpenAuditCard((v) => !v)}
-                  className="w-full flex items-center justify-between text-slate-800 font-semibold text-sm mb-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <History size={16} className="text-slate-400" />
-                    <span>Audit Trail</span>
-                  </div>
-                  {openAuditCard ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-
-                {openAuditCard && (
-                  <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1 mb-4">
-                    {(['all', 'comments'] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setAuditTab(tab)}
-                        className={cn(
-                          'px-3 py-1 rounded-md text-xs font-medium transition-colors',
-                          auditTab === tab
-                            ? 'bg-white text-[#6692C5] shadow-xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        )}
-                      >
-                        {tab === 'all' ? 'All' : 'Comments'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {openAuditCard && isSelectedBillDetailLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
-                        <div className="flex-1 space-y-1.5">
-                          <Skeleton className="h-3 w-1/2" />
-                          <Skeleton className="h-3 w-1/4" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : openAuditCard && detailError ? (
-                  <div className="text-xs text-rose-500 py-2">{detailError}</div>
-                ) : openAuditCard && visibleAuditTrail.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-2 italic">
-                    {auditTab === 'comments' ? 'No comments yet.' : 'No activity recorded for this bill.'}
-                  </div>
-                ) : openAuditCard ? (
-                  <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
-                    {visibleAuditTrail.map((ev) => {
-                      // Comments/audit-log entries fetched from the API
-                      // carry `authorId`, compared here (at render time)
-                      // against `authUserId` — the Supabase Auth id, which
-                      // is what the backend actually stamps authors/actors
-                      // with (author_user_id/approver_user_id), NOT
-                      // `user.reference_id` (a separate internal id from
-                      // the app's own /user profile endpoint — comparing
-                      // against that always came out false). Computed at
-                      // render time rather than baked in at fetch time
-                      // since the fetch is cached per bill and `authUserId`
-                      // can still be loading when it first runs. Locally-
-                      // created comments (one you just sent) set `isMine`
-                      // directly instead, with no `authorId` to compare.
-                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === authUserId)
-
-                      return (
-                      <div key={ev.id} className="relative group">
-                        {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
-                        <div
-                          className={cn(
-                            'absolute -left-[31px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
-                            ev.type === 'comment' ? 'bg-slate-300' : 'bg-emerald-500 text-white'
-                          )}
-                        >
-                          {ev.type !== 'comment' && '✓'}
-                        </div>
-
-                        {ev.type === 'comment' ? (
-                          <div
-                            className={cn(
-                              'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
-                              isMine
-                                ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
-                                : 'bg-slate-50 border-slate-100'
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
-                              )}
-                            >
-                              {ev.user?.[0] ?? 'U'}
-                            </div>
-                            <div className="flex-1 text-xs">
-                              <div
-                                className={cn(
-                                  'flex items-center justify-between mb-1',
-                                  isMine && 'flex-row-reverse'
-                                )}
-                              >
-                                <span className="font-semibold text-slate-800">{ev.user}</span>
-                                <span className="text-[10px] text-slate-400">{ev.date}</span>
-                              </div>
-                              <p className="text-slate-700 font-medium">"{ev.notes}"</p>
-                            </div>
-                          </div>
-                        ) : (
-                          // Action/system entries — a bordered card (matching
-                          // the comment bubbles' card treatment, rather than
-                          // floating unstyled text) with an optional
-                          // before -> after "changes" table and an optional
-                          // comment callout, both collapsible sections since
-                          // not every entry has either.
-                          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden max-w-[85%]">
-                            <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-slate-800">{ev.title}</div>
-                                {ev.user && (
-                                  <div className="text-[10px] text-slate-400 mt-0.5">By {ev.user}</div>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-slate-400 flex-shrink-0 whitespace-nowrap">
-                                {ev.date}
-                              </span>
-                            </div>
-
-                            {ev.changes && ev.changes.length > 0 && (
-                              <div className="border-t border-slate-100 divide-y divide-slate-100">
-                                {ev.changes.map((change, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                                  >
-                                    <span className="text-slate-400 flex-shrink-0">{change.label}</span>
-                                    <span className="flex items-center gap-1.5 min-w-0 text-right">
-                                      <span className="text-slate-400 line-through truncate">{change.from}</span>
-                                      <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
-                                      <span className="text-slate-800 font-semibold truncate">{change.to}</span>
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Comment Input Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
-                    placeholder="Leave a comment..."
-                    disabled={commentSending}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] disabled:opacity-60"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendComment}
-                    disabled={commentSending || !commentText.trim()}
-                    className="px-4 py-2.5 bg-[#6692C5] hover:bg-[#4F7CB3] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
-                  >
-                    {commentSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                    Send
-                  </button>
-                </div>
               </div>
             </div>
           ) : (
