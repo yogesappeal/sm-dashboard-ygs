@@ -932,16 +932,22 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                         : 'bg-white'
                     )}
                   >
-                    <div className="flex justify-between items-start mb-1.5">
-                      <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight min-w-0 pr-2">
-                        Bill {bill.billNumber}
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <span className="text-xs text-slate-500 leading-tight min-w-0 truncate">
+                        Bill From{' '}
+                        <span className="font-semibold text-slate-800">{bill.supplierName}</span>
                       </span>
                       <StatusBadge status={bill.status} size="xs" />
                     </div>
 
-                    <div className="text-xs mt-2">
-                      <div className="text-slate-400 text-[10px] mb-0.5">Total</div>
-                      <span className="font-bold text-slate-800">{formatCurrency(bill.amount, bill.currencyCode)}</span>
+                    <div className="flex justify-between items-end gap-2 mt-2">
+                      <div>
+                        <div className="text-slate-400 text-[10px] mb-0.5">Total</div>
+                        <span className="text-sm font-bold text-[#6692C5]">
+                          {formatCurrency(bill.amount, bill.currencyCode)}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">{bill.billNumber}</span>
                     </div>
                   </div>
                 ))

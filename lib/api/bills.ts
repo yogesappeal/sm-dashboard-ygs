@@ -191,7 +191,7 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
   return {
     id: api.id,
     billNumber: api.external_bill_number ?? api.reference ?? NO_DATA,
-    supplierName: api.contact?.name ?? NO_DATA,
+    supplierName: api.contact?.name ?? api.contact_name ?? NO_DATA,
     address: NO_DATA, // never provided by this API — would need a separate Contacts lookup by contact_id
     issueDate: formatApiDate(api.bill_date),
     dueDate: formatApiDate(api.due_date),
@@ -214,8 +214,8 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
     reference: api.reference ?? existing?.reference,
     currencyCode: api.currency_code ?? existing?.currencyCode,
     externalStatus: api.external_status ?? existing?.externalStatus,
-    approvalStage: api.current_stage ?? existing?.approvalStage,
-    approvalStepName: api.current_step_name ?? existing?.approvalStepName,
+    approvalStage: api.current_stage ?? api.stage ?? existing?.approvalStage,
+    approvalStepName: api.current_step_name ?? api.step_name ?? existing?.approvalStepName,
     decision: api.decision ?? existing?.decision,
     decidedDate: api.decided_at ? formatApiDateTime(api.decided_at) : existing?.decidedDate,
   }

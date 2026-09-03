@@ -47,11 +47,14 @@ export interface ApiContact {
 
 export interface ApiBill {
   id: string
-  // Confirmed real shape: a nested `contact` object, not a flat
-  // `contact_name` string — `contact_id` kept as a fallback in case some
-  // responses only send that.
+  // Confirmed: the Detail endpoint (GET /bills/{id}) sends a nested
+  // `contact` object; the List endpoint (GET /bills?scope=) sends a flat
+  // `contact_name` string instead, no nested object at all — both handled,
+  // `contact.name` wins when both are present. `contact_id` kept as a
+  // last-resort fallback in case some responses only send that.
   contact?: ApiContact | null
   contact_id?: string | null
+  contact_name?: string | null
   external_bill_number?: string | null
   reference?: string | null
   external_status?: string | null
@@ -67,11 +70,15 @@ export interface ApiBill {
   // Xero and may still say e.g. "SUBMITTED" after we've already approved
   // it), so `decision` takes priority when mapping to the UI's `status`.
   approval_run_id?: string | null
-  // Confirmed real field names — the bill's overall progress through its
-  // approval run, distinct from each individual assignment's own `stage`/
-  // `decision` in `assignments[]` below.
+  // The bill's overall progress through its approval run, distinct from
+  // each individual assignment's own `stage`/`decision` in `assignments[]`
+  // below. Confirmed: Detail sends `current_stage`/`current_step_name`;
+  // List (GET /bills?scope=) sends the same concept as plain `stage`/
+  // `step_name` instead — both handled, current_* wins when both present.
   current_stage?: number | null
   current_step_name?: string | null
+  stage?: number | null
+  step_name?: string | null
   decision?: string | null
   decided_at?: string | null
   assignments?: ApiAssignment[]
