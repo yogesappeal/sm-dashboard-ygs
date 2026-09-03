@@ -41,7 +41,7 @@ export async function getBillComments(token: string, billId: string) {
 }
 
 export async function postBillComment(token: string, billId: string, body: string) {
-  return api.post<unknown>(`/functions/v1/bills/${billId}/comments`, token, { body })
+  return api.post<MaybeWrapped<ApiComment>>(`/functions/v1/bills/${billId}/comments`, token, { body })
 }
 
 export async function getBillAuditLog(token: string, billId: string) {
@@ -223,7 +223,7 @@ export function mapApiBillToBill(api: ApiBill, existing?: Bill): Bill {
 // bills-workspace.tsx) rather than resolved to `isMine` here — this data
 // gets cached once fetched, and the current user can still be loading when
 // that fetch first happens, so baking in a stale comparison would stick.
-function mapApiCommentToAuditEvent(c: ApiComment): AuditTrailEvent {
+export function mapApiCommentToAuditEvent(c: ApiComment): AuditTrailEvent {
   return {
     id: c.id,
     type: 'comment',

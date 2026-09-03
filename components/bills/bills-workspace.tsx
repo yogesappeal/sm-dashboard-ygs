@@ -61,6 +61,7 @@ import {
   approveBill,
   rejectBill,
   mapApiBillToBill,
+  mapApiCommentToAuditEvent,
   mapCommentsAndAuditLogToAuditTrail,
   unwrapApiData,
   formatCurrencyAmount,
@@ -572,27 +573,22 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     [toast, canApproveBills, token, user]
   )
 
-  // Posts to GET/POST .../comments, then appends the comment locally on
-  // success (the endpoint's response shape for the created comment isn't
-  // confirmed, so this mirrors the approve/reject pattern of updating state
-  // from what we sent rather than parsing the response).
+  // Posts to POST .../comments, then appends the comment locally from the
+  // response body (confirmed shape: {id, body, author: {id, name},
+  // created_at, ...}) rather than refetching the whole comments list.
   const handleSendComment = useCallback(async () => {
     const body = commentText.trim()
     if (!body || !selectedBill || !token) return
 
     setCommentSending(true)
     try {
-      await postBillComment(token, selectedBill.id, body)
-      const nowStr = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
-      const newComment: AuditTrailEvent = {
-        id: `at-${Date.now()}`,
-        type: 'comment',
-        title: 'Comment',
-        user: user?.full_name || 'You',
-        notes: body,
-        date: `${nowStr} via Web`,
-        isMine: true,
-      }
+      const json = await postBillComment(token, selectedBill.id, body)
+      const apiComment = unwrapApiData(json)
+      // Built straight from the API's own response (author name, id,
+      // created_at, ...) rather than guessed client-side, so it matches
+      // exactly what a subsequent refetch of this bill's comments would
+      // show — no separate "You"/local-timestamp placeholder to reconcile.
+      const newComment: AuditTrailEvent = { ...mapApiCommentToAuditEvent(apiComment), isMine: true }
 
       setBills((prev) =>
         prev.map((b) => {
@@ -612,7 +608,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     } finally {
       setCommentSending(false)
     }
-  }, [commentText, selectedBill, token, toast, user])
+  }, [commentText, selectedBill, token, toast])
 
   // Opens the preview panel and always resolves a fresh signed URL from
   // getBillAttachment() — never reuses whatever's cached on `file.url`.
