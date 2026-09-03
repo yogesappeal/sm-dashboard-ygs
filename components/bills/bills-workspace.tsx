@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   Loader2,
   RefreshCw,
+  Maximize2,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { PermissionGuard } from '@/components/shared/permission-guard'
@@ -782,6 +783,17 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       +
                     </button>
                   </div>
+                )}
+                {(activeAttachment?.type === 'pdf' || activeAttachment?.type === 'image') && (
+                  <button
+                    type="button"
+                    onClick={() => setPdfZoom(100)}
+                    disabled={pdfZoom === 100}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                    title="Fit to width"
+                  >
+                    <Maximize2 size={14} />
+                  </button>
                 )}
                 {activeAttachment?.url && (
                   <a
