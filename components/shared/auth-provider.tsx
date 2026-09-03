@@ -23,16 +23,17 @@ function mapBackendRoleToRole(role: BackendUserRole | undefined): UserRole {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setRole, setToken, setLoading, setAccessDenied, isLoading, accessDenied, clear } = useAuthStore()
+  const { setUser, setRole, setToken, setAuthUserId, setLoading, setAccessDenied, isLoading, accessDenied, clear } = useAuthStore()
   const supabase = createClient()
   const router = useRouter()
   const [showWelcome, setShowWelcome] = useState(false)
 
   useEffect(() => {
-    async function loadProfile(accessToken: string) {
-      setToken(accessToken)
+    async function loadProfile(session: { access_token: string; user: { id: string } }) {
+      setToken(session.access_token)
+      setAuthUserId(session.user.id)
       try {
-        const res = await getUserDetails(accessToken)
+        const res = await getUserDetails(session.access_token)
         if (res?.data) {
           setUser(res.data)
           const role = mapBackendRoleToRole(res.data.role)
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
-        await loadProfile(session.access_token)
+        await loadProfile(session)
         setShowWelcome(!session.user.user_metadata?.has_seen_welcome)
       }
       setLoading(false)
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // and would otherwise blank the whole app on every refresh.
           const isFreshSignIn = event === 'SIGNED_IN' && !sawInitialSignIn
           if (isFreshSignIn) setLoading(true)
-          await loadProfile(session.access_token)
+          await loadProfile(session)
           if (isFreshSignIn) {
             setLoading(false)
             sawInitialSignIn = true
@@ -96,12 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           setToken(null)
+          setAuthUserId(null)
         }
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [setUser, setRole, setToken, setLoading, setAccessDenied, supabase])
+  }, [setUser, setRole, setToken, setAuthUserId, setLoading, setAccessDenied, supabase])
 
   async function handleSignOut() {
     await supabase.auth.signOut()

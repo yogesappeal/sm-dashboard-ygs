@@ -216,7 +216,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Bills now lives on the same Supabase project as the rest of the app
   // (NEXT_PUBLIC_SUPABASE_URL) and accepts the app's own authenticated
   // session token — no more manual entry.
-  const { token, user } = useAuthStore()
+  const { token, user, authUserId } = useAuthStore()
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -566,7 +566,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         id: `at-${Date.now()}`,
         type: 'comment',
         title: 'Comment',
-        user: 'You',
+        user: user?.full_name || 'You',
         notes: body,
         date: `${nowStr} via Web`,
         isMine: true,
@@ -590,7 +590,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     } finally {
       setCommentSending(false)
     }
-  }, [commentText, selectedBill, token, toast])
+  }, [commentText, selectedBill, token, toast, user])
 
   // Opens the preview panel immediately; if the file's URL hasn't been
   // resolved yet (bill detail only gives storage location, not a URL),
@@ -1480,15 +1480,20 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 ) : openAuditCard ? (
                   <div className="relative pl-6 space-y-5 border-l-2 border-slate-100 ml-2 pt-1">
                     {visibleAuditTrail.map((ev) => {
-                      // Comments fetched from the API carry `authorId`,
-                      // compared here (at render time) against the current
-                      // user rather than baked in at fetch time — the fetch
-                      // is cached per bill, and `user` can still be loading
-                      // when it first runs, so a comparison done then could
-                      // go stale. Locally-created comments (one you just
-                      // sent) set `isMine` directly instead, with no
-                      // `authorId` to compare.
-                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === user?.reference_id)
+                      // Comments/audit-log entries fetched from the API
+                      // carry `authorId`, compared here (at render time)
+                      // against `authUserId` — the Supabase Auth id, which
+                      // is what the backend actually stamps authors/actors
+                      // with (author_user_id/approver_user_id), NOT
+                      // `user.reference_id` (a separate internal id from
+                      // the app's own /user profile endpoint — comparing
+                      // against that always came out false). Computed at
+                      // render time rather than baked in at fetch time
+                      // since the fetch is cached per bill and `authUserId`
+                      // can still be loading when it first runs. Locally-
+                      // created comments (one you just sent) set `isMine`
+                      // directly instead, with no `authorId` to compare.
+                      const isMine = ev.isMine || (!!ev.authorId && ev.authorId === authUserId)
 
                       return (
                       <div key={ev.id} className="relative group">
