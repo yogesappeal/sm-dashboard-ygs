@@ -155,7 +155,7 @@ export type MaybeWrapped<T> = T | { data: T }
 
 // The Bills views, driven by GET /bills?scope=<value> — see getBills in
 // lib/api/bills.ts for which values are confirmed vs. per-spec.
-export type BillScope = 'pending' | 'approved_by_me' | 'all'
+export type BillScope = 'pending' | 'approved_by_me' | 'rejected_by_me' | 'all'
 
 // ---------------------------------------------------------------------------
 // UI-facing shapes — what components/bills/bills-workspace.tsx renders.

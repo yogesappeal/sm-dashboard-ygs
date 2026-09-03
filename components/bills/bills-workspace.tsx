@@ -470,16 +470,20 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const pageTitle =
     scope === 'pending'
       ? 'Requires My Approval'
-      : scope === 'approved_by_me'
-        ? 'Approved by Me'
-        : 'All Bills'
+      : scope === 'rejected_by_me'
+        ? 'Rejected'
+        : scope === 'approved_by_me'
+          ? 'Approved'
+          : 'All Bills'
 
   const pageDescription =
     scope === 'pending'
       ? 'Bills waiting on your approval'
-      : scope === 'approved_by_me'
-        ? 'Bills you have approved'
-        : 'View and manage all bills'
+      : scope === 'rejected_by_me'
+        ? 'Bills you have rejected'
+        : scope === 'approved_by_me'
+          ? 'Bills you have approved'
+          : 'View and manage all bills'
 
   // Defaults to AUD (matching prior mock-data behavior everywhere this is
   // called without a currency) but respects the bill's own currencyCode

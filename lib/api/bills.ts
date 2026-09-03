@@ -26,10 +26,8 @@ export function unwrapApiData<T>(json: MaybeWrapped<T>): T {
   return json as T
 }
 
-// `scope` selects which Bills view to fetch. Only `approved_by_me` is
-// confirmed by Resource/data-curl-api.md; `pending` and `all` follow the
-// same vocabulary per the product spec for the "Requires My Approval" /
-// "All Bills" sidebar views.
+// `scope` selects which Bills view to fetch — confirmed values:
+// pending | approved_by_me | rejected_by_me | all.
 export async function getBills(token: string, scope: BillScope) {
   return api.get<MaybeWrapped<ApiBill[]>>(`/functions/v1/bills?scope=${scope}`, token)
 }

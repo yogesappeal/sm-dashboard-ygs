@@ -72,8 +72,9 @@ function getNavItems(role: UserRole): NavItem[] {
               href: '/bills/requires-my-approval',
               count: REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER,
             },
+            { label: 'Rejected', href: '/bills/rejected-by-me' },
+            { label: 'Approved', href: '/bills/approved-by-me' },
             { label: 'All Bills', href: '/bills' },
-            { label: 'Approved by Me', href: '/bills/approved-by-me' },
           ],
         }]
       : []),
