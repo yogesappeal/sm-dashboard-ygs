@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Search,
@@ -39,6 +40,15 @@ import { usePermission } from '@/lib/hooks/use-permission'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+
+// pdfjs-dist (via react-pdf) reaches for browser-only globals (DOMMatrix,
+// Path2D, ...) as soon as it's imported, which crashes Next's server-side
+// render pass for this otherwise-client component — ssr: false skips that
+// pass entirely so it only ever loads in the browser.
+const BillAttachmentViewer = dynamic(
+  () => import('@/components/bills/bill-attachment-viewer').then((m) => m.BillAttachmentViewer),
+  { ssr: false }
+)
 import { useToast } from '@/components/shared/toast'
 import { useAuthStore } from '@/lib/store'
 import {
@@ -126,11 +136,10 @@ function getFileTypeInfo(file: BillFile) {
     icon: ext === 'XLSX' || ext === 'CSV' ? FileSpreadsheet : FileQuestion,
     colorClass: 'bg-amber-50 text-amber-700',
     badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
-    // Every type gets an attempted inline preview now (via <iframe> — see
-    // the "other" render branch) rather than being blocked outright; the
-    // browser renders what it natively can (PDF, images, text, CSV, HTML)
-    // and shows nothing for formats it can't (e.g. .docx/.xlsx), so the
-    // Download button next to the preview stays the fallback for those.
+    // Clicking still opens the viewer panel (see the "other" render branch)
+    // rather than being blocked outright, but no browser can reliably
+    // render these inline (.docx/.xlsx/...), so it shows a plain "can't
+    // preview" message with a Download action instead of attempting one.
     canPreview: true,
   }
 }
@@ -810,72 +819,38 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </div>
               ) : !activeAttachment || !activeTypeInfo ? (
                 <div className="m-auto text-xs text-slate-400">No document available to preview</div>
-              ) : activeTypeInfo.icon === ImageIcon ? (
-                // Zoom is a percentage of the panel's own width (not a fixed
-                // px base) so 100% always fills the available canvas exactly
-                // — no leftover whitespace — and scales automatically as the
-                // panel's responsive width changes. It's a real box-width
-                // change rather than a CSS transform: scale(), so the
-                // browser decodes/paints the bitmap at the target size
-                // instead of stretching an already-rasterized image, which
-                // is what was causing the blurriness.
-                <div
-                  style={{ width: `${pdfZoom}%` }}
-                  className="flex-shrink-0 flex flex-col items-center transition-[width] duration-150 ease-out"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={activeAttachment.url}
-                    alt={activeAttachment.name}
-                    className="w-full h-auto rounded-lg shadow-xl border border-slate-300 object-contain bg-white"
-                  />
-                </div>
-              ) : activeAttachment.type === 'pdf' ? (
-                // Unlike the <img> above, resizing this iframe's CSS box
-                // doesn't make the browser's native PDF viewer re-render
-                // bigger — that viewer computes its "fit to width" once, at
-                // load, and doesn't react to later box resizes. So zoom is
-                // driven instead through the viewer's own #zoom= open
-                // parameter, which does control it live — but only if the
-                // browser actually re-navigates the iframe. A URL that
-                // differs *only* in its fragment (e.g. just #zoom=115 vs
-                // #zoom=100) is treated as an in-page fragment jump, not a
-                // real navigation, so the new zoom param gets ignored; the
-                // `?z=` query param forces a genuine reload so the new zoom
-                // level actually takes effect. No `key` here, though — that
-                // would fully unmount/remount the iframe (blank flash on
-                // every click); updating `src` on the same element instead
-                // keeps the previous page visible until the new one is ready.
-                <div className="w-full min-h-[780px] flex flex-col items-center">
-                  <iframe
-                    // `activeAttachment.url` is a Supabase Storage signed URL
-                    // and already has its own `?token=<jwt>` query string —
-                    // appending `?z=` here (instead of `&`) would put a
-                    // second `?` in the URL, which browsers still treat as
-                    // part of the query string, corrupting the JWT (breaks
-                    // with "InvalidJWT: Failed to base64url decode the
-                    // signature"). `&` (or `?` only if there's no existing
-                    // query string) is required.
-                    src={`${activeAttachment.url}${activeAttachment.url.includes('?') ? '&' : '?'}z=${pdfZoom}#toolbar=0&navpanes=0&zoom=${pdfZoom}`}
-                    className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
-                    title={activeAttachment.name}
-                  />
-                </div>
+              ) : activeTypeInfo.icon === ImageIcon || activeAttachment.type === 'pdf' ? (
+                // Fetches the file as a blob, validates it (catches an API
+                // error/HTML page returned in place of the real file), then
+                // renders via react-pdf (true reflow on zoom, unlike an
+                // iframe's #zoom= param which only re-renders on a fresh
+                // navigation) or a validated <img> — see
+                // components/bills/bill-attachment-viewer.tsx.
+                <BillAttachmentViewer file={activeAttachment} zoom={pdfZoom} />
               ) : (
-                // Any other file type — the browser renders whatever it
-                // natively can inline (text, CSV, HTML, ...) and shows a
-                // blank frame for formats it can't (e.g. .docx/.xlsx); the
-                // Download button in the toolbar above is the fallback for
-                // those rather than blocking the attempt outright.
-                <div className="w-full h-full flex flex-col items-center gap-2">
-                  <iframe
-                    src={activeAttachment.url}
-                    className="w-full h-full min-h-[780px] bg-white rounded-lg shadow-xl border border-slate-300"
-                    title={activeAttachment.name}
-                  />
-                  <p className="text-[10px] text-slate-400 flex-shrink-0">
-                    Nothing showing? Use Download in the toolbar above — this file type may not be viewable in-browser.
+                // Any other file type (.docx, .xlsx, ...) — no browser can
+                // reliably render these inline, so rather than attempting
+                // an iframe that usually just shows blank, say so plainly
+                // and hand the user a direct way to get the file instead.
+                <div className="m-auto flex flex-col items-center justify-center p-6 text-center bg-white rounded-2xl border border-slate-200 shadow-sm max-w-xs">
+                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-3', activeTypeInfo.colorClass)}>
+                    <activeTypeInfo.icon size={22} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 mb-1">Preview not available</h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    {activeAttachment.name}{' '}
+                    can&apos;t be previewed in the browser. Download it to view the file.
                   </p>
+                  <a
+                    href={activeAttachment.url}
+                    download={activeAttachment.name}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-[#6692C5] hover:bg-[#4F7CB3] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Download size={13} />
+                    Download
+                  </a>
                 </div>
               )}
             </div>
@@ -1285,6 +1260,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                         {selectedBill.files.map((file) => {
                           const fInfo = getFileTypeInfo(file)
                           const FIcon = fInfo.icon
+                          const isPreviewableType = file.type === 'pdf' || file.type === 'image'
                           return (
                             <div
                               key={file.id}
@@ -1306,8 +1282,8 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                                 type="button"
                                 className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 group-hover:bg-[#6692C5] group-hover:text-white group-hover:border-[#6692C5] rounded-lg text-xs font-medium flex items-center gap-1 shadow-xs transition-colors flex-shrink-0"
                               >
-                                <Eye size={12} />
-                                Preview
+                                {isPreviewableType ? <Eye size={12} /> : <Download size={12} />}
+                                {isPreviewableType ? 'Preview' : 'Download'}
                               </button>
                             </div>
                           )
