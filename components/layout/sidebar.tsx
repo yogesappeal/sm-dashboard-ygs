@@ -34,7 +34,14 @@ const FEATURE_TASK = process.env.NEXT_PUBLIC_FEATURE_TASK === 'true'
 interface NavSubItem {
   label: string
   href: string
+  count?: number
 }
+
+// UI-only placeholder for the "Requires My Approval" badge — not wired to
+// a real endpoint yet (no API for this count exists). Swap this out for a
+// real fetched value once one does; every render spot below already reads
+// from `count` on the nav item, not this constant directly.
+const REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER = 5
 
 interface NavItem {
   label: string
@@ -60,7 +67,11 @@ function getNavItems(role: UserRole): NavItem[] {
           href: '/bills',
           icon: Receipt,
           children: [
-            { label: 'Requires My Approval', href: '/bills/requires-my-approval' },
+            {
+              label: 'Requires My Approval',
+              href: '/bills/requires-my-approval',
+              count: REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER,
+            },
             { label: 'All Bills', href: '/bills' },
             { label: 'Approved by Me', href: '/bills/approved-by-me' },
           ],
@@ -116,6 +127,10 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
         const Icon = item.icon
         const hasChildren = !!item.children?.length
         const isGroupOpen = openGroups[item.label] ?? false
+        // Bubbled up from whichever child carries a count (currently just
+        // "Requires My Approval") so a collapsed sidebar — which hides the
+        // submenu behind a flyout — can still surface it on the icon itself.
+        const badgeCount = item.children?.reduce((sum, c) => sum + (c.count ?? 0), 0) ?? 0
 
         if (hasChildren) {
           // Collapsed sidebar has no room to show an inline submenu, so the
@@ -130,13 +145,18 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
                   onClick={(e) => toggleFlyout(item.label, e)}
                   title={item.label}
                   className={cn(
-                    'w-full flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                    'relative w-full flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                     isParentActive || isFlyoutOpen
                       ? 'bg-[#6692C5]/10 text-[#6692C5] border border-[#6692C5]/20'
                       : 'text-[#667085] hover:text-slate-800 hover:bg-slate-100'
                   )}
                 >
                   <Icon size={18} className="flex-shrink-0" />
+                  {badgeCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {badgeCount}
+                    </span>
+                  )}
                 </button>
 
                 {isFlyoutOpen &&
@@ -163,13 +183,23 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
                               onLinkClick?.()
                             }}
                             className={cn(
-                              'block px-3.5 py-2 text-xs font-medium transition-colors',
+                              'flex items-center justify-between gap-2 px-3.5 py-2 text-xs font-medium transition-colors',
                               isChildActive
                                 ? 'bg-[#6692C5] text-white font-semibold'
                                 : 'text-[#667085] hover:text-slate-900 hover:bg-slate-100'
                             )}
                           >
-                            {child.label}
+                            <span className="truncate">{child.label}</span>
+                            {!!child.count && (
+                              <span
+                                className={cn(
+                                  'flex-shrink-0 min-w-4 h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center',
+                                  isChildActive ? 'bg-white text-amber-600' : 'bg-amber-500 text-white'
+                                )}
+                              >
+                                {child.count}
+                              </span>
+                            )}
                           </Link>
                         )
                       })}
@@ -196,7 +226,16 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
                   <Icon size={18} className="flex-shrink-0" />
                   <span className="truncate">{item.label}</span>
                 </div>
-                {isGroupOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Shown whenever the group itself is collapsed, so the
+                      count stays visible without needing it expanded. */}
+                  {!isGroupOpen && badgeCount > 0 && (
+                    <span className="min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {badgeCount}
+                    </span>
+                  )}
+                  {isGroupOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                </div>
               </button>
 
               {isGroupOpen && (
@@ -212,13 +251,23 @@ function NavLinks({ pathname, role, collapsed, onLinkClick }: { pathname: string
                         href={child.href}
                         onClick={onLinkClick}
                         className={cn(
-                          'block px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                          'flex items-center justify-between gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                           isChildActive
                             ? 'bg-[#6692C5] text-white font-semibold shadow-xs'
                             : 'text-[#667085] hover:text-slate-900 hover:bg-slate-100'
                         )}
                       >
-                        {child.label}
+                        <span className="truncate">{child.label}</span>
+                        {!!child.count && (
+                          <span
+                            className={cn(
+                              'flex-shrink-0 min-w-4 h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center',
+                              isChildActive ? 'bg-white text-amber-600' : 'bg-amber-500 text-white'
+                            )}
+                          >
+                            {child.count}
+                          </span>
+                        )}
                       </Link>
                     )
                   })}
