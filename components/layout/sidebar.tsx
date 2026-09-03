@@ -364,7 +364,11 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
           <p className="text-slate-400 text-xs truncate">{user.email}</p>
         </div>
         <div className="py-1">
-          <button
+          {/* Profile and Settings temporarily hidden — routes kept in place
+              (app/(dashboard)/profile, app/(dashboard)/settings) so they can
+              be restored later by simply uncommenting, same convention as
+              the sidebar nav items above. */}
+          {/* <button
             onClick={() => { setOpen(false); router.push('/profile') }}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 text-sm transition-colors"
           >
@@ -377,7 +381,7 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
           >
             <Settings size={15} />
             Settings
-          </button>
+          </button> */}
           <button
             onClick={handleSignOut}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 text-sm transition-colors"
