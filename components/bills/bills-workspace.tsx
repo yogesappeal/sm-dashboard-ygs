@@ -614,9 +614,16 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     }
   }, [commentText, selectedBill, token, toast, user])
 
-  // Opens the preview panel immediately; if the file's URL hasn't been
-  // resolved yet (bill detail only gives storage location, not a URL),
-  // fetches it from getBillAttachment() first.
+  // Opens the preview panel and always resolves a fresh signed URL from
+  // getBillAttachment() — never reuses whatever's cached on `file.url`.
+  // Supabase's signed URL expires after `signed_url_ttl_sec` (~120s — see
+  // lib/types/bill.ts), so a URL fetched once and reused indefinitely (the
+  // previous behavior) would silently start failing with a raw
+  // `InvalidJWT: "exp" claim timestamp check failed` once a bill's been
+  // open longer than that — e.g. close the preview, keep working on the
+  // bill for a couple minutes, reopen the same file. Re-resolving on every
+  // open costs one extra request but is the only way to guarantee the URL
+  // handed to BillAttachmentViewer is still valid.
   const resolveAndPreviewAttachment = useCallback(
     async (file: BillFile) => {
       if (!selectedBill) return
@@ -631,11 +638,6 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
       setPdfZoom(100)
       setShowLeftPreview(true)
       setAttachmentUrlError(null)
-
-      if (file.url) {
-        toast(`Loaded ${file.name} on left side`, 'info')
-        return
-      }
 
       if (!token) return
       setAttachmentUrlLoading(true)
