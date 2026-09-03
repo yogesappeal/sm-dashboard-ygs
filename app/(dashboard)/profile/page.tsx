@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { useAuthStore } from '@/lib/store'
 import { User, Mail, Phone, Briefcase, Hash, X, ZoomIn } from 'lucide-react'
 
-const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
+const STORAGE_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 
 function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string }) {
   return (

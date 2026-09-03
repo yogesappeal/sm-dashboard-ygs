@@ -10,7 +10,7 @@ import { ToolboxPanel } from './toolbox-panel'
 import { PermissionGuard } from '@/components/shared/permission-guard'
 import { useNotificationsUnreadCount } from '@/lib/hooks/use-notifications'
 
-const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
+const STORAGE_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 
 export function Header() {
   const { user } = useAuthStore()

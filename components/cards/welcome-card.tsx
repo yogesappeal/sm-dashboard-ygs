@@ -5,7 +5,7 @@ import { getGreeting } from '@/lib/utils'
 import { Sparkles } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 
-const STORAGE_BASE = 'https://exlknzxmmqnehvximbyj.supabase.co'
+const STORAGE_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 
 interface WelcomeCardProps {
   firstName: string

@@ -30,6 +30,7 @@ import type { UserDetails } from '@/lib/types'
 import { LOGO_MINI_URL, COMPANY_ALT_TEXT } from '@/lib/branding'
 
 const FEATURE_TASK = process.env.NEXT_PUBLIC_FEATURE_TASK === 'true'
+const STORAGE_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 
 interface NavSubItem {
   label: string
@@ -348,7 +349,7 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
   const avatarUrl = user.image_url
     ? user.image_url.startsWith('http')
       ? user.image_url
-      : `https://exlknzxmmqnehvximbyj.supabase.co/${user.image_url.replace(/^\/+/, '')}`
+      : `${STORAGE_BASE}/${user.image_url.replace(/^\/+/, '')}`
     : null
 
   const floatingMenu = open
