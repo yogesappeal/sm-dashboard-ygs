@@ -1132,25 +1132,45 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-xs pt-3 border-t border-slate-100 mt-2">
                     <div>
                       <div className="text-slate-400 mb-1">Date</div>
-                      <div className="text-slate-800 font-semibold">{selectedBill.issueDate}</div>
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-20" />
+                      ) : (
+                        <div className="text-slate-800 font-semibold">{selectedBill.issueDate}</div>
+                      )}
                     </div>
                     <div>
                       <div className="text-slate-400 mb-1">Due Date</div>
-                      <div className="text-slate-800 font-semibold">{selectedBill.dueDate}</div>
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-20" />
+                      ) : (
+                        <div className="text-slate-800 font-semibold">{selectedBill.dueDate}</div>
+                      )}
                     </div>
                     <div>
                       <div className="text-slate-400 mb-1">Reference</div>
-                      <div className="text-slate-800 font-semibold font-mono">{selectedBill.billNumber}</div>
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-20" />
+                      ) : (
+                        <div className="text-slate-800 font-semibold font-mono">{selectedBill.billNumber}</div>
+                      )}
                     </div>
                     <div>
                       <div className="text-slate-400 mb-1">PO Reference</div>
-                      <div className="text-slate-800 font-semibold font-mono">
-                        {selectedBill.reference ?? NO_DATA}
-                      </div>
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-20" />
+                      ) : (
+                        <div className="text-slate-800 font-semibold font-mono">
+                          {selectedBill.reference ?? NO_DATA}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <div className="text-slate-400 mb-1">Currency</div>
-                      <div className="text-slate-800 font-semibold">{selectedBill.currencyCode ?? NO_DATA}</div>
+                      {isSelectedBillDetailLoading ? (
+                        <Skeleton className="h-4 w-16" />
+                      ) : (
+                        <div className="text-slate-800 font-semibold">{selectedBill.currencyCode ?? NO_DATA}</div>
+                      )}
                     </div>
                   </div>
                 )}
