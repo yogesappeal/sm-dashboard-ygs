@@ -346,13 +346,22 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   }, [token, scope, billsReloadKey])
 
   // Search is still client-side — scoping (which view) is server-side now,
-  // search within a view isn't.
+  // search within a view isn't. Amount matches two ways: the raw number
+  // (so "5647" finds a $5,647.40 bill) and the formatted currency string
+  // (so "$5,647.40" or "5,647" also works, punctuation and all).
   const filteredBills = useMemo(() => {
-    return bills.filter(
-      (b) =>
-        b.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return bills
+    const numericQuery = query.replace(/[^0-9.]/g, '')
+    return bills.filter((b) => {
+      const formattedAmount = formatCurrencyAmount(b.amount, b.currencyCode).toLowerCase()
+      return (
+        b.billNumber.toLowerCase().includes(query) ||
+        b.supplierName.toLowerCase().includes(query) ||
+        formattedAmount.includes(query) ||
+        (numericQuery !== '' && String(b.amount).includes(numericQuery))
+      )
+    })
   }, [bills, searchQuery])
 
   // No auto-select — until the user actually clicks a bill (or a
@@ -870,7 +879,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search bill or supplier..."
+                  placeholder="Search bill, supplier, or amount..."
                   className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#6692C5]/30 focus:border-[#6692C5] bg-white"
                 />
                 {searchQuery && (
