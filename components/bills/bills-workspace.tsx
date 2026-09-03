@@ -1056,7 +1056,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => setConfirmDialog({ type: 'approve', billId: selectedBill.id })}
-                              disabled={actionPendingId === selectedBill.id}
+                              disabled={actionPendingId === selectedBill.id || isSelectedBillDetailLoading}
                               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
                             >
                               {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
@@ -1064,7 +1064,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                             </button>
                             <button
                               onClick={() => setConfirmDialog({ type: 'reject', billId: selectedBill.id })}
-                              disabled={actionPendingId === selectedBill.id}
+                              disabled={actionPendingId === selectedBill.id || isSelectedBillDetailLoading}
                               className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
                             >
                               {actionPendingId === selectedBill.id && <Loader2 size={12} className="animate-spin" />}
