@@ -41,7 +41,7 @@ interface NavSubItem {
 // a real endpoint yet (no API for this count exists). Swap this out for a
 // real fetched value once one does; every render spot below already reads
 // from `count` on the nav item, not this constant directly.
-const REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER = 5
+// const REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER = 5
 
 interface NavItem {
   label: string
@@ -70,7 +70,7 @@ function getNavItems(role: UserRole): NavItem[] {
             {
               label: 'Requires My Approval',
               href: '/bills/requires-my-approval',
-              count: REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER,
+              // count: REQUIRES_MY_APPROVAL_COUNT_PLACEHOLDER,
             },
             { label: 'Rejected', href: '/bills/rejected-by-me' },
             { label: 'Approved', href: '/bills/approved-by-me' },
