@@ -63,13 +63,15 @@ export async function proxy(request: NextRequest) {
   // Bills-only lockdown — every other authenticated page is temporarily
   // unreachable, including by typing the URL directly (Home "/",
   // Purchase Orders, Suppliers & Subs, Scope, Tasks, Contract,
-  // Contract Preview, Profile, Settings, Notifications). Restore access by
-  // removing this block (sidebar entries are commented out separately in
-  // components/layout/sidebar.tsx).
+  // Contract Preview, Notifications). Profile and Settings are exempted
+  // (see their buttons re-enabled in components/layout/sidebar.tsx).
+  // Restore access to the rest by removing this block.
   const isBillsRoute =
     request.nextUrl.pathname === '/bills' ||
     request.nextUrl.pathname.startsWith('/bills/')
-  if (user && !isAuthRoute && !isPublicRoute && !isBillsRoute) {
+  const isProfileRoute = request.nextUrl.pathname.startsWith('/profile')
+  const isSettingsRoute = request.nextUrl.pathname.startsWith('/settings')
+  if (user && !isAuthRoute && !isPublicRoute && !isBillsRoute && !isProfileRoute && !isSettingsRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/bills/requires-my-approval'
     return NextResponse.redirect(url)

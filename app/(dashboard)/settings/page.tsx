@@ -59,8 +59,10 @@ export default function SettingsPage() {
         <p className="text-sm text-slate-500 mt-0.5">Manage your preferences</p>
       </div>
 
-      {/* Notifications */}
-      <div className="bg-white rounded-2xl border border-slate-100 px-6">
+      {/* Notifications — temporarily hidden, not removed. Uncomment to
+          restore (also uncomment the notifications/emailAlerts state and
+          the Bell import above if removed). */}
+      {/* <div className="bg-white rounded-2xl border border-slate-100 px-6">
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide pt-5 pb-2">
           Notifications
         </h3>
@@ -76,7 +78,7 @@ export default function SettingsPage() {
           description="Get notified via email for important events"
           action={<Toggle enabled={emailAlerts} onChange={setEmailAlerts} />}
         />
-      </div>
+      </div> */}
 
       {/* Security */}
       <div className="bg-white rounded-2xl border border-slate-100 px-6">
