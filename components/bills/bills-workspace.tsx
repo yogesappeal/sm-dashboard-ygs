@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -661,6 +661,48 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     },
     [selectedBill, token, toast]
   )
+
+  // Auto-opens a pending bill's first attachment once its detail has
+  // genuinely finished loading — saves the extra click of opening the file
+  // yourself while reviewing something you're about to approve/reject.
+  // Only for "Pending Approval" bills, and it's a no-op if the bill has no
+  // attachments.
+  //
+  // Re-triggers every time you come back to a bill (select bill A, select
+  // bill B, select bill A again -> auto-opens again on that second visit),
+  // not just the very first time — tracked by remembering only the *last*
+  // selected bill id (a ref, not state, since it's bookkeeping that
+  // shouldn't itself trigger a re-render) rather than a permanent
+  // "already tried" set. While you stay on the same bill, `selectedBill`'s
+  // object identity can still change (e.g. after sending a comment
+  // updates `bills`), but its `id` doesn't, so the guard below keeps this
+  // from re-firing on every unrelated update — only an actual id change
+  // (a real re-entry) does.
+  //
+  // Gates on `detailLoadedIds.has(id)` specifically, NOT a derived
+  // "isLoading" boolean — right after a bill is first selected, detail
+  // fetching hasn't started yet, so a naive "not loading" check reads as
+  // true for one render before the fetch effect below even calls
+  // setDetailLoading(true). That false negative would let this effect run
+  // immediately with `files` still empty (from the list-only summary),
+  // mark this id as "handled" via the ref, and then skip the real attempt
+  // once detail actually finishes loading moments later — attachments
+  // would silently never auto-open. `detailLoadedIds` only gains an id
+  // after a real successful fetch, so it can't false-positive that way.
+  const lastAutoOpenAttemptedBillId = useRef<string | null>(null)
+  useEffect(() => {
+    if (!selectedBill) return
+    if (!detailLoadedIds.has(selectedBill.id)) return
+    if (selectedBill.status !== 'Pending Approval') return
+    if (lastAutoOpenAttemptedBillId.current === selectedBill.id) return
+    lastAutoOpenAttemptedBillId.current = selectedBill.id
+
+    const firstFile = selectedBill.files[0]
+    if (!firstFile) return
+    // Deferred a tick (not called synchronously in the effect body) per
+    // react-hooks/set-state-in-effect.
+    Promise.resolve().then(() => resolveAndPreviewAttachment(firstFile))
+  }, [selectedBill, detailLoadedIds, resolveAndPreviewAttachment])
 
   // Subtotal calculations
   const subtotal = useMemo(() => {
