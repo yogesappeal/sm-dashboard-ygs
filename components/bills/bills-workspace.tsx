@@ -183,8 +183,8 @@ function BillDetailSkeleton() {
       {/* Details Card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
         <Skeleton className="h-4 w-20 mb-4" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-1.5">
               <Skeleton className="h-3 w-14" />
               <Skeleton className="h-4 w-20" />
@@ -1183,7 +1183,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 </button>
 
                 {openDetailsCard && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-xs pt-3 border-t border-slate-100 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs pt-3 border-t border-slate-100 mt-2">
                     <div>
                       <div className="text-slate-400 mb-1">Date</div>
                       {isSelectedBillDetailLoading ? (
@@ -1208,7 +1208,9 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                         <div className="text-slate-800 font-semibold font-mono">{selectedBill.billNumber}</div>
                       )}
                     </div>
-                    <div>
+                    {/* PO Reference temporarily hidden — restore by
+                        uncommenting. */}
+                    {/* <div>
                       <div className="text-slate-400 mb-1">PO Reference</div>
                       {isSelectedBillDetailLoading ? (
                         <Skeleton className="h-4 w-20" />
@@ -1217,7 +1219,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                           {selectedBill.reference ?? NO_DATA}
                         </div>
                       )}
-                    </div>
+                    </div> */}
                     <div>
                       <div className="text-slate-400 mb-1">Currency</div>
                       {isSelectedBillDetailLoading ? (
