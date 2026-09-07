@@ -48,8 +48,16 @@ export async function proxy(request: NextRequest) {
   // Redirect unauthenticated users to login
   if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
+    // Preserve the deep link's own query string (e.g. ?bill=<id> on a
+    // Bills approval link) as part of `redirectTo`, not just the pathname
+    // — otherwise post-login always lands on the bare list view instead of
+    // the specific bill the link pointed at. `url.search` is cleared
+    // first since it still carries the original request's query params
+    // (cloned along with the pathname) — those get folded into the single
+    // `redirectTo` value below instead of floating alongside it.
     url.pathname = '/login'
-    url.searchParams.set('redirectTo', request.nextUrl.pathname)
+    url.search = ''
+    url.searchParams.set('redirectTo', request.nextUrl.pathname + request.nextUrl.search)
     return NextResponse.redirect(url)
   }
 
