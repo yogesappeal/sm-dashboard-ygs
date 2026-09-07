@@ -13,7 +13,7 @@ interface WelcomeModalProps {
 const STEPS = [
   {
     emoji: '🎉',
-    title: 'Welcome to the SM Dashboard',
+    title: 'Welcome to the SM Approval',
     description: "We're glad to have you here. Let's take a quick look at what you can do.",
   },
   {

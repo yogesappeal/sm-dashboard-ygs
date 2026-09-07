@@ -8,7 +8,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 export const COMPANY_NAME = process.env.NEXT_PUBLIC_COMPANY ?? 'AusHail'
 export const COMPANY_ALT_TEXT = COMPANY_NAME
 export const COMPANY_LOGO_ALT_TEXT = `${COMPANY_NAME} Construction`
-export const SITE_TITLE = `SM Dashboard - ${COMPANY_NAME}`
+export const SITE_TITLE = `SM Approval - ${COMPANY_NAME}`
 
 const LOGO_FULL_PATH = process.env.NEXT_PUBLIC_LOGO_FULL_PATH ?? '/assets/company-logos/logo_ah.png'
 const LOGO_MINI_PATH = process.env.NEXT_PUBLIC_LOGO_MINI_PATH ?? '/assets/company-logos/mini_logo_ah.png'

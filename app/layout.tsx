@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: siteTitle,
     description: siteDescription,
-    siteName: 'SM Dashboard',
+    siteName: 'SM Approval',
     type: 'website',
     url: siteUrl,
     images: [{ url: '/og-image.png', width: 1200, height: 630, type: 'image/png' }],
