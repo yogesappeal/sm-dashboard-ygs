@@ -150,7 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      <WelcomeModal open={showWelcome} onFinish={handleFinishWelcome} />
+      {/* Welcome modal temporarily hidden on login — restore by
+          uncommenting. Everything that drives it (showWelcome state,
+          has_seen_welcome tracking, handleFinishWelcome) is left in place. */}
+      {/* <WelcomeModal open={showWelcome} onFinish={handleFinishWelcome} /> */}
     </>
   )
 }
