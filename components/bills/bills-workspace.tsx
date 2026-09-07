@@ -311,6 +311,95 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // applied alongside it further down.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
+  // Forces landscape on mobile while the attachment viewer is open — a
+  // portrait phone screen leaves almost no usable width for a document.
+  // Screen Orientation's `lock()` isn't in TS's DOM lib (unlike `unlock()`,
+  // which is) since it's not universally supported, hence the local
+  // augmented type instead of `any`. Most mobile browsers only allow the
+  // lock while the page is fullscreen, so fullscreen is requested first —
+  // both calls are wrapped and swallowed on failure (iOS Safari has no
+  // orientation-lock API at all; desktop ignores this whole effect via the
+  // viewport check) rather than surfaced as an error, since this is a
+  // nice-to-have, not a required capability.
+  useEffect(() => {
+    if (!showLeftPreview) return
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return
+
+    type LockableScreenOrientation = ScreenOrientation & {
+      lock?: (orientation: 'landscape' | 'portrait') => Promise<void>
+    }
+
+    let cancelled = false
+      ; (async () => {
+        try {
+          const el = document.documentElement
+          if (!document.fullscreenElement) {
+            await el.requestFullscreen?.()
+          }
+          if (cancelled) return
+          await (screen.orientation as LockableScreenOrientation).lock?.('landscape')
+        } catch {
+          // Unsupported or blocked (no user-gesture context, iOS Safari,
+          // desktop, etc.) — leave the viewer in whatever orientation it's in.
+        }
+      })()
+
+    return () => {
+      cancelled = true
+      try {
+        ; (screen.orientation as LockableScreenOrientation).unlock?.()
+        if (document.fullscreenElement) {
+          void document.exitFullscreen()
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [showLeftPreview])
+
+  // Drives the mobile "attachment view goes side-by-side like desktop"
+  // layout — true whenever the viewer is open on a phone-sized screen, in
+  // EITHER orientation (see the OR'd media query below), overriding the
+  // normal mobile single-pane master/detail toggle so both the attachment
+  // and the bill detail pane render together, same as desktop's `md:flex`
+  // row does. `isPortraitNow` additionally drives the CSS-rotate fallback
+  // just below: only needed while the device is still physically portrait
+  // (no rotate transform is applied once real landscape is achieved,
+  // either because the native lock above succeeded or the user physically
+  // turned the phone — at that point the flex row already reads as
+  // landscape on its own, nothing left to fake).
+  //
+  // Tracked reactively via matchMedia rather than computed once, so both
+  // self-correct: a successful native lock or a physical turn flips
+  // `isPortraitNow` off on its own, and closing the viewer (`showLeftPreview`
+  // false) drops `isMobileAttachmentLandscapeMode` immediately.
+  //
+  // `mobileQuery` matches on EITHER dimension (comma = OR in a media
+  // query) so a phone already rotated to landscape (tall dimension now the
+  // width) is still recognized as phone-sized, not mistaken for a small
+  // desktop window.
+  const [isMobileAttachmentLandscapeMode, setIsMobileAttachmentLandscapeMode] = useState(false)
+  const [forceLandscapeCss, setForceLandscapeCss] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mobileQuery = window.matchMedia('(max-width: 767px), (max-height: 767px)')
+    const portraitQuery = window.matchMedia('(orientation: portrait)')
+
+    const update = () => {
+      const isPhoneSized = mobileQuery.matches
+      const isPortraitNow = portraitQuery.matches
+      setIsMobileAttachmentLandscapeMode(showLeftPreview && isPhoneSized)
+      setForceLandscapeCss(showLeftPreview && isPhoneSized && isPortraitNow)
+    }
+    update()
+    mobileQuery.addEventListener('change', update)
+    portraitQuery.addEventListener('change', update)
+    return () => {
+      mobileQuery.removeEventListener('change', update)
+      portraitQuery.removeEventListener('change', update)
+    }
+  }, [showLeftPreview])
+
   const toast = useToast()
 
   // Re-fetches whenever the token changes, or `scope` (set by which sidebar
@@ -421,12 +510,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           prev.map((b) =>
             b.id === id
               ? {
-                  ...mapApiBillToBill(apiBill, b),
-                  auditTrail: mapCommentsAndAuditLogToAuditTrail(
-                    Array.isArray(comments) ? comments : [],
-                    Array.isArray(auditLog) ? auditLog : []
-                  ),
-                }
+                ...mapApiBillToBill(apiBill, b),
+                auditTrail: mapCommentsAndAuditLogToAuditTrail(
+                  Array.isArray(comments) ? comments : [],
+                  Array.isArray(auditLog) ? auditLog : []
+                ),
+              }
               : b
           )
         )
@@ -458,9 +547,12 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Mobile-only visibility for the two top-level panes (see
   // mobileDetailOpen above). The preview always takes priority over the
   // detail pane on mobile since it's opened from a control inside the
-  // detail pane and must stay reachable there.
+  // detail pane and must stay reachable there — except in
+  // isMobileAttachmentLandscapeMode, where both panes show together
+  // side-by-side (attachment left, detail right) like desktop, since a
+  // landscape-shaped phone screen has the room for it.
   const showMobileLeftSlot = !mobileDetailOpen || showLeftPreview
-  const showMobileRightSlot = mobileDetailOpen && !showLeftPreview
+  const showMobileRightSlot = (mobileDetailOpen && !showLeftPreview) || isMobileAttachmentLandscapeMode
 
   // True while the selected bill's line items / files / audit trail are
   // still being fetched (see the detail-fetch effect above) — the Header
@@ -767,8 +859,30 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           (their ratio, not their sum), and the two left-side states — the
           Bills List and the attachment preview above it — are independent,
           so each can have its own ratio against the "Right Detail
-          Workspace" panel further down this file. */}
-      <div className="flex-1 flex overflow-hidden">
+          Workspace" panel further down this file.
+
+          In isMobileAttachmentLandscapeMode, this whole row (both panes
+          together, already laid out side-by-side via flex) is what gets
+          pinned fullscreen and rotated by forceLandscapeCss below — not
+          just the attachment pane alone — so the two panes keep their
+          side-by-side arrangement instead of one covering the whole
+          screen by itself. */}
+      <div
+        className={cn(
+          'flex-1 flex overflow-hidden',
+          forceLandscapeCss && 'fixed inset-0 z-[100]'
+        )}
+        style={
+          forceLandscapeCss
+            ? {
+              width: '100vh',
+              height: '100vw',
+              transform: 'rotate(90deg) translateY(-100%)',
+              transformOrigin: 'top left',
+            }
+            : undefined
+        }
+      >
         {/* Left Side: Either Bills List or Document Previewer (PDF / Image) */}
         {showLeftPreview ? (
           <div
@@ -1389,87 +1503,87 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                       const isMine = ev.isMine || (!!ev.authorId && ev.authorId === authUserId)
 
                       return (
-                      <div key={ev.id} className="relative group">
-                        {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
-                        <div
-                          className={cn(
-                            'absolute -left-[31px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
-                            ev.type === 'comment' ? 'bg-slate-300' : 'bg-emerald-500 text-white'
-                          )}
-                        >
-                          {ev.type !== 'comment' && '✓'}
-                        </div>
-
-                        {ev.type === 'comment' ? (
+                        <div key={ev.id} className="relative group">
+                          {/* Timeline Bullet — comments get a plain marker, no check/approval icon */}
                           <div
                             className={cn(
-                              'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
-                              isMine
-                                ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
-                                : 'bg-slate-50 border-slate-100'
+                              'absolute -left-[31px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                              ev.type === 'comment' ? 'bg-slate-300' : 'bg-emerald-500 text-white'
                             )}
                           >
+                            {ev.type !== 'comment' && '✓'}
+                          </div>
+
+                          {ev.type === 'comment' ? (
                             <div
                               className={cn(
-                                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
+                                'flex items-start gap-3 p-3 rounded-xl border max-w-[85%]',
+                                isMine
+                                  ? 'flex-row-reverse ml-auto bg-[#6692C5]/10 border-[#6692C5]/20'
+                                  : 'bg-slate-50 border-slate-100'
                               )}
                             >
-                              {ev.user?.[0] ?? 'U'}
-                            </div>
-                            <div className="flex-1 text-xs">
                               <div
                                 className={cn(
-                                  'flex items-center justify-between mb-1',
-                                  isMine && 'flex-row-reverse'
+                                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                                  isMine ? 'bg-[#6692C5] text-white' : 'bg-[#6692C5]/20 text-[#6692C5]'
                                 )}
                               >
-                                <span className="font-semibold text-slate-800">{ev.user}</span>
-                                <span className="text-[10px] text-slate-400">{ev.date}</span>
+                                {ev.user?.[0] ?? 'U'}
                               </div>
-                              <p className="text-slate-700 font-medium">"{ev.notes}"</p>
-                            </div>
-                          </div>
-                        ) : (
-                          // Action/system entries — a bordered card (matching
-                          // the comment bubbles' card treatment, rather than
-                          // floating unstyled text) with an optional
-                          // before -> after "changes" table and an optional
-                          // comment callout, both collapsible sections since
-                          // not every entry has either.
-                          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden max-w-[85%]">
-                            <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-slate-800">{ev.title}</div>
-                                {ev.user && (
-                                  <div className="text-[10px] text-slate-400 mt-0.5">By {ev.user}</div>
-                                )}
+                              <div className="flex-1 text-xs">
+                                <div
+                                  className={cn(
+                                    'flex items-center justify-between mb-1',
+                                    isMine && 'flex-row-reverse'
+                                  )}
+                                >
+                                  <span className="font-semibold text-slate-800">{ev.user}</span>
+                                  <span className="text-[10px] text-slate-400">{ev.date}</span>
+                                </div>
+                                <p className="text-slate-700 font-medium">"{ev.notes}"</p>
                               </div>
-                              <span className="text-[10px] text-slate-400 flex-shrink-0 whitespace-nowrap">
-                                {ev.date}
-                              </span>
                             </div>
+                          ) : (
+                            // Action/system entries — a bordered card (matching
+                            // the comment bubbles' card treatment, rather than
+                            // floating unstyled text) with an optional
+                            // before -> after "changes" table and an optional
+                            // comment callout, both collapsible sections since
+                            // not every entry has either.
+                            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden max-w-[85%]">
+                              <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-slate-800">{ev.title}</div>
+                                  {ev.user && (
+                                    <div className="text-[10px] text-slate-400 mt-0.5">By {ev.user}</div>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 flex-shrink-0 whitespace-nowrap">
+                                  {ev.date}
+                                </span>
+                              </div>
 
-                            {ev.changes && ev.changes.length > 0 && (
-                              <div className="border-t border-slate-100 divide-y divide-slate-100">
-                                {ev.changes.map((change, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                                  >
-                                    <span className="text-slate-400 flex-shrink-0">{change.label}</span>
-                                    <span className="flex items-center gap-1.5 min-w-0 text-right">
-                                      <span className="text-slate-400 line-through truncate">{change.from}</span>
-                                      <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
-                                      <span className="text-slate-800 font-semibold truncate">{change.to}</span>
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                              {ev.changes && ev.changes.length > 0 && (
+                                <div className="border-t border-slate-100 divide-y divide-slate-100">
+                                  {ev.changes.map((change, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                                    >
+                                      <span className="text-slate-400 flex-shrink-0">{change.label}</span>
+                                      <span className="flex items-center gap-1.5 min-w-0 text-right">
+                                        <span className="text-slate-400 line-through truncate">{change.from}</span>
+                                        <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
+                                        <span className="text-slate-800 font-semibold truncate">{change.to}</span>
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
