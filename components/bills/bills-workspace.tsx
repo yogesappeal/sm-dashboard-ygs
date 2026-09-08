@@ -333,11 +333,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // `mobileQuery` matches on EITHER dimension (comma = OR in a media
   // query) so a phone that happens to already be in landscape (tall
   // dimension now the width) still counts as phone-sized, not mistaken
-  // for a small desktop window.
+  // for a small desktop window. The landscape-phone clause also caps
+  // *width* (932px covers the largest current phones, e.g. iPhone 15 Pro
+  // Max at 932x430) and tightens the height bound (500px) — without that
+  // cap, a bare `max-height: 767px` matches ANY short window regardless of
+  // width, so a resized desktop/laptop browser (e.g. 1024x722) or a tablet
+  // in landscape (e.g. 1024x768) would wrongly count as phone-sized too.
   const [isMobileAttachmentLandscapeMode, setIsMobileAttachmentLandscapeMode] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const mobileQuery = window.matchMedia('(max-width: 767px), (max-height: 767px)')
+    const mobileQuery = window.matchMedia(
+      '(max-width: 767px), (max-width: 932px) and (max-height: 500px)'
+    )
 
     const update = () => {
       setIsMobileAttachmentLandscapeMode(showLeftPreview && mobileQuery.matches)
@@ -833,8 +840,19 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         style={
           isMobileAttachmentLandscapeMode
             ? {
-                width: '100vh',
-                height: '100vw',
+                // `dvh`/`dvw` (dynamic viewport units), not `vh`/`vw` — on a
+                // real phone the browser's own address bar/toolbar collapses
+                // and expands as the page scrolls, changing how much of the
+                // screen is actually visible at any moment. `vh`/`vw` are
+                // pinned to one fixed reference (which one varies by
+                // browser), so this box could end up taller/wider than what
+                // toolbar state currently allows, pushing edge controls like
+                // "Return to bills list" outside the tappable area or under
+                // the toolbar itself. `dvh`/`dvw` track the real, current
+                // visible viewport instead, keeping every corner of this box
+                // reachable regardless of toolbar state.
+                width: '100dvh',
+                height: '100dvw',
                 transform: 'rotate(90deg) translateY(-100%)',
                 transformOrigin: 'top left',
               }
