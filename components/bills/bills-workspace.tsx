@@ -302,6 +302,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // Preview is clicked.
   const [attachmentUrlLoading, setAttachmentUrlLoading] = useState(false)
   const [attachmentUrlError, setAttachmentUrlError] = useState<string | null>(null)
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
 
   // Mobile-only master/detail toggle — desktop (md: and up) always shows
   // both panes side by side, completely unaffected by this. Below md, only
@@ -710,6 +711,42 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     [selectedBill, token, toast]
   )
 
+  // Same staleness problem as resolveAndPreviewAttachment above, but for the
+  // Download button specifically: it used to point straight at
+  // `activeAttachment.url`, the signed URL resolved once when the preview
+  // was first opened. Stay on that preview past `signed_url_ttl_sec` (~120s)
+  // and clicking Download would still hit that same expired URL — the
+  // in-browser viewer itself doesn't re-fetch (it already has the file's
+  // bytes loaded), so only Download exposed how stale it had gotten,
+  // surfacing Supabase's raw `InvalidJWT` error. Resolving a fresh signed
+  // URL right before triggering the download closes that gap.
+  const handleDownloadAttachment = useCallback(
+    async (file: BillFile) => {
+      if (!selectedBill || !token) return
+      setDownloadingFileId(file.id)
+      try {
+        const json = await getBillAttachment(token, selectedBill.id, file.id)
+        const apiAttachment = unwrapApiData(json)
+        const freshUrl = apiAttachment.signed_url ?? ''
+        if (!freshUrl) throw new Error('No download URL returned for this attachment')
+
+        const link = document.createElement('a')
+        link.href = freshUrl
+        link.download = file.name
+        link.rel = 'noreferrer'
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      } catch (err) {
+        toast(getFriendlyErrorMessage(err, 'Failed to download attachment'), 'error')
+      } finally {
+        setDownloadingFileId(null)
+      }
+    },
+    [selectedBill, token, toast]
+  )
+
   // Auto-opens a pending bill's first attachment once its detail has
   // genuinely finished loading — saves the extra click of opening the file
   // yourself while reviewing something you're about to approve/reject.
@@ -939,16 +976,19 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                   </button>
                 )}
                 {activeAttachment?.url && (
-                  <a
-                    href={activeAttachment.url}
-                    download={activeAttachment.name}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadAttachment(activeAttachment)}
+                    disabled={downloadingFileId === activeAttachment.id}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40"
                     title="Download"
                   >
-                    <Download size={14} />
-                  </a>
+                    {downloadingFileId === activeAttachment.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )}
+                  </button>
                 )}
                 <button
                   type="button"
