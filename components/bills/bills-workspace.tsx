@@ -313,23 +313,25 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
   // Forces the attachment viewer into a landscape-style, side-by-side
-  // layout on mobile — unconditionally, the same way regardless of the
-  // device's actual physical orientation at the time. No native
-  // `screen.orientation.lock()` attempt and no reacting to real
-  // portrait/landscape state: both were tried in earlier versions of this
-  // feature and dropped on purpose —
-  // - The native lock only works on some Android browsers, never iOS
-  //   (Apple's WebKit has no `lock()` at all), so relying on it meant the
-  //   feature behaved differently per platform, which is exactly the
-  //   inconsistency this version avoids.
-  // - Reacting to real orientation (rotating only while portrait, turning
-  //   it off once landscape was reached) meant a physical rotation *while*
-  //   already forced could race with the browser's own reflow, and it's
-  //   the reason this looked different depending on whether the phone
-  //   happened to be portrait or landscape when you opened the viewer.
-  // This version is a single, deterministic CSS transform applied purely
-  // from screen *size* (phone-sized or not) — never orientation — so the
-  // result is identical every time, on every platform.
+  // layout on mobile whenever the screen is phone-sized (`isMobileAttachment
+  // LandscapeMode`) — that entry condition never looks at real orientation,
+  // still purely screen *size*, so switching into this dual-pane mode itself
+  // stays deterministic and identical on every platform. No native
+  // `screen.orientation.lock()`: tried in an earlier version and dropped
+  // since it only works on some Android browsers, never iOS (WebKit has no
+  // `lock()` at all), which would've meant the feature behaved differently
+  // per platform.
+  //
+  // What DOES react to real orientation is `needsFakeRotate`, layered on
+  // top: the dual-pane mode above is what a landscape phone should look
+  // like, but a phone actually held portrait is still, physically, a
+  // portrait screen — nothing rotates it for you. `needsFakeRotate` is only
+  // true while the phone is still genuinely portrait, and drives the CSS
+  // `rotate(90deg)` trick that fakes the landscape look on it (see the style
+  // below). Once the phone is ACTUALLY held landscape, that trick would
+  // rotate an already-landscape screen an extra 90° and wreck the layout —
+  // so `needsFakeRotate` turns off there and the dual-pane mode renders
+  // un-rotated, filling the real landscape viewport directly.
   //
   // `mobileQuery` matches on EITHER dimension (comma = OR in a media
   // query) so a phone that happens to already be in landscape (tall
@@ -340,19 +342,32 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // cap, a bare `max-height: 767px` matches ANY short window regardless of
   // width, so a resized desktop/laptop browser (e.g. 1024x722) or a tablet
   // in landscape (e.g. 1024x768) would wrongly count as phone-sized too.
+  //
+  // `orientationQuery` is a separate matchMedia specifically so its own
+  // `change` event fires on every real portrait<->landscape flip — a phone
+  // rotating from 390x844 to 844x390 stays phone-sized the whole time
+  // (`mobileQuery.matches` never flips), so relying on `mobileQuery`'s
+  // `change` event alone would miss that rotation entirely and leave
+  // `needsFakeRotate` stuck stale.
   const [isMobileAttachmentLandscapeMode, setIsMobileAttachmentLandscapeMode] = useState(false)
+  const [needsFakeRotate, setNeedsFakeRotate] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mobileQuery = window.matchMedia(
       '(max-width: 767px), (max-width: 932px) and (max-height: 500px)'
     )
+    const orientationQuery = window.matchMedia('(orientation: portrait)')
 
     const update = () => {
-      setIsMobileAttachmentLandscapeMode(showLeftPreview && mobileQuery.matches)
+      const isPhoneSized = mobileQuery.matches
+      setIsMobileAttachmentLandscapeMode(showLeftPreview && isPhoneSized)
+      setNeedsFakeRotate(showLeftPreview && isPhoneSized && orientationQuery.matches)
     }
     update()
     mobileQuery.addEventListener('change', update)
+    orientationQuery.addEventListener('change', update)
     return () => {
+      orientationQuery.removeEventListener('change', update)
       mobileQuery.removeEventListener('change', update)
     }
   }, [showLeftPreview])
@@ -875,7 +890,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           isMobileAttachmentLandscapeMode && 'fixed inset-0 z-40'
         )}
         style={
-          isMobileAttachmentLandscapeMode
+          needsFakeRotate
             ? {
                 // `dvh`/`dvw` (dynamic viewport units), not `vh`/`vw` — on a
                 // real phone the browser's own address bar/toolbar collapses
@@ -888,6 +903,13 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 // the toolbar itself. `dvh`/`dvw` track the real, current
                 // visible viewport instead, keeping every corner of this box
                 // reachable regardless of toolbar state.
+                //
+                // Only applied while `needsFakeRotate` — i.e. the phone is
+                // still genuinely portrait. Once it's actually landscape,
+                // `isMobileAttachmentLandscapeMode` alone (via `fixed
+                // inset-0` above) is enough: no swapped dimensions, no
+                // rotation, this row just fills the real landscape viewport
+                // as-is.
                 width: '100dvh',
                 height: '100dvw',
                 transform: 'rotate(90deg) translateY(-100%)',
@@ -1275,7 +1297,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 confirmLabel="Approve"
                 variant="default"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
-                rotate={isMobileAttachmentLandscapeMode}
+                rotate={needsFakeRotate}
                 onConfirm={async () => {
                   if (!confirmDialog) return
                   await handleApprove(confirmDialog.billId, '')
@@ -1292,7 +1314,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 variant="danger"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
                 confirmDisabled={!rejectDialogComment.trim()}
-                rotate={isMobileAttachmentLandscapeMode}
+                rotate={needsFakeRotate}
                 onConfirm={async () => {
                   if (!confirmDialog || !rejectDialogComment.trim()) return
                   await handleReject(confirmDialog.billId, rejectDialogComment.trim())
