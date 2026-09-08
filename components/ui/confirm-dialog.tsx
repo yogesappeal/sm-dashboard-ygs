@@ -17,6 +17,15 @@ interface ConfirmDialogProps {
   // hasn't been filled in yet) — Cancel and the Escape/backdrop-close paths
   // stay active either way.
   confirmDisabled?: boolean
+  // Visually rotates the dialog card 90° in place, around its own center
+  // (it's already centered via the backdrop's flex layout, so this doesn't
+  // need any width/height/translate compensation the way a full-screen
+  // element would). For callers that force their own page into a
+  // landscape-style layout on mobile via a CSS transform (see
+  // components/bills/bills-workspace.tsx) — this dialog portals to
+  // `document.body`, outside that transformed subtree, so it would
+  // otherwise render upright while everything behind it is rotated.
+  rotate?: boolean
   onConfirm: () => void
   onCancel: () => void
   children?: React.ReactNode
@@ -31,6 +40,7 @@ export function ConfirmDialog({
   variant = 'default',
   isLoading = false,
   confirmDisabled = false,
+  rotate = false,
   onConfirm,
   onCancel,
   children,
@@ -67,7 +77,10 @@ export function ConfirmDialog({
       />
       <div
         ref={dialogRef}
-        className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
+        className={cn(
+          'relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6',
+          rotate && 'rotate-90'
+        )}
       >
         <button
           onClick={onCancel}

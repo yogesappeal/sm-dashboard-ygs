@@ -311,92 +311,41 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // applied alongside it further down.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
-  // Forces landscape on mobile while the attachment viewer is open — a
-  // portrait phone screen leaves almost no usable width for a document.
-  // Screen Orientation's `lock()` isn't in TS's DOM lib (unlike `unlock()`,
-  // which is) since it's not universally supported, hence the local
-  // augmented type instead of `any`. Most mobile browsers only allow the
-  // lock while the page is fullscreen, so fullscreen is requested first —
-  // both calls are wrapped and swallowed on failure (iOS Safari has no
-  // orientation-lock API at all; desktop ignores this whole effect via the
-  // viewport check) rather than surfaced as an error, since this is a
-  // nice-to-have, not a required capability.
-  useEffect(() => {
-    if (!showLeftPreview) return
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return
-
-    type LockableScreenOrientation = ScreenOrientation & {
-      lock?: (orientation: 'landscape' | 'portrait') => Promise<void>
-    }
-
-    let cancelled = false
-      ; (async () => {
-        try {
-          const el = document.documentElement
-          if (!document.fullscreenElement) {
-            await el.requestFullscreen?.()
-          }
-          if (cancelled) return
-          await (screen.orientation as LockableScreenOrientation).lock?.('landscape')
-        } catch {
-          // Unsupported or blocked (no user-gesture context, iOS Safari,
-          // desktop, etc.) — leave the viewer in whatever orientation it's in.
-        }
-      })()
-
-    return () => {
-      cancelled = true
-      try {
-        ; (screen.orientation as LockableScreenOrientation).unlock?.()
-        if (document.fullscreenElement) {
-          void document.exitFullscreen()
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }, [showLeftPreview])
-
-  // Drives the mobile "attachment view goes side-by-side like desktop"
-  // layout — true whenever the viewer is open on a phone-sized screen, in
-  // EITHER orientation (see the OR'd media query below), overriding the
-  // normal mobile single-pane master/detail toggle so both the attachment
-  // and the bill detail pane render together, same as desktop's `md:flex`
-  // row does. `isPortraitNow` additionally drives the CSS-rotate fallback
-  // just below: only needed while the device is still physically portrait
-  // (no rotate transform is applied once real landscape is achieved,
-  // either because the native lock above succeeded or the user physically
-  // turned the phone — at that point the flex row already reads as
-  // landscape on its own, nothing left to fake).
-  //
-  // Tracked reactively via matchMedia rather than computed once, so both
-  // self-correct: a successful native lock or a physical turn flips
-  // `isPortraitNow` off on its own, and closing the viewer (`showLeftPreview`
-  // false) drops `isMobileAttachmentLandscapeMode` immediately.
+  // Forces the attachment viewer into a landscape-style, side-by-side
+  // layout on mobile — unconditionally, the same way regardless of the
+  // device's actual physical orientation at the time. No native
+  // `screen.orientation.lock()` attempt and no reacting to real
+  // portrait/landscape state: both were tried in earlier versions of this
+  // feature and dropped on purpose —
+  // - The native lock only works on some Android browsers, never iOS
+  //   (Apple's WebKit has no `lock()` at all), so relying on it meant the
+  //   feature behaved differently per platform, which is exactly the
+  //   inconsistency this version avoids.
+  // - Reacting to real orientation (rotating only while portrait, turning
+  //   it off once landscape was reached) meant a physical rotation *while*
+  //   already forced could race with the browser's own reflow, and it's
+  //   the reason this looked different depending on whether the phone
+  //   happened to be portrait or landscape when you opened the viewer.
+  // This version is a single, deterministic CSS transform applied purely
+  // from screen *size* (phone-sized or not) — never orientation — so the
+  // result is identical every time, on every platform.
   //
   // `mobileQuery` matches on EITHER dimension (comma = OR in a media
-  // query) so a phone already rotated to landscape (tall dimension now the
-  // width) is still recognized as phone-sized, not mistaken for a small
-  // desktop window.
+  // query) so a phone that happens to already be in landscape (tall
+  // dimension now the width) still counts as phone-sized, not mistaken
+  // for a small desktop window.
   const [isMobileAttachmentLandscapeMode, setIsMobileAttachmentLandscapeMode] = useState(false)
-  const [forceLandscapeCss, setForceLandscapeCss] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mobileQuery = window.matchMedia('(max-width: 767px), (max-height: 767px)')
-    const portraitQuery = window.matchMedia('(orientation: portrait)')
 
     const update = () => {
-      const isPhoneSized = mobileQuery.matches
-      const isPortraitNow = portraitQuery.matches
-      setIsMobileAttachmentLandscapeMode(showLeftPreview && isPhoneSized)
-      setForceLandscapeCss(showLeftPreview && isPhoneSized && isPortraitNow)
+      setIsMobileAttachmentLandscapeMode(showLeftPreview && mobileQuery.matches)
     }
     update()
     mobileQuery.addEventListener('change', update)
-    portraitQuery.addEventListener('change', update)
     return () => {
       mobileQuery.removeEventListener('change', update)
-      portraitQuery.removeEventListener('change', update)
     }
   }, [showLeftPreview])
 
@@ -863,23 +812,32 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
           In isMobileAttachmentLandscapeMode, this whole row (both panes
           together, already laid out side-by-side via flex) is what gets
-          pinned fullscreen and rotated by forceLandscapeCss below — not
-          just the attachment pane alone — so the two panes keep their
-          side-by-side arrangement instead of one covering the whole
-          screen by itself. */}
+          pinned fullscreen and rotated — not just the attachment pane
+          alone — so the two panes keep their side-by-side arrangement
+          instead of one covering the whole screen by itself.
+
+          `z-40` (not higher) is deliberate: it sits above normal page
+          content but stays BELOW ConfirmDialog's `z-50` portal
+          (components/ui/confirm-dialog.tsx, shared with purchase-orders/
+          suppliers/tasks) and Toast's `z-[200]` (components/shared/toast.tsx)
+          — an earlier version of this used `z-[100]`, which sat ABOVE the
+          dialog and silently swallowed every click meant for it, since the
+          dialog portals to `document.body` outside this rotated subtree
+          entirely and stacking is purely z-index-driven once both sides
+          have an explicit value, regardless of DOM/mount order. */}
       <div
         className={cn(
           'flex-1 flex overflow-hidden',
-          forceLandscapeCss && 'fixed inset-0 z-[100]'
+          isMobileAttachmentLandscapeMode && 'fixed inset-0 z-40'
         )}
         style={
-          forceLandscapeCss
+          isMobileAttachmentLandscapeMode
             ? {
-              width: '100vh',
-              height: '100vw',
-              transform: 'rotate(90deg) translateY(-100%)',
-              transformOrigin: 'top left',
-            }
+                width: '100vh',
+                height: '100vw',
+                transform: 'rotate(90deg) translateY(-100%)',
+                transformOrigin: 'top left',
+              }
             : undefined
         }
       >
@@ -896,7 +854,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
               <div className="flex items-center gap-1.5 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setShowLeftPreview(false)}
+                  onClick={() => {
+                    setShowLeftPreview(false)
+                    // Also drops back out of the mobile detail pane — pre-
+                    // existing (not landscape-specific) mismatch between
+                    // this button's own label/tooltip and its actual
+                    // behavior: on mobile, closing just the attachment
+                    // used to reveal the bill *detail* pane underneath,
+                    // one level short of the bills list this button says
+                    // it returns to. Harmless on desktop, which ignores
+                    // mobileDetailOpen entirely via its own `md:` overrides.
+                    setMobileDetailOpen(false)
+                  }}
                   className="p-1.5 -ml-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold flex-shrink-0"
                   title="Return to bills list"
                 >
@@ -1248,6 +1217,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 confirmLabel="Approve"
                 variant="default"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
+                rotate={isMobileAttachmentLandscapeMode}
                 onConfirm={async () => {
                   if (!confirmDialog) return
                   await handleApprove(confirmDialog.billId, '')
@@ -1264,6 +1234,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
                 variant="danger"
                 isLoading={!!confirmDialog && actionPendingId === confirmDialog.billId}
                 confirmDisabled={!rejectDialogComment.trim()}
+                rotate={isMobileAttachmentLandscapeMode}
                 onConfirm={async () => {
                   if (!confirmDialog || !rejectDialogComment.trim()) return
                   await handleReject(confirmDialog.billId, rejectDialogComment.trim())
