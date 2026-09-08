@@ -578,6 +578,30 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // where it's known, fixing amounts silently mislabeled as AUD.
   const formatCurrency = (val: number, currencyCode?: string) => formatCurrencyAmount(val, currencyCode)
 
+  // After a decision, jumps straight to the next bill in the current list
+  // (falling back to the previous one if the decided bill was last) rather
+  // than leaving the reviewer stranded on the just-decided bill — saves the
+  // extra "close this / pick the next one" round trip when working through
+  // a queue of approvals back to back. `filteredBills` here is a closure
+  // over the value from the render that triggered the approve/reject click
+  // — i.e. the order the reviewer was actually looking at — not a fresh
+  // read of `bills` after the mutation above, which only changes `status`
+  // in place and never reorders/removes anything itself. Selecting the
+  // next bill re-triggers the existing auto-open-first-attachment effect
+  // for free, so a Pending-Approval next bill lands the reviewer straight
+  // back into the side-by-side attachment + detail view.
+  const advanceToNextBill = useCallback(
+    (decidedId: string) => {
+      const index = filteredBills.findIndex((b) => b.id === decidedId)
+      if (index === -1) return
+      const next = filteredBills[index + 1] ?? filteredBills[index - 1]
+      if (next && next.id !== decidedId) {
+        selectBill(next.id)
+      }
+    },
+    [filteredBills, selectBill]
+  )
+
   // Handlers for bill workflow actions. Each bails out if the role lacks
   // bill:approve — enforced here (not just by hiding the button) since these
   // are the only two mutating actions Bills has left. The bill's status is
@@ -613,13 +637,14 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           })
         )
         toast('Bill approved successfully!', 'success')
+        advanceToNextBill(id)
       } catch (err) {
         toast(getFriendlyErrorMessage(err, 'Failed to approve bill'), 'error')
       } finally {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, token, user]
+    [toast, canApproveBills, token, user, advanceToNextBill]
   )
 
   const handleReject = useCallback(
@@ -651,13 +676,14 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         )
         setRejectDialogComment('')
         toast('Bill rejected', 'error')
+        advanceToNextBill(id)
       } catch (err) {
         toast(getFriendlyErrorMessage(err, 'Failed to reject bill'), 'error')
       } finally {
         setActionPendingId(null)
       }
     },
-    [toast, canApproveBills, token, user]
+    [toast, canApproveBills, token, user, advanceToNextBill]
   )
 
   // Posts to POST .../comments, then appends the comment locally from the
