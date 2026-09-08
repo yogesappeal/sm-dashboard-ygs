@@ -304,12 +304,14 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   const [attachmentUrlError, setAttachmentUrlError] = useState<string | null>(null)
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
 
-  // Mobile-only master/detail toggle — desktop (md: and up) always shows
-  // both panes side by side, completely unaffected by this. Below md, only
-  // one pane is visible at a time: the bills list until a bill is tapped,
-  // then the detail workspace, with an explicit "Back to Bills List" way
-  // back. Ignored entirely at md+ via the `md:flex`/`md:block` overrides
-  // applied alongside it further down.
+  // Phone-only master/detail toggle — a genuine desktop screen always
+  // shows both panes side by side, completely unaffected by this. On a
+  // phone-sized screen (see `isPhoneSizedScreen` below), only one pane is
+  // visible at a time: the bills list until a bill is tapped, then the
+  // detail workspace, with an explicit "Back to Bills List" way back.
+  // Ignored entirely on desktop via the `isPhoneSizedScreen` checks
+  // applied alongside it further down (not a `md:` Tailwind breakpoint —
+  // see `isPhoneSizedScreen` for why).
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
   // Forces the attachment viewer into a landscape-style, side-by-side
@@ -351,6 +353,19 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
   // `needsFakeRotate` stuck stale.
   const [isMobileAttachmentLandscapeMode, setIsMobileAttachmentLandscapeMode] = useState(false)
   const [needsFakeRotate, setNeedsFakeRotate] = useState(false)
+  // Whether THIS screen counts as phone-sized at all, independent of
+  // whether the attachment preview happens to be open right now — drives
+  // the mobile master/detail single-pane navigation (below) so it applies
+  // consistently across the same width range as the force-landscape
+  // feature above (up to 932px for a landscape phone), instead of
+  // Tailwind's own fixed 768px `md:` breakpoint. Without this, a landscape
+  // phone between 768-932px wide (most current large phones — e.g. iPhone
+  // 13 landscape is 844px, iPhone 15 Pro Max landscape is 932px) would
+  // cross `md:` and silently flip into the "desktop" layout — Bills List
+  // and Detail forced to always show side by side, and the "Back to Bills
+  // List" button (`md:hidden`) hidden — while still being, physically, a
+  // phone screen too cramped for that.
+  const [isPhoneSizedScreen, setIsPhoneSizedScreen] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mobileQuery = window.matchMedia(
@@ -360,6 +375,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
 
     const update = () => {
       const isPhoneSized = mobileQuery.matches
+      setIsPhoneSizedScreen(isPhoneSized)
       setIsMobileAttachmentLandscapeMode(showLeftPreview && isPhoneSized)
       setNeedsFakeRotate(showLeftPreview && isPhoneSized && orientationQuery.matches)
     }
@@ -516,15 +532,21 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
     [activeAttachment]
   )
 
-  // Mobile-only visibility for the two top-level panes (see
-  // mobileDetailOpen above). The preview always takes priority over the
-  // detail pane on mobile since it's opened from a control inside the
-  // detail pane and must stay reachable there — except in
-  // isMobileAttachmentLandscapeMode, where both panes show together
-  // side-by-side (attachment left, detail right) like desktop, since a
-  // landscape-shaped phone screen has the room for it.
-  const showMobileLeftSlot = !mobileDetailOpen || showLeftPreview
-  const showMobileRightSlot = (mobileDetailOpen && !showLeftPreview) || isMobileAttachmentLandscapeMode
+  // Master/detail single-pane visibility for the two top-level panes (see
+  // mobileDetailOpen above) — gated on `isPhoneSizedScreen` rather than a
+  // Tailwind `md:` breakpoint override, so it stays in effect across the
+  // same width range as the force-landscape feature (up to 932px for a
+  // landscape phone) instead of flipping to "always show both" at 768px.
+  // A genuine desktop screen (`!isPhoneSizedScreen`) always shows both.
+  // On a phone-sized screen, the preview always takes priority over the
+  // detail pane since it's opened from a control inside the detail pane
+  // and must stay reachable there — except in isMobileAttachmentLandscapeMode,
+  // where both panes show together side-by-side (attachment left, detail
+  // right) like desktop, since a landscape-shaped phone screen has the
+  // room for it.
+  const showMobileLeftSlot = !isPhoneSizedScreen || !mobileDetailOpen || showLeftPreview
+  const showMobileRightSlot =
+    !isPhoneSizedScreen || (mobileDetailOpen && !showLeftPreview) || isMobileAttachmentLandscapeMode
 
   // True while the selected bill's line items / files / audit trail are
   // still being fetched (see the detail-fetch effect above) — the Header
@@ -923,7 +945,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           <div
             className={cn(
               showMobileLeftSlot ? 'flex' : 'hidden',
-              'md:flex flex-col flex-45 min-w-0 md:min-w-80 bg-slate-900/5 border-r border-slate-200 h-full overflow-hidden relative'
+              'flex-col flex-45 min-w-0 md:min-w-80 bg-slate-900/5 border-r border-slate-200 h-full overflow-hidden relative'
             )}
           >
             {/* Viewer Header Toolbar */}
@@ -1087,7 +1109,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           <div
             className={cn(
               showMobileLeftSlot ? 'flex' : 'hidden',
-              'md:flex flex-col flex-23 min-w-0 md:min-w-80 bg-white border-r border-slate-200 h-full overflow-hidden'
+              'flex-col flex-23 min-w-0 md:min-w-80 bg-white border-r border-slate-200 h-full overflow-hidden'
             )}
           >
             {/* Search bar */}
@@ -1188,7 +1210,7 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
         <div
           className={cn(
             showMobileRightSlot ? 'block' : 'hidden',
-            'md:block flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
+            'flex-60 min-w-0 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-5'
           )}
         >
           {!token || billsLoading ? (
@@ -1208,13 +1230,34 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
             </div>
           ) : selectedBill ? (
             <div className="space-y-5">
-              {/* Mobile-only: return to the bills list without disturbing
-                  the desktop side-by-side layout, which never renders
-                  this (md:hidden). */}
+              {/* Phone-only: return to the bills list without disturbing
+                  the desktop side-by-side layout, which never renders this.
+                  Gated on `isPhoneSizedScreen` (not a `md:hidden` Tailwind
+                  breakpoint) so it stays reachable up to the same 932px
+                  width as the rest of the mobile master/detail logic above
+                  — a landscape phone between 768-932px wide would otherwise
+                  cross Tailwind's fixed 768px `md:` cutoff and lose this
+                  button while still being too narrow for the desktop
+                  side-by-side layout to make sense.
+                  Also closes the attachment preview (`setShowLeftPreview`),
+                  not just `setMobileDetailOpen` — while the preview is open
+                  on a phone-sized screen, isMobileAttachmentLandscapeMode
+                  forces both panes to show together regardless of
+                  mobileDetailOpen (see showMobileRightSlot above), so
+                  clearing mobileDetailOpen alone is a no-op there: tapping
+                  this button would do nothing visible. Matches the "Return
+                  to bills list" toolbar button inside the preview itself,
+                  which already closes both. */}
               <button
                 type="button"
-                onClick={() => setMobileDetailOpen(false)}
-                className="md:hidden flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+                onClick={() => {
+                  setShowLeftPreview(false)
+                  setMobileDetailOpen(false)
+                }}
+                className={cn(
+                  isPhoneSizedScreen ? 'flex' : 'hidden',
+                  'items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors'
+                )}
               >
                 <ArrowRight size={14} className="rotate-180" />
                 Back to Bills List
