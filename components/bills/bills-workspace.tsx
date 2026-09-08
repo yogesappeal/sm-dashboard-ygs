@@ -945,7 +945,18 @@ export function BillsWorkspace({ scope }: BillsWorkspaceProps) {
           <div
             className={cn(
               showMobileLeftSlot ? 'flex' : 'hidden',
-              'flex-col flex-45 min-w-0 md:min-w-80 bg-slate-900/5 border-r border-slate-200 h-full overflow-hidden relative'
+              // `bg-slate-900/5` (95% transparent) is fine normally — this
+              // pane only ever sits in the page's own flow, with nothing
+              // but the plain body background behind it. But in
+              // isMobileAttachmentLandscapeMode this whole row becomes a
+              // `fixed inset-0` overlay stacked ABOVE the rest of the page
+              // (PageHeader included) rather than pushing it out of the
+              // way, so that same near-transparent background lets the
+              // page content underneath (e.g. PageHeader's title/
+              // description) faintly show through — an opaque color here
+              // avoids that regardless of what's rendered behind it.
+              isMobileAttachmentLandscapeMode ? 'bg-slate-100' : 'bg-slate-900/5',
+              'flex-col flex-45 min-w-0 md:min-w-80 border-r border-slate-200 h-full overflow-hidden relative'
             )}
           >
             {/* Viewer Header Toolbar */}
