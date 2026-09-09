@@ -336,7 +336,11 @@ function UserFooter({ user, role, collapsed }: { user: UserDetails | null; role:
 
   async function handleSignOut() {
     setOpen(false)
-    await supabase.auth.signOut()
+    // `scope: 'local'` — Supabase's default (`'global'`) revokes the
+    // refresh token server-side entirely, signing the user out of every
+    // active session on every device, not just this one. See the matching
+    // fix/comment in components/shared/auth-provider.tsx.
+    await supabase.auth.signOut({ scope: 'local' })
     clear()
     router.push('/login')
     router.refresh()

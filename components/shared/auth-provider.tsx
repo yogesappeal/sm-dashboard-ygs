@@ -106,7 +106,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setUser, setRole, setToken, setAuthUserId, setLoading, setAccessDenied, supabase])
 
   async function handleSignOut() {
-    await supabase.auth.signOut()
+    // `scope: 'local'` — Supabase's default (`'global'`) signs the user out
+    // of every active session on every device, not just this one (it
+    // revokes the underlying refresh token server-side entirely). A Sign
+    // Out button is only ever expected to end the session someone is
+    // actually looking at.
+    await supabase.auth.signOut({ scope: 'local' })
     clear()
     // So the next login redirects a Site Manager to /bills again — see
     // app/(dashboard)/page.tsx, which sets this flag once per login.
