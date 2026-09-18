@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
@@ -37,7 +37,6 @@ function getFriendlyVerifyError(message: string): string {
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [verifyState, setVerifyState] = useState<VerifyState>('verifying')
   const [verifyError, setVerifyError] = useState('')
   const [serverError, setServerError] = useState('')
@@ -52,8 +51,18 @@ export default function ResetPasswordPage() {
   } = useForm<ResetForm>({ resolver: zodResolver(resetPasswordSchema) })
 
   useEffect(() => {
-    const tokenHash = searchParams.get('token_hash')
-    const type = searchParams.get('type') as EmailOtpType | null
+    // Reads straight from `window.location.search` (matching Resource/
+    // auth-email-hook-fe-integration.md's own example) rather than
+    // `next/navigation`'s useSearchParams() — that hook requires this page
+    // to be wrapped in a <Suspense> boundary or the production build fails
+    // outright ("useSearchParams() should be wrapped in a suspense
+    // boundary"). Reading the URL directly, only inside this effect (so
+    // only in the browser, never during the server/static build), sidesteps
+    // that requirement entirely — nothing here needs the reactivity
+    // useSearchParams offers anyway, since this only ever runs once.
+    const params = new URLSearchParams(window.location.search)
+    const tokenHash = params.get('token_hash')
+    const type = params.get('type') as EmailOtpType | null
 
     if (!tokenHash || !type) {
       // Deferred a tick (not called synchronously in the effect body) per
@@ -74,8 +83,7 @@ export default function ResetPasswordPage() {
       setVerifyState('verified')
     })
     // Only ever meant to run once, against whatever token_hash/type the
-    // page loaded with — re-running on searchParams identity changes would
-    // re-consume an already-used token_hash and fail the second time.
+    // page loaded with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
