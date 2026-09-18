@@ -95,6 +95,16 @@ export default function ResetPasswordPage() {
       setServerError(error.message)
       return
     }
+    // verifyOtp() above didn't just validate the recovery link — it
+    // actually established a real, active session from it. Left alone,
+    // "Back to login" would find that session still sitting there and
+    // proxy.ts's own "already logged in, don't show /login" rule would
+    // bounce the user straight to the dashboard instead. `scope: 'local'`
+    // (not the default 'global') only ends this one recovery session, not
+    // every other device the user's already logged in on elsewhere — see
+    // the same reasoning on the Sign Out button in
+    // components/shared/auth-provider.tsx / components/layout/sidebar.tsx.
+    await supabase.auth.signOut({ scope: 'local' })
     setResetSuccess(true)
   }
 
