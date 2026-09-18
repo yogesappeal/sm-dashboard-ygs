@@ -1,18 +1,45 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
-import { Eye, EyeOff } from 'lucide-react'
+import type { EmailOtpType } from '@supabase/supabase-js'
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { resetPasswordSchema } from '@/lib/utils/validation'
 
 type ResetForm = z.infer<typeof resetPasswordSchema>
 
+// Since the `auth-email-hook` Edge Function took over sending this email
+// (see Resource/auth-email-hook-fe-integration.md), the link it sends no
+// longer carries an already-active session the way Supabase's own default
+// reset email used to (an access token in the URL hash, auto-detected on
+// load) — it's `?token_hash=<...>&type=recovery` in the query string
+// instead, a one-time code that has to be explicitly exchanged for a
+// session via verifyOtp() before updateUser({ password }) has anything to
+// act on. Calling updateUser() straight away (the old behavior here) fails
+// with a raw "Auth session missing!" for every user landing from the new
+// link format.
+type VerifyState = 'verifying' | 'verified' | 'error'
+
+function getFriendlyVerifyError(message: string): string {
+  // Supabase's own wording for an already-used/expired recovery token is
+  // usually "Token has expired or is invalid" — surfaced as-is it reads
+  // like a developer/debug message, not something a user asked to reset
+  // their password would know what to do with.
+  if (/expired|invalid/i.test(message)) {
+    return 'This password reset link has expired or has already been used. Please request a new one.'
+  }
+  return "We couldn't verify this password reset link. Please request a new one."
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [verifyState, setVerifyState] = useState<VerifyState>('verifying')
+  const [verifyError, setVerifyError] = useState('')
   const [serverError, setServerError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -24,6 +51,34 @@ export default function ResetPasswordPage() {
     formState: { errors, isSubmitting },
   } = useForm<ResetForm>({ resolver: zodResolver(resetPasswordSchema) })
 
+  useEffect(() => {
+    const tokenHash = searchParams.get('token_hash')
+    const type = searchParams.get('type') as EmailOtpType | null
+
+    if (!tokenHash || !type) {
+      // Deferred a tick (not called synchronously in the effect body) per
+      // react-hooks/set-state-in-effect.
+      Promise.resolve().then(() => {
+        setVerifyError('This password reset link is missing or malformed. Please request a new one.')
+        setVerifyState('error')
+      })
+      return
+    }
+
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
+      if (error) {
+        setVerifyError(getFriendlyVerifyError(error.message))
+        setVerifyState('error')
+        return
+      }
+      setVerifyState('verified')
+    })
+    // Only ever meant to run once, against whatever token_hash/type the
+    // page loaded with — re-running on searchParams identity changes would
+    // re-consume an already-used token_hash and fail the second time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function onSubmit(data: ResetForm) {
     setServerError('')
     const { error } = await supabase.auth.updateUser({
@@ -34,6 +89,33 @@ export default function ResetPasswordPage() {
       return
     }
     router.push('/login?reset=1')
+  }
+
+  if (verifyState === 'verifying') {
+    return (
+      <div className="flex flex-col items-center py-8 text-center">
+        <Loader2 className="animate-spin text-slate-400 mb-4" size={28} />
+        <p className="text-slate-500 text-sm">Verifying your reset link…</p>
+      </div>
+    )
+  }
+
+  if (verifyState === 'error') {
+    return (
+      <div className="text-center">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="text-red-500" size={22} />
+        </div>
+        <h1 className="text-xl font-bold text-slate-800 mb-2">Link no longer valid</h1>
+        <p className="text-slate-500 text-sm">{verifyError}</p>
+        <a
+          href="/forgot-password"
+          className="mt-6 inline-block text-sm text-primary hover:text-primary-dark"
+        >
+          Request a new reset link
+        </a>
+      </div>
+    )
   }
 
   return (
