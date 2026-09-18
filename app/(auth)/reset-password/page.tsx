@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
 import type { EmailOtpType } from '@supabase/supabase-js'
-import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { resetPasswordSchema } from '@/lib/utils/validation'
 
@@ -36,9 +35,9 @@ function getFriendlyVerifyError(message: string): string {
 }
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const [verifyState, setVerifyState] = useState<VerifyState>('verifying')
   const [verifyError, setVerifyError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(false)
   const [serverError, setServerError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -96,7 +95,7 @@ export default function ResetPasswordPage() {
       setServerError(error.message)
       return
     }
-    router.push('/login?reset=1')
+    setResetSuccess(true)
   }
 
   if (verifyState === 'verifying') {
@@ -121,6 +120,26 @@ export default function ResetPasswordPage() {
           className="mt-6 inline-block text-sm text-primary hover:text-primary-dark"
         >
           Request a new reset link
+        </a>
+      </div>
+    )
+  }
+
+  if (resetSuccess) {
+    return (
+      <div className="text-center">
+        <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="text-green-500" size={22} />
+        </div>
+        <h1 className="text-xl font-bold text-slate-800 mb-2">Password updated</h1>
+        <p className="text-slate-500 text-sm">
+          Your password has been changed successfully. You can now sign in with your new password.
+        </p>
+        <a
+          href="/login"
+          className="mt-6 inline-block px-4 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold text-sm transition-colors"
+        >
+          Back to login
         </a>
       </div>
     )
